@@ -14,8 +14,10 @@ edge-native).
 
 ## Frontend
 
-**Vercel** — this is a standard Next.js App Router app, deploys directly
-from a GitHub repo with zero config.
+**Vercel**, connected to `github.com/CoderRahul01/qerin` (private) — a
+standard Next.js App Router app, deploys automatically on every push to
+`main`. The Vercel project's Root Directory is set to `apps/frontend`
+since this is a monorepo. Manual deploys still work the same way:
 
 ```bash
 npm install -g vercel
