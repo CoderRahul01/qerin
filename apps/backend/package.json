@@ -1,0 +1,28 @@
+{
+  "name": "qerin-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-org/account": "^2.5.8",
+    "@neondatabase/serverless": "^1.1.0",
+    "@x402/core": "^2.21.0",
+    "@x402/evm": "^2.21.0",
+    "@x402/fetch": "^2.21.0",
+    "@x402/hono": "^2.21.0",
+    "hono": "^4.6.0",
+    "jose": "^6.2.8",
+    "openai": "^7.3.0",
+    "viem": "^2.55.10"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.0.0"
+  }
+}

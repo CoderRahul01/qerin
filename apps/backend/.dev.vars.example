@@ -1,0 +1,33 @@
+# Local-dev secrets for `wrangler dev`. Copy to `.dev.vars` (gitignored) and
+# fill in real values — never commit `.dev.vars`. In production these are set
+# with `wrangler secret put <NAME>`, not committed anywhere.
+
+# EOA private key that pays real x402 sources on Base mainnet with real USDC.
+# Keep the balance small. Same key also receives developer payments to
+# /v1/paid/answer (payToConfig in src/index.ts uses this account's address).
+QERIN_WALLET_PRIVATE_KEY=0x...
+
+# CDP API key, used to authenticate with the CDP x402 facilitator on both the
+# buyer side (paying sources, via paidFetch.ts's facilitator sync) and the
+# seller side (accepting developer payments to /v1/paid/answer). Create at
+# https://portal.cdp.coinbase.com — no CDP_WALLET_SECRET needed since we pass
+# our own wallet address via payToConfig instead of provisioning a CDP wallet.
+CDP_API_KEY_ID=
+CDP_API_KEY_SECRET=
+
+# Free API key from https://build.nvidia.com (NVIDIA Developer Program, no
+# credit card) — used for answer synthesis via NVIDIA NIM.
+NVIDIA_API_KEY=
+
+# Shared secret that gates the free /v1/answer route (consumer app only).
+# Generate with `openssl rand -hex 32`. Must match QERIN_INTERNAL_SECRET set
+# on the frontend (apps/frontend), sent as the X-Qerin-Internal-Secret header.
+QERIN_INTERNAL_SECRET=
+
+# Deployed QerinReceiptRegistry contract address (apps/contracts). Optional —
+# leave unset to skip on-chain receipt logging entirely.
+QERIN_REGISTRY_ADDRESS=
+
+# Postgres connection string (Neon). Required — stores issued API keys and
+# per-request spend/usage records that back the daily spend cap.
+DATABASE_URL=

@@ -1,0 +1,23 @@
+name = "qerin-backend"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+# nodejs_compat_populate_process_env is on by default for dates >= 2025-04-01,
+# listed explicitly since every file here reads secrets via process.env
+# (lazily, at request time — see wallet.ts) rather than threading Hono's `c.env`.
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+
+# Non-secret defaults. Real values (and anything sensitive) are set with
+# `wrangler secret put <NAME>` instead — see apps/backend/.dev.vars.example
+# for the full list and 07-deployment.md for the deploy walkthrough.
+[vars]
+QERIN_NETWORK = "mainnet"
+QERIN_LLM_MODEL = "meta/llama-3.3-70b-instruct"
+
+# Free-tier rate limiting binding (Cloudflare Workers native), applied to
+# both /v1/answer and /v1/paid/answer in src/index.ts. 20 requests per
+# 60-second window per client IP.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
