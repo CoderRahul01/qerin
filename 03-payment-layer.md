@@ -185,6 +185,15 @@ JWT claims shape exactly but generates its nonce with the Workers-native
 payments settle straight into the same wallet address that pays sources
 (`QERIN_WALLET_PRIVATE_KEY`) — no separate receiving wallet.
 
+One easy mistake to make in the CDP Portal when setting up
+`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET`: new API keys default to the
+**Sandbox** environment, which looks visually identical to Production
+(same key format, same portal UI) but returns a generic `401
+Unauthorized` from every CDP endpoint, with no indication in the error
+that the key's environment is the problem. Check for a "Sandbox" badge
+next to the account name in the portal before assuming a 401 is a code
+bug.
+
 ## Consumers: prepaid balance, not a free ride
 
 `POST /v1/paid/answer` only covers developers, who bring their own
@@ -202,30 +211,42 @@ consumer now funds their own balance first:
    still only one wallet that actually holds and spends USDC, same as
    the buyer flow above. This mirrors how an exchange runs one hot
    wallet with an internal ledger.
-3. Funding goes through **Coinbase Onramp** (`apps/backend/src/onramp.ts`)
-   — buy USDC by card/bank, delivered straight to Qerin's existing
-   wallet, tagged with `partnerUserRef` = the account id so a completed
-   purchase can be attributed back to the right balance. Reuses the same
-   CDP JWT auth as the facilitator client above (`cdpAuth.ts`).
+3. Funding goes through **Razorpay** (`apps/backend/src/razorpay.ts`),
+   not crypto — a consumer pays by UPI/card/netbanking directly in an
+   embedded Razorpay Checkout modal (`apps/frontend/src/lib/razorpay.ts`),
+   no wallet, no exchange account, no crypto exposure at all. The
+   backend creates a Razorpay order (`POST /v1/account/topup`), the
+   frontend opens Checkout with it, and on success the frontend posts
+   the payment id + HMAC signature to `POST /v1/account/topup/confirm`,
+   which verifies the signature server-side
+   (`hmac_sha256(orderId + "|" + paymentId, RAZORPAY_KEY_SECRET)` must
+   match) before crediting anything — confirms synchronously in-browser,
+   no polling or webhook needed.
 4. `POST /v1/answer` debits `$0.15` (same price as the developer path,
    `ANSWER_PRICE_USD` in `spendGuard.ts`) from the balance before running
    the request, and refunds it if the request fails after the debit (no
    sources responded, spend cap hit) — same "no charge on failure"
    guarantee the free version always had.
 
-CDP's own Onramp docs describe more than one integration shape across
-different doc pages with inconsistent field names (a newer one-shot
-"create session" endpoint, versus an older two-step "session token then
-build the URL yourself" flow). `onramp.ts` uses the older flow
-specifically because attributing a shared-wallet deposit back to the
-right user's balance requires `partnerUserRef`, which is unambiguously
-documented there. Verified working end-to-end (`createOnrampSession`
-and `syncDeposits`) against a real CDP **Production** Secret API Key.
+**This replaced an earlier Coinbase Onramp integration**, which is why
+you may see references to it in older commits or CDP-related code
+(`cdpAuth.ts`, `cdpFacilitator.ts` — still used for the x402 facilitator
+above, unrelated to funding). Onramp technically worked end-to-end in
+testing, but Coinbase's own Onramp production application was rejected
+outright ("did not meet the specific requirements needed for compliance
+within our program") — not a config issue, a decisive no. The India
+bank-account restriction hit during testing
+("sending crypto is disabled because you've linked an INR bank account")
+was a symptom of the same underlying mismatch: Onramp assumes the payer
+has and uses a personal Coinbase account, which doesn't fit a
+non-crypto-native retail audience. Razorpay removes that dependency
+entirely — consumers never touch crypto.
 
-One easy mistake to make in the CDP Portal: new API keys default to the
-**Sandbox** environment, which looks visually identical to Production
-(same key format, same portal UI) but returns a generic `401
-Unauthorized` from every CDP endpoint — x402 facilitator calls included,
-not just Onramp — with no indication in the error that the key's
-environment is the problem. Check for a "Sandbox" badge next to the
-account name in the portal before assuming a 401 is a code bug.
+**Qerin's operational wallet still needs real USDC to pay sources.**
+That's now entirely decoupled from consumer payments: Razorpay revenue
+settles to Qerin's own bank account, and the business periodically
+converts some of it to USDC and moves it into
+`QERIN_WALLET_PRIVATE_KEY`'s address through its own means. This is a
+manual, ongoing operational step — not automated, not something any
+code in this repo does — same spirit as the wallet funding guidance in
+`08-security-and-limits.md`.

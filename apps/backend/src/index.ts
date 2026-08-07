@@ -10,7 +10,7 @@ import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
-import { createOnrampSession, syncDeposits } from "./onramp.js";
+import { createTopupOrder, verifyAndCreditPayment } from "./razorpay.js";
 import { ANSWER_PRICE_USD } from "./spendGuard.js";
 
 interface Bindings {
@@ -84,12 +84,6 @@ app.get("/v1/account/balance", async (c) => {
   const accountId = c.req.header("x-qerin-account-id");
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
-  // Reconcile any Onramp top-ups that completed since the last check — no
-  // webhook needed, the frontend polls this while a top-up tab is open.
-  // A sync failure (CDP unreachable, bad credentials) must never hide the
-  // caller's actual balance — log it and fall back to the last-known value.
-  await syncDeposits(accountId).catch((err) => console.error("syncDeposits failed (non-fatal):", err));
-
   try {
     const balance = await getBalance(accountId);
     if (balance === null) return c.json({ error: "Unknown account" }, 404);
@@ -100,6 +94,10 @@ app.get("/v1/account/balance", async (c) => {
   }
 });
 
+// Creates a Razorpay order for a top-up. The frontend opens Razorpay's
+// embedded Checkout with these details and confirms via
+// POST /v1/account/topup/confirm once the user completes payment —
+// no redirect, no polling, confirms synchronously in-browser.
 app.post("/v1/account/topup", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
 
@@ -113,11 +111,44 @@ app.post("/v1/account/topup", async (c) => {
   }
 
   try {
-    const url = await createOnrampSession(accountId, amountUsd);
-    return c.json({ url });
+    const order = await createTopupOrder(accountId, amountUsd);
+    return c.json(order);
   } catch (err) {
     console.error(err);
     return c.json({ error: "Could not start top-up" }, 500);
+  }
+});
+
+// Verifies Razorpay's payment signature and credits the balance — must
+// never credit anything before the signature check passes.
+app.post("/v1/account/topup/confirm", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+
+  const accountId = c.req.header("x-qerin-account-id");
+  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+
+  const body = await c.req.json().catch(() => ({}));
+  const { orderId, paymentId, signature } = body ?? {};
+  const amountUsd = Number(body?.amountUsd);
+  if (
+    typeof orderId !== "string" ||
+    typeof paymentId !== "string" ||
+    typeof signature !== "string" ||
+    !Number.isFinite(amountUsd) ||
+    amountUsd <= 0
+  ) {
+    return c.json({ error: "orderId, paymentId, signature, and amountUsd are required" }, 400);
+  }
+
+  try {
+    const result = await verifyAndCreditPayment(accountId, orderId, paymentId, signature, amountUsd);
+    if (!result.verified) {
+      return c.json({ error: "Payment signature could not be verified" }, 400);
+    }
+    return c.json({ balance: result.balance });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal error" }, 500);
   }
 });
 

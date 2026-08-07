@@ -19,9 +19,10 @@ CDP_API_KEY_SECRET=
 # credit card) — used for answer synthesis via NVIDIA NIM.
 NVIDIA_API_KEY=
 
-# Shared secret that gates the free /v1/answer route (consumer app only).
-# Generate with `openssl rand -hex 32`. Must match QERIN_INTERNAL_SECRET set
-# on the frontend (apps/frontend), sent as the X-Qerin-Internal-Secret header.
+# Shared secret that gates the consumer /v1/answer and /v1/account* routes
+# (balance-gated, not free — see accounts.ts). Generate with
+# `openssl rand -hex 32`. Must match QERIN_INTERNAL_SECRET set on the
+# frontend (apps/frontend), sent as the X-Qerin-Internal-Secret header.
 QERIN_INTERNAL_SECRET=
 
 # Deployed QerinReceiptRegistry contract address (apps/contracts). Optional —
@@ -29,5 +30,12 @@ QERIN_INTERNAL_SECRET=
 QERIN_REGISTRY_ADDRESS=
 
 # Postgres connection string (Neon). Required — stores issued API keys and
-# per-request spend/usage records that back the daily spend cap.
+# per-request spend/usage records that back the daily spend cap, plus
+# consumer accounts/balances/deposits (accounts.ts).
 DATABASE_URL=
+
+# Razorpay API key, used for consumer balance top-ups (razorpay.ts) — UPI,
+# cards, netbanking. Create at https://dashboard.razorpay.com/app/keys.
+# Use test-mode keys for local dev, live-mode keys in production.
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=

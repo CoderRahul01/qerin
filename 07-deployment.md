@@ -61,12 +61,14 @@ each one is used for):
 
 ```bash
 npx wrangler secret put QERIN_WALLET_PRIVATE_KEY   # mainnet key, small balance only
-npx wrangler secret put CDP_API_KEY_ID              # CDP facilitator auth (buyer + seller side)
+npx wrangler secret put CDP_API_KEY_ID              # CDP facilitator auth (x402 buyer + seller side only)
 npx wrangler secret put CDP_API_KEY_SECRET
 npx wrangler secret put NVIDIA_API_KEY
 npx wrangler secret put QERIN_INTERNAL_SECRET        # `openssl rand -hex 32`; must match the frontend's copy
 npx wrangler secret put QERIN_REGISTRY_ADDRESS       # once the registry contract is deployed
 npx wrangler secret put DATABASE_URL                 # Neon Postgres connection string
+npx wrangler secret put RAZORPAY_KEY_ID              # consumer top-ups — from the Razorpay dashboard
+npx wrangler secret put RAZORPAY_KEY_SECRET
 ```
 
 `QERIN_NETWORK` and `QERIN_LLM_MODEL` are non-secret and already set as
@@ -138,8 +140,12 @@ Workers-native `crypto.getRandomValues` directly.
 - [ ] `QERIN_INTERNAL_SECRET` set identically on both the backend (Worker
       secret) and the frontend (Vercel env var) — the consumer app's
       `/v1/answer` calls fail closed (403) if these don't match
-- [ ] `DATABASE_URL` pointed at the live Neon project, `api_keys` /
-      `answer_requests` tables present
+- [ ] `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` set as Worker secrets —
+      required for consumer top-ups (`POST /v1/account/topup` and
+      `/topup/confirm`); use live-mode keys, not test-mode, before
+      accepting real payments
+- [ ] `DATABASE_URL` pointed at the live Neon project, `users` /
+      `deposits` / `answer_requests` tables present
 - [ ] `QerinReceiptRegistry` deployed and verified on Basescan,
       `QERIN_REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` set
 - [ ] Confirm each real x402 source endpoint (CryptoSlate, Superhighway,
@@ -150,6 +156,12 @@ Workers-native `crypto.getRandomValues` directly.
 - [ ] Pay `/v1/paid/answer` once for real with a funded test wallet
       (`@x402/fetch` + a small amount of USDC) and confirm the payment
       settles and the answer/receipt come back
+- [ ] Complete one real top-up on `/v1/account/topup` +
+      `/topup/confirm` through the live frontend and confirm the balance
+      credits correctly
+- [ ] Qerin's operational wallet has enough real USDC to cover expected
+      source-payment volume — this is funded manually from Razorpay
+      revenue, not automatically; see `03-payment-layer.md`
 - [ ] Frontend deployed and pointed at the real backend URL, not
       `localhost`
 - [ ] Base Build dashboard: production domain registered, `base:app_id`

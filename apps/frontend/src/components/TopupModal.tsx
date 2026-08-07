@@ -22,6 +22,9 @@ export function TopupModal({
     try {
       await onTopup(amountUsd);
     } catch (err) {
+      // The user closing the Razorpay modal without paying isn't an error
+      // worth surfacing — just let them try again.
+      if (err instanceof Error && err.message === "dismissed") return;
       setError(err instanceof Error ? err.message : "Could not start top-up. Try again.");
     } finally {
       setLoadingAmount(null);
@@ -82,8 +85,8 @@ export function TopupModal({
         </div>
         {error && <div style={{ marginTop: 12, fontSize: 13, color: "#B23B3B" }}>{error}</div>}
         <div style={{ marginTop: 16, fontSize: 12, color: "#6B6E76" }}>
-          Opens Coinbase's hosted checkout in a new tab. Your balance updates automatically once
-          the purchase completes.
+          Pay by UPI, card, or netbanking — your balance updates immediately once payment
+          completes.
         </div>
         <button
           onClick={onClose}
