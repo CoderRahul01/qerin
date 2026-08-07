@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+*.pem
+.env
+.env.*
+!.env.example
+.vercel
+.wrangler
+dist
+.next
+out
+apps/contracts/lib
+apps/contracts/broadcast/**/dry-run
