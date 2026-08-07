@@ -9,7 +9,8 @@ import { DeveloperScreen } from "./screens/DeveloperScreen";
 import { TopupModal } from "./TopupModal";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
-import { getOrCreateAccountId, fetchBalance, requestTopup } from "@/lib/account";
+import { getOrCreateAccountId, fetchBalance, requestTopup, confirmTopup } from "@/lib/account";
+import { openRazorpayCheckout } from "@/lib/razorpay";
 import type { AnswerData, PaySource, Screen } from "@/lib/types";
 
 const ANSWER_PRICE_USD = 0.15;
@@ -32,7 +33,6 @@ export function QerinApp() {
   const animationDone = useRef(false);
   const responseData = useRef<AnswerData | null>(null);
   const responseFailed = useRef(false);
-  const balancePoll = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshBalance = async (id: string) => {
     try {
@@ -54,7 +54,6 @@ export function QerinApp() {
 
     return () => {
       timers.current.forEach(clearTimeout);
-      if (balancePoll.current) clearInterval(balancePoll.current);
     };
   }, []);
 
@@ -167,22 +166,21 @@ export function QerinApp() {
 
   const onTopup = async (amountUsd: number) => {
     if (!accountId) return;
-    const url = await requestTopup(accountId, amountUsd);
-    window.open(url, "_blank", "noopener,noreferrer");
-
-    // No webhook wired up client-side — poll while the checkout tab is
-    // likely open. GET /v1/account/balance itself reconciles completed
-    // Onramp purchases server-side on every call (see onramp.ts's
-    // syncDeposits), so this just needs to keep asking.
-    if (balancePoll.current) clearInterval(balancePoll.current);
-    let ticks = 0;
-    balancePoll.current = setInterval(async () => {
-      ticks += 1;
-      const b = await refreshBalance(accountId);
-      if ((b !== null && b >= ANSWER_PRICE_USD) || ticks > 40) {
-        if (balancePoll.current) clearInterval(balancePoll.current);
-      }
-    }, 4000);
+    const order = await requestTopup(accountId, amountUsd);
+    const payment = await openRazorpayCheckout({
+      keyId: order.keyId,
+      amountPaise: order.amountPaise,
+      orderId: order.orderId,
+    });
+    const newBalance = await confirmTopup(
+      accountId,
+      payment.razorpay_order_id,
+      payment.razorpay_payment_id,
+      payment.razorpay_signature,
+      amountUsd
+    );
+    setBalance(newBalance);
+    setShowTopup(false);
   };
 
   const receiptLines: ReceiptLine[] =

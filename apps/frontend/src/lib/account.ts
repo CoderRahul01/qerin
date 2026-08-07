@@ -33,15 +33,41 @@ export async function fetchBalance(accountId: string): Promise<number> {
   return json.balance as number;
 }
 
-export async function requestTopup(accountId: string, amountUsd: number): Promise<string> {
+export interface TopupOrder {
+  orderId: string;
+  amountPaise: number;
+  keyId: string;
+  amountUsd: number;
+}
+
+export async function requestTopup(accountId: string, amountUsd: number): Promise<TopupOrder> {
   const res = await fetch("/api/account/topup", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
     body: JSON.stringify({ amountUsd }),
   });
   const json = await res.json();
-  if (!res.ok || !json.url) {
+  if (!res.ok || !json.orderId) {
     throw new Error(json?.error || "Could not start top-up");
   }
-  return json.url as string;
+  return json as TopupOrder;
+}
+
+export async function confirmTopup(
+  accountId: string,
+  orderId: string,
+  paymentId: string,
+  signature: string,
+  amountUsd: number
+): Promise<number> {
+  const res = await fetch("/api/account/topup/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
+    body: JSON.stringify({ orderId, paymentId, signature, amountUsd }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error || "Could not confirm top-up");
+  }
+  return json.balance as number;
 }
