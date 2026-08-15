@@ -3,11 +3,6 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
   height: 100%;
-  /* The app manages its own internal scrolling per-screen (see
-     .qerin-phone-frame and each screen's own overflowY) — the outer page
-     must never scroll itself, or mobile browsers show the whole layout
-     sliding up and down instead of a fixed, app-like frame. */
-  overflow-y: hidden;
 }
 
 body {
@@ -90,5 +85,59 @@ a:hover {
 @keyframes qerin-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Content is never hidden by this — only offset — so a slow paint, a
+   crawler/screenshot tool, or JS-disabled fallback never leaves sections
+   invisible. Pure transform animation, no opacity. */
+@keyframes qerin-fade-up {
+  from {
+    transform: translateY(14px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.qerin-fade-up {
+  animation: qerin-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qerin-fade-up {
+    animation: none;
+  }
+}
+
+/* Animated gradient border ("boundary animation") — a slow-moving sheen
+   around the waitlist card. The gradient lives on the outer wrapper and
+   shows only through a 1px padding gap; the inner card sits on top with
+   its own solid background. */
+@keyframes qerin-border-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.qerin-glow-border {
+  position: relative;
+  border-radius: 17px;
+  padding: 1px;
+  background: linear-gradient(115deg, #0000ff, #b3b3ff, #12141a, #0000ff, #b3b3ff);
+  background-size: 300% 300%;
+  animation: qerin-border-flow 7s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qerin-glow-border {
+    animation: none;
+    background: #0000ff;
   }
 }
