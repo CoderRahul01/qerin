@@ -158,7 +158,8 @@ Current live source list (found via the CDP x402 Bazaar discovery API,
 `GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources`,
 which lists every resource currently registered with the CDP facilitator
 along with real usage counts): CryptoSlate, Superhighway, Veles Finance
-Agent, Tavily Search, Otto AI Crypto News, Otto AI TradFi Data. See
+Agent, Tavily Search, Otto AI Crypto News, Otto AI TradFi Data, CoinGecko
+Onchain Search, CoinMarketCap DEX Search, Messari Signal. See
 `apps/backend/src/sources.ts` for the current definitive list and
 `apps/backend/src/selectSources.ts` for the routing rules.
 

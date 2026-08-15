@@ -144,8 +144,12 @@ Workers-native `crypto.getRandomValues` directly.
       required for consumer top-ups (`POST /v1/account/topup` and
       `/topup/confirm`); use live-mode keys, not test-mode, before
       accepting real payments
-- [ ] `DATABASE_URL` pointed at the live Neon project, `users` /
-      `deposits` / `answer_requests` tables present
+- [ ] `DATABASE_URL` pointed at the live Neon project, with
+      `apps/backend/migrations/*.sql` applied in order (`users` /
+      `deposits` / `answer_requests` / `api_keys` / `waitlist_signups`
+      tables present) — these were previously created by hand on Neon and
+      are now committed migrations; run them against any new environment
+      (e.g. `psql "$DATABASE_URL" -f apps/backend/migrations/001_init.sql`)
 - [ ] `QerinReceiptRegistry` deployed and verified on Basescan,
       `QERIN_REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` set
 - [ ] Confirm each real x402 source endpoint (CryptoSlate, Superhighway,

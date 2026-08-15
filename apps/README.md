@@ -34,8 +34,14 @@ response (`bazaar` extension — no guessing):
 | CryptoSlate | `POST library.proofivy.com/cryptoslate` | $0.01 | Needs a specific article URL (`content_url`), not a free-text query — no paid search exists. We use CryptoSlate's free public RSS feed to find the most relevant recent article for the question, then pay to unlock its full content. |
 | Superhighway | `GET superhighway.walls.sh/search?q=` | $0.001 | Free-text web search. |
 | Veles Finance Agent | `POST veles-finance-gateway.fly.dev/ask` | $0.02 | Free-text financial question (`message` field), answered by their own model. |
+| Tavily Search | `POST x402.tavily.com/search` | $0.01 | Free-text web search, general-purpose fallback. |
+| Otto AI Crypto News | `GET x402.ottoai.services/crypto-news` | $0.001 | Crypto news feed, no query param. |
+| Otto AI TradFi Data | `GET x402.ottoai.services/tradfi-data?symbol=` | $0.003 | Needs a ticker symbol extracted from the question. |
+| CoinGecko Onchain Search | `GET pro-api.coingecko.com/api/v3/x402/onchain/search/pools?query=` | $0.01 | Free-text DEX pool/token search by name, symbol, or contract address. |
+| CoinMarketCap DEX Search | `GET pro-api.coinmarketcap.com/x402/v1/dex/search?q=` | $0.01 | Free-text DEX token search. |
+| Messari Signal | `GET api.messari.io/signal/v1/assets?search=` | $0.55 | Crypto asset mindshare rankings with sentiment/momentum context — free-text search. |
 
-All three run on **Base mainnet only** — there is no testnet version of any of them.
+All run on **Base mainnet only** — there is no testnet version of any of them.
 
 **Payment proof:** `scripts/test-seller.ts` is a minimal local x402-protected resource (not part of
 the shipped product — Qerin is a buyer only) used to prove the buyer-side payment code fires a real,

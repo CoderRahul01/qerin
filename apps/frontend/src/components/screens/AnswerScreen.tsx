@@ -52,6 +52,13 @@ export function AnswerScreen({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setExpanded((e) => ({ ...e, [name]: !e[name] }));
 
+  const cardUrl = `/api/card?${new URLSearchParams({
+    question,
+    answer,
+    sourceCount: String(receiptLines.length),
+    total: totalLabel.replace(/^\$/, ""),
+  }).toString()}`;
+
   const onDownload = () => {
     const payload = {
       question,
@@ -90,22 +97,38 @@ export function AnswerScreen({
       <div style={{ padding: "24px 24px 0" }}>
         <div style={{ fontWeight: 500, fontSize: 14, color: "#6B6E76" }}>{question}</div>
         <div style={{ marginTop: 16, fontSize: 17, lineHeight: 1.5, color: "#12141A" }}>{answer}</div>
-        <button
-          onClick={onDownload}
-          style={{
-            marginTop: 16,
-            background: "none",
-            border: "none",
-            padding: 0,
-            fontSize: 13,
-            fontWeight: 500,
-            color: "#0000FF",
-            cursor: "pointer",
-            fontFamily: "var(--font-inter), sans-serif",
-          }}
-        >
-          Download full sources ↓
-        </button>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <button
+            onClick={onDownload}
+            style={{
+              marginTop: 16,
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#0000FF",
+              cursor: "pointer",
+              fontFamily: "var(--font-inter), sans-serif",
+            }}
+          >
+            Download full sources ↓
+          </button>
+          <a
+            href={cardUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              marginTop: 16,
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#0000FF",
+              fontFamily: "var(--font-inter), sans-serif",
+            }}
+          >
+            Share as card ↗
+          </a>
+        </div>
       </div>
       <div style={{ margin: "32px 24px 0" }}>
         <div style={{ position: "relative" }}>

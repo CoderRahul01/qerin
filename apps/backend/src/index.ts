@@ -12,6 +12,7 @@ import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
 import { createTopupOrder, verifyAndCreditPayment } from "./razorpay.js";
 import { ANSWER_PRICE_USD } from "./spendGuard.js";
+import { isValidEmail, joinWaitlist } from "./waitlist.js";
 
 interface Bindings {
   RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> };
@@ -35,6 +36,7 @@ async function rateLimit(c: { req: { header: (name: string) => string | undefine
 app.use("/v1/keys", rateLimit);
 app.use("/v1/answer", rateLimit);
 app.use("/v1/account/*", rateLimit);
+app.use("/v1/waitlist", rateLimit);
 
 // Issuing a key is free and unauthenticated (matches the DeveloperScreen
 // "Get API access" button) — it identifies a developer for future
@@ -194,6 +196,24 @@ app.post("/v1/answer", async (c) => {
   } catch (err) {
     console.error(err);
     await creditBalance(accountId, ANSWER_PRICE_USD).catch(() => {});
+    return c.json({ error: "Internal error" }, 500);
+  }
+});
+
+// Public marketing signup — no internal-secret gate (reachable directly from
+// the homepage, not just Qerin's app frontend), rate-limited to deter spam.
+app.post("/v1/waitlist", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const email = body?.email;
+  if (!isValidEmail(email)) {
+    return c.json({ error: "A valid email is required" }, 400);
+  }
+
+  try {
+    const { joined } = await joinWaitlist(email);
+    return c.json({ joined });
+  } catch (err) {
+    console.error(err);
     return c.json({ error: "Internal error" }, 500);
   }
 });
