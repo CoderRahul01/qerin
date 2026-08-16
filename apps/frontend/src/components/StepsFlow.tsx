@@ -1,54 +1,14 @@
-const steps = [
-  {
-    title: "Ask a question",
-    body: "Anything about crypto, markets, or research — Qerin never answers from memory.",
-    icon: (
-      <path
-        d="M8 8.5c0-2.2 1.8-4 4-4s4 1.8 4 4c0 1.6-1 2.4-2 3.1-.8.6-1.5 1.1-1.5 2.2M12 18.2v.1"
-        stroke="#0000FF"
-        strokeWidth="1.8"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
-  },
-  {
-    title: "Qerin pays for sources",
-    body: "An agent picks the right paid research platforms and pays each one in USDC on Base, live.",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="7" stroke="#0000FF" strokeWidth="1.8" fill="none" />
-        <path
-          d="M9.6 14.3c.4.7 1.2 1.1 2.1 1.1 1.3 0 2.3-.7 2.3-1.7 0-1-1-1.4-2.3-1.7-1.3-.3-2.3-.7-2.3-1.7 0-1 1-1.7 2.3-1.7.9 0 1.7.4 2.1 1.1"
-          stroke="#0000FF"
-          strokeWidth="1.6"
-          fill="none"
-          strokeLinecap="round"
-        />
-        <path d="M12 7.6v1M12 15.4v1" stroke="#0000FF" strokeWidth="1.6" strokeLinecap="round" />
-      </>
-    ),
-  },
-  {
-    title: "Get a verified answer",
-    body: "A synthesized answer with every source, price, and on-chain receipt — nothing hidden.",
-    icon: (
-      <path
-        d="M7 12.5l3.3 3.3L17.5 8.4"
-        stroke="#0000FF"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
-  },
-];
+import type { ReactNode } from "react";
 
-export function StepsFlow() {
+export interface FlowStep {
+  title: string;
+  body: string;
+  icon: ReactNode;
+}
+
+export function StepsFlow({ steps, label }: { steps: FlowStep[]; label: string }) {
   return (
-    <div className="qerin-flow" role="list" aria-label="How Qerin works">
+    <div className="qerin-flow" role="list" aria-label={label}>
       {steps.map((step, i) => {
         const hasNext = i < steps.length - 1;
         return (
