@@ -7,14 +7,19 @@ const AMOUNTS = [5, 10, 20];
 export function TopupModal({
   onClose,
   onTopup,
+  onTopupCrypto,
   reason,
 }: {
   onClose: () => void;
   onTopup: (amountUsd: number) => Promise<void>;
+  onTopupCrypto: (amountUsd: number) => Promise<void>;
   reason?: string | null;
 }) {
   const [loadingAmount, setLoadingAmount] = useState<number | null>(null);
+  const [cryptoLoadingAmount, setCryptoLoadingAmount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const busy = loadingAmount !== null || cryptoLoadingAmount !== null;
 
   const onPick = async (amountUsd: number) => {
     setLoadingAmount(amountUsd);
@@ -28,6 +33,18 @@ export function TopupModal({
       setError(err instanceof Error ? err.message : "Could not start top-up. Try again.");
     } finally {
       setLoadingAmount(null);
+    }
+  };
+
+  const onPickCrypto = async (amountUsd: number) => {
+    setCryptoLoadingAmount(amountUsd);
+    setError(null);
+    try {
+      await onTopupCrypto(amountUsd);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not complete the USDC top-up. Try again.");
+    } finally {
+      setCryptoLoadingAmount(null);
     }
   };
 
@@ -63,7 +80,7 @@ export function TopupModal({
             <button
               key={amountUsd}
               onClick={() => onPick(amountUsd)}
-              disabled={loadingAmount !== null}
+              disabled={busy}
               className="qerin-pill-btn"
               style={{
                 flex: 1,
@@ -74,7 +91,7 @@ export function TopupModal({
                 fontWeight: 600,
                 fontSize: 16,
                 color: "#F7F5F0",
-                cursor: loadingAmount !== null ? "default" : "pointer",
+                cursor: busy ? "default" : "pointer",
                 opacity: loadingAmount !== null && loadingAmount !== amountUsd ? 0.5 : 1,
                 fontFamily: "var(--font-inter), sans-serif",
               }}
@@ -83,11 +100,44 @@ export function TopupModal({
             </button>
           ))}
         </div>
-        {error && <div style={{ marginTop: 12, fontSize: 13, color: "#B23B3B" }}>{error}</div>}
-        <div style={{ marginTop: 16, fontSize: 12, color: "#6B6E76" }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: "#6B6E76" }}>
           Pay by UPI, card, or netbanking — your balance updates immediately once payment
           completes.
         </div>
+
+        <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid #D8D5CC" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#12141A" }}>Or pay directly with USDC</div>
+          <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+            {AMOUNTS.map((amountUsd) => (
+              <button
+                key={amountUsd}
+                onClick={() => onPickCrypto(amountUsd)}
+                disabled={busy}
+                className="qerin-pill-btn"
+                style={{
+                  flex: 1,
+                  height: 52,
+                  background: "transparent",
+                  border: "1px solid #12141A",
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: 16,
+                  color: "#12141A",
+                  cursor: busy ? "default" : "pointer",
+                  opacity: cryptoLoadingAmount !== null && cryptoLoadingAmount !== amountUsd ? 0.5 : 1,
+                  fontFamily: "var(--font-inter), sans-serif",
+                }}
+              >
+                {cryptoLoadingAmount === amountUsd ? "…" : `$${amountUsd}`}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "#6B6E76" }}>
+            Connect a wallet and send USDC on Base — your balance updates as soon as the
+            transaction confirms on-chain.
+          </div>
+        </div>
+        {error && <div style={{ marginTop: 12, fontSize: 13, color: "#B23B3B" }}>{error}</div>}
         <button
           onClick={onClose}
           style={{

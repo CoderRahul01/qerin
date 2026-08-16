@@ -71,3 +71,20 @@ export async function confirmTopup(
   }
   return json.balance as number;
 }
+
+export async function confirmCryptoTopup(
+  accountId: string,
+  txHash: string,
+  signature: string
+): Promise<number> {
+  const res = await fetch("/api/account/topup/crypto-confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
+    body: JSON.stringify({ txHash, signature }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error || "Could not confirm top-up");
+  }
+  return json.balance as number;
+}

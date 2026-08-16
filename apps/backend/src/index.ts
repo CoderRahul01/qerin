@@ -13,6 +13,7 @@ import { createAccount, getBalance, debitBalance, creditBalance } from "./accoun
 import { createTopupOrder, verifyAndCreditPayment } from "./razorpay.js";
 import { ANSWER_PRICE_USD } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
+import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
 
 interface Bindings {
   RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> };
@@ -146,6 +147,51 @@ app.post("/v1/account/topup/confirm", async (c) => {
     const result = await verifyAndCreditPayment(accountId, orderId, paymentId, signature, amountUsd);
     if (!result.verified) {
       return c.json({ error: "Payment signature could not be verified" }, 400);
+    }
+    return c.json({ balance: result.balance });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal error" }, 500);
+  }
+});
+
+// Public — everything here (Qerin's wallet address, the chain, the USDC
+// contract) is already visible on-chain to anyone; there's nothing to gate.
+// Lets the frontend build the USDC transfer without hardcoding addresses
+// in two places.
+app.get("/v1/network-info", (c) => {
+  const network = getNetwork();
+  return c.json({
+    payTo: getQerinAccount().address,
+    chainId: network.caip2.split(":")[1],
+    usdc: network.usdc,
+  });
+});
+
+// Direct on-chain top-up: the consumer sends USDC to Qerin's wallet with
+// their own wallet and this just verifies + credits it — see
+// cryptoTopup.ts for why the message signature is required alongside the
+// tx hash.
+app.post("/v1/account/topup/crypto-confirm", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+
+  const accountId = c.req.header("x-qerin-account-id");
+  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+
+  const body = await c.req.json().catch(() => ({}));
+  const { txHash, signature } = body ?? {};
+  if (typeof txHash !== "string" || typeof signature !== "string") {
+    return c.json({ error: "txHash and signature are required" }, 400);
+  }
+
+  try {
+    const result = await verifyAndCreditCryptoDeposit(
+      accountId,
+      txHash as `0x${string}`,
+      signature as `0x${string}`
+    );
+    if (!result.verified) {
+      return c.json({ error: result.reason ?? "Could not verify this transaction" }, 400);
     }
     return c.json({ balance: result.balance });
   } catch (err) {

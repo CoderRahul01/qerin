@@ -9,8 +9,9 @@ import { DeveloperScreen } from "./screens/DeveloperScreen";
 import { TopupModal } from "./TopupModal";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
-import { getOrCreateAccountId, fetchBalance, requestTopup, confirmTopup } from "@/lib/account";
+import { getOrCreateAccountId, fetchBalance, requestTopup, confirmTopup, confirmCryptoTopup } from "@/lib/account";
 import { openRazorpayCheckout } from "@/lib/razorpay";
+import { sendUsdcTopup } from "@/lib/cryptoTopup";
 import type { AnswerData, PaySource, Screen } from "@/lib/types";
 
 const ANSWER_PRICE_USD = 0.15;
@@ -183,6 +184,14 @@ export function QerinApp() {
     setShowTopup(false);
   };
 
+  const onTopupCrypto = async (amountUsd: number) => {
+    if (!accountId) return;
+    const { txHash, signature } = await sendUsdcTopup(accountId, amountUsd);
+    const newBalance = await confirmCryptoTopup(accountId, txHash, signature);
+    setBalance(newBalance);
+    setShowTopup(false);
+  };
+
   const receiptLines: ReceiptLine[] =
     displayData?.receipt.map((r) => ({
       name: r.source,
@@ -218,7 +227,12 @@ export function QerinApp() {
       )}
       {screen === "developer" && <DeveloperScreen onGoHome={onGoHome} />}
       {showTopup && (
-        <TopupModal reason={topupReason} onClose={() => setShowTopup(false)} onTopup={onTopup} />
+        <TopupModal
+          reason={topupReason}
+          onClose={() => setShowTopup(false)}
+          onTopup={onTopup}
+          onTopupCrypto={onTopupCrypto}
+        />
       )}
     </PhoneFrame>
   );
