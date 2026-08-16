@@ -1,20 +1,7 @@
 import { LogoRow } from "@/components/StatusBar";
 import { WaitlistForm } from "@/components/WaitlistForm";
-
-const steps = [
-  {
-    title: "Ask a question",
-    body: "Anything about crypto, markets, or research — Qerin never answers from memory.",
-  },
-  {
-    title: "Qerin pays for sources",
-    body: "An agent picks the right paid research platforms and pays each one in USDC on Base, live.",
-  },
-  {
-    title: "Get a verified answer",
-    body: "A synthesized answer with every source, price, and on-chain receipt — nothing hidden.",
-  },
-];
+import { StepsFlow } from "@/components/StepsFlow";
+import { SocialUpdates } from "@/components/SocialUpdates";
 
 export default function Home() {
   return (
@@ -81,38 +68,14 @@ export default function Home() {
 
         <section
           className="qerin-fade-up"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 20,
-            padding: "clamp(12px, 2.5vw, 20px) 0",
-            borderTop: "1px solid #D8D5CC",
-            animationDelay: "90ms",
-          }}
+          style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid #D8D5CC", animationDelay: "90ms" }}
         >
-          {steps.map((step, i) => (
-            <div key={step.title}>
-              <div
-                style={{
-                  fontFamily: "var(--font-ibm-plex-mono), monospace",
-                  fontSize: 12,
-                  color: "#0000FF",
-                  fontWeight: 700,
-                }}
-              >
-                {String(i + 1).padStart(2, "0")}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 16, fontWeight: 600, color: "#12141A" }}>
-                {step.title}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5, color: "#6B6E76" }}>
-                {step.body}
-              </div>
-            </div>
-          ))}
+          <StepsFlow />
         </section>
 
-        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(8px, 2vw, 16px)", animationDelay: "170ms" }}>
+        <SocialUpdates />
+
+        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(8px, 2vw, 16px)", animationDelay: "260ms" }}>
           <section
             id="waitlist"
             style={{

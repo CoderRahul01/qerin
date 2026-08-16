@@ -65,7 +65,7 @@ a:hover {
 }
 
 .qerin-pill-btn {
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .qerin-pill-btn:hover {
@@ -149,5 +149,158 @@ a:hover {
   .qerin-glow-border {
     animation: none;
     background: #0000ff;
+  }
+}
+
+/* Ask → Pay → Answer flow. One responsive structure: on mobile each item
+   is a row (icon column + text beside it) and the connector is the
+   vertical fill between an icon and the next; past 720px each item
+   becomes a column (icon+connector row on top, text below) and the same
+   connector element becomes horizontal instead — same DOM, CSS alone
+   flips the orientation, so it never falls out of sync with the layout. */
+.qerin-flow {
+  display: flex;
+  flex-direction: column;
+}
+
+.qerin-flow-item {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding-bottom: 22px;
+}
+
+.qerin-flow-item-last {
+  padding-bottom: 0;
+}
+
+.qerin-flow-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.qerin-flow-node-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1px solid #d8d5cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qerin-flow-connector {
+  position: relative;
+  flex: 1;
+  min-height: 20px;
+  width: 2px;
+  margin-top: 2px;
+}
+
+.qerin-flow-connector-line {
+  position: absolute;
+  inset: 0;
+  background: #d8d5cc;
+}
+
+.qerin-flow-dot {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #0000ff;
+  transform: translateX(-50%);
+  animation: qerin-flow-dot-v 2.4s linear infinite;
+}
+
+@keyframes qerin-flow-dot-v {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes qerin-flow-dot-h {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+@media (min-width: 720px) {
+  .qerin-flow {
+    flex-direction: row;
+  }
+
+  .qerin-flow-item {
+    flex-direction: column;
+    flex: 1;
+    gap: 0;
+    padding-bottom: 0;
+    padding-right: 22px;
+  }
+
+  .qerin-flow-item-last {
+    padding-right: 0;
+  }
+
+  .qerin-flow-icon-wrap {
+    flex-direction: row;
+    width: 100%;
+  }
+
+  .qerin-flow-connector {
+    height: 2px;
+    width: auto;
+    min-height: 0;
+    min-width: 20px;
+    margin-top: 0;
+    margin-left: 2px;
+  }
+
+  .qerin-flow-dot {
+    left: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    animation-name: qerin-flow-dot-h;
+  }
+
+  .qerin-flow-node-body {
+    margin-top: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qerin-flow-dot {
+    animation: none;
+    opacity: 1;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 }
