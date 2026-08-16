@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { LogoRow } from "@/components/StatusBar";
 import { WaitlistForm } from "@/components/WaitlistForm";
 
@@ -26,19 +25,15 @@ export default function Home() {
 
       <main
         style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
           width: "100%",
           maxWidth: 960,
           margin: "0 auto",
-          padding: "8px 24px",
+          padding: "0 24px 32px",
         }}
       >
         <section
           className="qerin-fade-up"
-          style={{ padding: "clamp(12px, 3vw, 28px) 0 clamp(16px, 3vw, 28px)", animationDelay: "0ms" }}
+          style={{ padding: "clamp(4px, 1.5vw, 12px) 0 clamp(12px, 2.5vw, 20px)", animationDelay: "0ms" }}
         >
           <h1
             style={{
@@ -66,25 +61,21 @@ export default function Home() {
             language model. Qerin's own wallet pays each source in USDC on Base, with a public
             receipt for every payment.
           </p>
-          <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
-            <Link
-              href="/app"
+          <div style={{ marginTop: 20 }}>
+            <a
+              href="#waitlist"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                height: 48,
-                padding: "0 24px",
-                borderRadius: 8,
-                background: "#0000FF",
-                color: "#FFFFFF",
-                fontWeight: 600,
+                gap: 6,
                 fontSize: 15,
+                fontWeight: 600,
+                color: "#0000FF",
                 textDecoration: "none",
-                transition: "opacity 0.15s ease",
               }}
             >
-              Try Qerin
-            </Link>
+              Join the waitlist ↓
+            </a>
           </div>
         </section>
 
@@ -94,7 +85,7 @@ export default function Home() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: 20,
-            padding: "clamp(16px, 3vw, 28px) 0",
+            padding: "clamp(12px, 2.5vw, 20px) 0",
             borderTop: "1px solid #D8D5CC",
             animationDelay: "90ms",
           }}
@@ -121,7 +112,7 @@ export default function Home() {
           ))}
         </section>
 
-        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(12px, 3vw, 24px)", animationDelay: "170ms" }}>
+        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(8px, 2vw, 16px)", animationDelay: "170ms" }}>
           <section
             id="waitlist"
             style={{
@@ -135,7 +126,8 @@ export default function Home() {
             </div>
             <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: "#6B6E76", maxWidth: 520 }}>
               Waitlist members get early access and a discounted rate — $0.85 instead of $1.15 —
-              when Qerin opens up. We'll email you the moment it's ready.
+              when Qerin opens up. We'll email you the moment it's ready. Developers get API
+              access through the same waitlist.
             </p>
             <div style={{ marginTop: 16 }}>
               <WaitlistForm />
@@ -143,23 +135,6 @@ export default function Home() {
           </section>
         </div>
       </main>
-
-      <footer
-        style={{
-          width: "100%",
-          maxWidth: 960,
-          margin: "0 auto",
-          padding: "16px 24px 20px",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ fontSize: 13, color: "#6B6E76" }}>
-          Building on top of Qerin?{" "}
-          <Link href="/app" style={{ color: "#0000FF" }}>
-            Open the app for developer API pricing →
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }
