@@ -212,42 +212,43 @@ consumer now funds their own balance first:
    still only one wallet that actually holds and spends USDC, same as
    the buyer flow above. This mirrors how an exchange runs one hot
    wallet with an internal ledger.
-3. Funding goes through **Razorpay** (`apps/backend/src/razorpay.ts`),
-   not crypto — a consumer pays by UPI/card/netbanking directly in an
-   embedded Razorpay Checkout modal (`apps/frontend/src/lib/razorpay.ts`),
-   no wallet, no exchange account, no crypto exposure at all. The
-   backend creates a Razorpay order (`POST /v1/account/topup`), the
-   frontend opens Checkout with it, and on success the frontend posts
-   the payment id + HMAC signature to `POST /v1/account/topup/confirm`,
-   which verifies the signature server-side
-   (`hmac_sha256(orderId + "|" + paymentId, RAZORPAY_KEY_SECRET)` must
-   match) before crediting anything — confirms synchronously in-browser,
-   no polling or webhook needed.
+3. Funding is **direct on-chain USDC on Base** (`apps/backend/src/cryptoTopup.ts`,
+   `apps/frontend/src/lib/cryptoTopup.ts`) — the consumer connects their own
+   browser wallet and sends USDC straight to Qerin's wallet (the same one
+   that pays sources). The frontend then has that wallet sign a message
+   binding the specific transaction to the account
+   (`buildTopupSignMessage`), and `POST /v1/account/topup/crypto-confirm`
+   independently verifies both the on-chain transfer (via a direct
+   JSON-RPC call to Base's public RPC, not a client-trusted amount) and
+   the signature (the recovered signer must match the transaction's
+   actual sender) before crediting anything. `GET /v1/network-info`
+   exposes Qerin's wallet address/USDC contract so the frontend never
+   hardcodes them.
 4. `POST /v1/answer` debits `$0.15` (same price as the developer path,
    `ANSWER_PRICE_USD` in `spendGuard.ts`) from the balance before running
    the request, and refunds it if the request fails after the debit (no
    sources responded, spend cap hit) — same "no charge on failure"
    guarantee the free version always had.
 
-**This replaced an earlier Coinbase Onramp integration**, which is why
-you may see references to it in older commits or CDP-related code
+**This replaced two earlier fiat integrations, in order: Coinbase Onramp,
+then Razorpay** — both rejected Qerin outright for the same underlying
+reason (a "wallet top-up / crypto platform" business falls outside their
+supported merchant categories), which is why direct on-chain funding is
+now the only consumer top-up path rather than another fiat PSP. You may
+still see references to either in older commits or CDP-related code
 (`cdpAuth.ts`, `cdpFacilitator.ts` — still used for the x402 facilitator
-above, unrelated to funding). Onramp technically worked end-to-end in
-testing, but Coinbase's own Onramp production application was rejected
-outright ("did not meet the specific requirements needed for compliance
-within our program") — not a config issue, a decisive no. The India
-bank-account restriction hit during testing
-("sending crypto is disabled because you've linked an INR bank account")
-was a symptom of the same underlying mismatch: Onramp assumes the payer
-has and uses a personal Coinbase account, which doesn't fit a
-non-crypto-native retail audience. Razorpay removes that dependency
-entirely — consumers never touch crypto.
+above, unrelated to funding).
 
-**Qerin's operational wallet still needs real USDC to pay sources.**
-That's now entirely decoupled from consumer payments: Razorpay revenue
-settles to Qerin's own bank account, and the business periodically
-converts some of it to USDC and moves it into
-`QERIN_WALLET_PRIVATE_KEY`'s address through its own means. This is a
-manual, ongoing operational step — not automated, not something any
-code in this repo does — same spirit as the wallet funding guidance in
-`08-security-and-limits.md`.
+**Fund loss is the one failure mode this flow cannot tolerate**, since a
+transfer is irreversible the moment it's broadcast. The frontend persists
+the transaction hash to `localStorage` immediately after the transfer
+succeeds — before requesting the confirmation signature — so a rejected
+signature, a closed tab, or a lost connection never loses track of money
+that's already moved; `TopupModal.tsx`'s "Resume payment"/"Retry
+confirmation" affordances re-check that same transaction rather than
+sending a new one.
+
+**Qerin's operational wallet is the same wallet consumers pay into.**
+There's no separate settlement step to fund it from a fiat PSP anymore —
+consumer top-ups add directly to the USDC balance Qerin pays sources
+from.

@@ -128,6 +128,13 @@ export async function verifyAndCreditCryptoDeposit(
   // Credit exactly what was actually sent on-chain — never trust a
   // claimed amount from the client, only what the receipt itself shows.
   const transferredUsd = Number(transferredAtomic) / USDC_DECIMALS;
-  const { balance } = await recordDeposit(accountId, txHash, transferredUsd);
+  const { balance, accountFound } = await recordDeposit(accountId, txHash, transferredUsd);
+  // accountFound:false means nothing was actually credited (vs. the
+  // legitimate "already credited by an earlier confirm of this same tx"
+  // case, which still has accountFound:true) — must not be reported as
+  // success, or a real deposit failure would look identical to a win.
+  if (!accountFound) {
+    return { verified: false, balance: 0, reason: "Unknown account" };
+  }
   return { verified: true, balance };
 }

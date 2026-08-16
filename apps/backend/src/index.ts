@@ -10,7 +10,6 @@ import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
-import { createTopupOrder, verifyAndCreditPayment } from "./razorpay.js";
 import { ANSWER_PRICE_USD } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
@@ -91,64 +90,6 @@ app.get("/v1/account/balance", async (c) => {
     const balance = await getBalance(accountId);
     if (balance === null) return c.json({ error: "Unknown account" }, 404);
     return c.json({ balance });
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Internal error" }, 500);
-  }
-});
-
-// Creates a Razorpay order for a top-up. The frontend opens Razorpay's
-// embedded Checkout with these details and confirms via
-// POST /v1/account/topup/confirm once the user completes payment —
-// no redirect, no polling, confirms synchronously in-browser.
-app.post("/v1/account/topup", async (c) => {
-  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
-
-  const accountId = c.req.header("x-qerin-account-id");
-  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
-
-  const body = await c.req.json().catch(() => ({}));
-  const amountUsd = Number(body?.amountUsd);
-  if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
-    return c.json({ error: "amountUsd must be a positive number" }, 400);
-  }
-
-  try {
-    const order = await createTopupOrder(accountId, amountUsd);
-    return c.json(order);
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Could not start top-up" }, 500);
-  }
-});
-
-// Verifies Razorpay's payment signature and credits the balance — must
-// never credit anything before the signature check passes.
-app.post("/v1/account/topup/confirm", async (c) => {
-  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
-
-  const accountId = c.req.header("x-qerin-account-id");
-  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
-
-  const body = await c.req.json().catch(() => ({}));
-  const { orderId, paymentId, signature } = body ?? {};
-  const amountUsd = Number(body?.amountUsd);
-  if (
-    typeof orderId !== "string" ||
-    typeof paymentId !== "string" ||
-    typeof signature !== "string" ||
-    !Number.isFinite(amountUsd) ||
-    amountUsd <= 0
-  ) {
-    return c.json({ error: "orderId, paymentId, signature, and amountUsd are required" }, 400);
-  }
-
-  try {
-    const result = await verifyAndCreditPayment(accountId, orderId, paymentId, signature, amountUsd);
-    if (!result.verified) {
-      return c.json({ error: "Payment signature could not be verified" }, 400);
-    }
-    return c.json({ balance: result.balance });
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
