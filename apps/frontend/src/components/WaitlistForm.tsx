@@ -56,11 +56,11 @@ export function WaitlistForm() {
             flex: "1 1 220px",
             height: 48,
             padding: "0 16px",
-            borderRadius: 8,
+            borderRadius: 9999,
             border: "1px solid #D8D5CC",
             background: "#FFFFFF",
             fontSize: 15,
-            fontFamily: "var(--font-inter), sans-serif",
+            fontFamily: "var(--font-ibm-plex-sans), var(--font-inter), sans-serif",
             color: "#12141A",
           }}
         />
@@ -70,15 +70,15 @@ export function WaitlistForm() {
           style={{
             height: 48,
             padding: "0 24px",
-            borderRadius: 8,
+            borderRadius: 9999,
             border: "none",
-            background: "#0000FF",
+            background: "#12141A",
             color: "#FFFFFF",
             fontWeight: 600,
             fontSize: 15,
             cursor: status === "loading" ? "default" : "pointer",
             opacity: status === "loading" ? 0.7 : 1,
-            fontFamily: "var(--font-inter), sans-serif",
+            fontFamily: "var(--font-ibm-plex-sans), var(--font-inter), sans-serif",
           }}
         >
           {status === "loading" ? "Joining…" : "Join waitlist"}

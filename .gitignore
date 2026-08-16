@@ -11,3 +11,6 @@ dist
 out
 apps/contracts/lib
 apps/contracts/broadcast/**/dry-run
+
+# Local design-reference/inspiration files — not for the public repo.
+*.design.md
