@@ -1,6 +1,7 @@
 import { encodeFunctionData, parseUnits, stringToHex } from "viem";
 
 const BASE_CHAIN_ID_HEX = "0x2105"; // 8453
+const PENDING_KEY_PREFIX = "qerin_pending_topup_";
 
 interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -63,20 +64,52 @@ const ERC20_TRANSFER_ABI = [
   },
 ] as const;
 
-export interface CryptoTopupResult {
+// --- Pending-payment recovery record --------------------------------------
+// Written the instant a transfer is broadcast, cleared only once the
+// backend has actually credited it. If the user rejects/loses the
+// signature step, closes the tab, or anything else fails after the money
+// has already moved, this is how the app can find that transaction again
+// on the next visit instead of the payment silently vanishing.
+
+export interface PendingTopup {
   txHash: string;
-  signature: string;
+  amountUsd: number;
+  sentAt: number;
 }
 
+function pendingKey(accountId: string): string {
+  return `${PENDING_KEY_PREFIX}${accountId}`;
+}
+
+export function getPendingTopup(accountId: string): PendingTopup | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(pendingKey(accountId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingTopup;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingTopup(accountId: string, record: PendingTopup): void {
+  window.localStorage.setItem(pendingKey(accountId), JSON.stringify(record));
+}
+
+export function clearPendingTopup(accountId: string): void {
+  window.localStorage.removeItem(pendingKey(accountId));
+}
+
+// --- Wallet flow ------------------------------------------------------------
+
 /**
- * Connects the user's injected wallet (Coinbase Wallet, MetaMask, or a
- * wallet-app in-app browser), sends amountUsd worth of USDC to Qerin's
- * wallet on Base, then has the same wallet sign a message binding this
- * specific transaction to the account. The backend (cryptoTopup.ts) only
- * credits the balance once it independently confirms both the on-chain
- * transfer and that signature.
+ * Connects the user's injected wallet and sends amountUsd worth of USDC to
+ * Qerin's wallet on Base. The txHash is persisted to localStorage the
+ * instant this resolves — before any signature is requested — so a
+ * transfer that already happened is never lost even if the next step
+ * (signMessageForTopup) fails.
  */
-export async function sendUsdcTopup(accountId: string, amountUsd: number): Promise<CryptoTopupResult> {
+export async function sendUsdcTransfer(accountId: string, amountUsd: number): Promise<string> {
   const provider = getProvider();
 
   const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
@@ -103,13 +136,28 @@ export async function sendUsdcTopup(accountId: string, amountUsd: number): Promi
     params: [{ from, to: info.usdc, data }],
   })) as string;
 
-  // Must exactly match buildTopupSignMessage on the backend
-  // (apps/backend/src/cryptoTopup.ts) — any drift breaks verification.
+  // Money has moved — record it before doing anything else that could fail.
+  savePendingTopup(accountId, { txHash, amountUsd, sentAt: Date.now() });
+
+  return txHash;
+}
+
+/**
+ * Signs the message binding this specific transaction to the account. Can
+ * be called again for a persisted pending txHash without re-sending funds
+ * — that's the whole point of separating this from sendUsdcTransfer.
+ * Must exactly match buildTopupSignMessage on the backend
+ * (apps/backend/src/cryptoTopup.ts) — any drift breaks verification.
+ */
+export async function signTopupConfirmation(accountId: string, txHash: string): Promise<string> {
+  const provider = getProvider();
+  const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+  const from = accounts[0];
+  if (!from) throw new Error("No wallet account available");
+
   const message = `Qerin top-up confirmation\naccount:${accountId}\ntx:${txHash}`;
-  const signature = (await provider.request({
+  return (await provider.request({
     method: "personal_sign",
     params: [stringToHex(message), from],
   })) as string;
-
-  return { txHash, signature };
 }

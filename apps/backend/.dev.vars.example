@@ -33,9 +33,3 @@ QERIN_REGISTRY_ADDRESS=
 # per-request spend/usage records that back the daily spend cap, plus
 # consumer accounts/balances/deposits (accounts.ts).
 DATABASE_URL=
-
-# Razorpay API key, used for consumer balance top-ups (razorpay.ts) — UPI,
-# cards, netbanking. Create at https://dashboard.razorpay.com/app/keys.
-# Use test-mode keys for local dev, live-mode keys in production.
-RAZORPAY_KEY_ID=
-RAZORPAY_KEY_SECRET=

@@ -56,7 +56,7 @@ export async function recordDeposit(
   accountId: string,
   onrampTxId: string,
   amountUsd: number
-): Promise<{ credited: boolean; balance: number }> {
+): Promise<{ credited: boolean; balance: number; accountFound: boolean }> {
   const sql = getSql();
   const rows = await sql`
     WITH inserted AS (
@@ -72,9 +72,10 @@ export async function recordDeposit(
   `;
   if (rows.length === 0) {
     // Account row is missing entirely — shouldn't happen since accountId
-    // comes from createAccount, but report as not credited rather than throw.
-    return { credited: false, balance: 0 };
+    // comes from createAccount, but callers must be able to tell this apart
+    // from "already credited" (accountFound:false vs credited:false).
+    return { credited: false, balance: 0, accountFound: false };
   }
   const insertedCount = Number(rows[0].inserted_count);
-  return { credited: insertedCount > 0, balance: Number(rows[0].balance_usdc) };
+  return { credited: insertedCount > 0, balance: Number(rows[0].balance_usdc), accountFound: true };
 }

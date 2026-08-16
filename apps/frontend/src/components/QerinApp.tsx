@@ -9,9 +9,7 @@ import { DeveloperScreen } from "./screens/DeveloperScreen";
 import { TopupModal } from "./TopupModal";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
-import { getOrCreateAccountId, fetchBalance, requestTopup, confirmTopup, confirmCryptoTopup } from "@/lib/account";
-import { openRazorpayCheckout } from "@/lib/razorpay";
-import { sendUsdcTopup } from "@/lib/cryptoTopup";
+import { getOrCreateAccountId, fetchBalance } from "@/lib/account";
 import type { AnswerData, PaySource, Screen } from "@/lib/types";
 
 const ANSWER_PRICE_USD = 0.15;
@@ -165,33 +163,6 @@ export function QerinApp() {
     setShowTopup(true);
   };
 
-  const onTopup = async (amountUsd: number) => {
-    if (!accountId) return;
-    const order = await requestTopup(accountId, amountUsd);
-    const payment = await openRazorpayCheckout({
-      keyId: order.keyId,
-      amountPaise: order.amountPaise,
-      orderId: order.orderId,
-    });
-    const newBalance = await confirmTopup(
-      accountId,
-      payment.razorpay_order_id,
-      payment.razorpay_payment_id,
-      payment.razorpay_signature,
-      amountUsd
-    );
-    setBalance(newBalance);
-    setShowTopup(false);
-  };
-
-  const onTopupCrypto = async (amountUsd: number) => {
-    if (!accountId) return;
-    const { txHash, signature } = await sendUsdcTopup(accountId, amountUsd);
-    const newBalance = await confirmCryptoTopup(accountId, txHash, signature);
-    setBalance(newBalance);
-    setShowTopup(false);
-  };
-
   const receiptLines: ReceiptLine[] =
     displayData?.receipt.map((r) => ({
       name: r.source,
@@ -226,12 +197,12 @@ export function QerinApp() {
         />
       )}
       {screen === "developer" && <DeveloperScreen onGoHome={onGoHome} />}
-      {showTopup && (
+      {showTopup && accountId && (
         <TopupModal
+          accountId={accountId}
           reason={topupReason}
           onClose={() => setShowTopup(false)}
-          onTopup={onTopup}
-          onTopupCrypto={onTopupCrypto}
+          onCredited={(newBalance) => setBalance(newBalance)}
         />
       )}
     </PhoneFrame>
