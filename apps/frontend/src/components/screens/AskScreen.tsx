@@ -25,7 +25,7 @@ export function AskScreen({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#F7F5F0",
+        background: "var(--qerin-bg-soft)",
         paddingBottom: 24,
         boxSizing: "border-box",
         position: "relative",
@@ -49,11 +49,11 @@ export function AskScreen({
               height: 40,
               padding: "0 14px",
               borderRadius: 9999,
-              border: "1px solid #D8D5CC",
-              background: "#FFFFFF",
+              border: "1px solid var(--qerin-border)",
+              background: "var(--qerin-surface)",
               fontSize: 13,
               fontWeight: 500,
-              color: "#12141A",
+              color: "var(--qerin-text)",
               cursor: "pointer",
               fontFamily: "var(--font-ibm-plex-mono), monospace",
             }}
@@ -70,11 +70,11 @@ export function AskScreen({
               height: 40,
               padding: "0 14px",
               borderRadius: 9999,
-              border: "1px solid #D8D5CC",
-              background: "#FFFFFF",
+              border: "1px solid var(--qerin-border)",
+              background: "var(--qerin-surface)",
               fontSize: 13,
               fontWeight: 500,
-              color: "#12141A",
+              color: "var(--qerin-text)",
               cursor: "pointer",
               fontFamily: "var(--font-inter), sans-serif",
             }}
@@ -83,7 +83,7 @@ export function AskScreen({
             <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M4 12L12 4M12 4H5M12 4V11"
-                stroke="#12141A"
+                stroke="var(--qerin-text)"
                 strokeWidth="1.6"
                 fill="none"
                 strokeLinecap="round"
@@ -108,15 +108,15 @@ export function AskScreen({
           <path
             d="M6 55 C 40 15, 90 20, 118 58 C 140 88, 178 92, 200 56"
             fill="none"
-            stroke="#D8D5CC"
+            stroke="var(--qerin-border)"
             strokeWidth="1.5"
             strokeDasharray="4 5"
           />
-          <rect x="6" y="34" width="52" height="36" rx="6" fill="none" stroke="#12141A" strokeWidth="1.5" />
+          <rect x="6" y="34" width="52" height="36" rx="6" fill="none" stroke="var(--qerin-text)" strokeWidth="1.5" />
           <path
             d="M18 70 L14 82 L28 70 Z"
             fill="none"
-            stroke="#12141A"
+            stroke="var(--qerin-text)"
             strokeWidth="1.5"
             strokeLinejoin="round"
           />
@@ -126,17 +126,17 @@ export function AskScreen({
             fontFamily="Inter,sans-serif"
             fontWeight="700"
             fontSize="20"
-            fill="#12141A"
+            fill="var(--qerin-text)"
             textAnchor="middle"
           >
             ?
           </text>
-          <rect x="103" y="43" width="30" height="30" fill="#0000FF" />
-          <path d="M178 24 h34 v34 l-8.5 8 -8.5 -8 -8.5 8 -8.5 -8 z" fill="#12141A" />
-          <line x1="185" y1="35" x2="205" y2="35" stroke="#F7F5F0" strokeWidth="2" />
-          <line x1="185" y1="45" x2="205" y2="45" stroke="#F7F5F0" strokeWidth="2" />
+          <rect x="103" y="43" width="30" height="30" fill="var(--qerin-accent)" />
+          <path d="M178 24 h34 v34 l-8.5 8 -8.5 -8 -8.5 8 -8.5 -8 z" fill="var(--qerin-text)" />
+          <line x1="185" y1="35" x2="205" y2="35" stroke="var(--qerin-bg-soft)" strokeWidth="2" />
+          <line x1="185" y1="45" x2="205" y2="45" stroke="var(--qerin-bg-soft)" strokeWidth="2" />
         </svg>
-        <div style={{ fontSize: 17, color: "#6B6E76", textAlign: "center" }}>
+        <div style={{ fontSize: 17, color: "var(--qerin-text-muted)", textAlign: "center" }}>
           Ask anything. Qerin pays for the truth.
         </div>
         <div style={{ width: "100%", position: "relative" }}>
@@ -152,11 +152,11 @@ export function AskScreen({
               pointerEvents: "none",
             }}
           >
-            <rect x="5.5" y="1" width="5" height="8" rx="2.5" fill="none" stroke="#6B6E76" strokeWidth="1.3" />
+            <rect x="5.5" y="1" width="5" height="8" rx="2.5" fill="none" stroke="var(--qerin-text-muted)" strokeWidth="1.3" />
             <path
               d="M3 8.5c0 2.8 2.2 5 5 5s5-2.2 5-5M8 13.5v2"
               fill="none"
-              stroke="#6B6E76"
+              stroke="var(--qerin-text-muted)"
               strokeWidth="1.3"
               strokeLinecap="round"
             />
@@ -169,13 +169,13 @@ export function AskScreen({
             style={{
               width: "100%",
               height: 56,
-              background: "#FFFFFF",
-              border: "1px solid #D8D5CC",
+              background: "var(--qerin-surface)",
+              border: "1px solid var(--qerin-border)",
               borderRadius: 12,
               boxSizing: "border-box",
               padding: "0 56px 0 44px",
               fontSize: 15,
-              color: "#12141A",
+              color: "var(--qerin-text)",
               outline: "none",
               fontFamily: "var(--font-inter), sans-serif",
             }}
@@ -190,7 +190,7 @@ export function AskScreen({
               width: 40,
               height: 40,
               borderRadius: 9999,
-              background: "#0000FF",
+              background: "var(--qerin-accent)",
               border: "none",
               display: "flex",
               alignItems: "center",
@@ -202,7 +202,7 @@ export function AskScreen({
             <svg width="16" height="16" viewBox="0 0 16 16">
               <path
                 d="M8 13V3M3 7l5-5 5 5"
-                stroke="#F7F5F0"
+                stroke="var(--qerin-bg-soft)"
                 strokeWidth="2"
                 fill="none"
                 strokeLinecap="round"
@@ -212,7 +212,7 @@ export function AskScreen({
           </button>
         </div>
         {errorMessage && (
-          <div style={{ fontSize: 13, color: "#B23B3B", textAlign: "center" }}>{errorMessage}</div>
+          <div style={{ fontSize: 13, color: "var(--qerin-danger)", textAlign: "center" }}>{errorMessage}</div>
         )}
       </div>
     </div>

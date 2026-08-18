@@ -132,15 +132,15 @@ export function TopupModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          background: "#F7F5F0",
+          background: "var(--qerin-bg-soft)",
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
           padding: 24,
           boxSizing: "border-box",
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 18, color: "#12141A" }}>Top up your balance</div>
-        <div style={{ marginTop: 6, fontSize: 14, color: "#6B6E76" }}>
+        <div style={{ fontWeight: 700, fontSize: 18, color: "var(--qerin-text)" }}>Top up your balance</div>
+        <div style={{ marginTop: 6, fontSize: 14, color: "var(--qerin-text-muted)" }}>
           {reason ?? "Fund your balance to keep asking questions — Qerin pays sources with it."}
         </div>
 
@@ -152,14 +152,14 @@ export function TopupModal({
               marginTop: 16,
               padding: 14,
               borderRadius: 8,
-              border: "1px solid #0000FF",
-              background: "#F0F0FF",
+              border: "1px solid var(--qerin-accent)",
+              background: "var(--qerin-bg-soft)",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#12141A" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--qerin-text)" }}>
               You have a ${pending.amountUsd} payment waiting to be confirmed
             </div>
-            <div style={{ marginTop: 4, fontSize: 12, color: "#6B6E76" }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: "var(--qerin-text-muted)" }}>
               This USDC was already sent — resuming just re-checks it, it will not send again.
             </div>
             <button
@@ -169,12 +169,12 @@ export function TopupModal({
                 marginTop: 10,
                 height: 40,
                 width: "100%",
-                background: "#0000FF",
+                background: "var(--qerin-accent)",
                 border: "none",
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 14,
-                color: "#F7F5F0",
+                color: "var(--qerin-accent-contrast)",
                 cursor: "pointer",
                 fontFamily: "var(--font-inter), sans-serif",
               }}
@@ -195,12 +195,12 @@ export function TopupModal({
                   style={{
                     flex: 1,
                     height: 52,
-                    background: "#0000FF",
+                    background: "var(--qerin-accent)",
                     border: "none",
                     borderRadius: 8,
                     fontWeight: 600,
                     fontSize: 16,
-                    color: "#F7F5F0",
+                    color: "var(--qerin-accent-contrast)",
                     cursor: "pointer",
                     fontFamily: "var(--font-inter), sans-serif",
                   }}
@@ -209,32 +209,32 @@ export function TopupModal({
                 </button>
               ))}
             </div>
-            <div style={{ marginTop: 10, fontSize: 12, color: "#6B6E76" }}>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--qerin-text-muted)" }}>
               Connect a wallet and send USDC on Base — your balance updates as soon as the
               transaction confirms on-chain.
             </div>
             {step.kind === "error" && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "#B23B3B" }}>{step.message}</div>
+              <div style={{ marginTop: 12, fontSize: 13, color: "var(--qerin-danger)" }}>{step.message}</div>
             )}
           </>
         )}
 
         {step.kind === "sending" && (
-          <div style={{ marginTop: 20, fontSize: 14, color: "#12141A" }}>
+          <div style={{ marginTop: 20, fontSize: 14, color: "var(--qerin-text)" }}>
             Waiting for your wallet to send ${step.amountUsd} USDC…
           </div>
         )}
 
         {step.kind === "confirming" && (
           <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 14, color: "#12141A" }}>
+            <div style={{ fontSize: 14, color: "var(--qerin-text)" }}>
               Payment sent — confirming on Base{step.attempt > 1 ? ` (attempt ${step.attempt})` : ""}…
             </div>
             <a
               href={explorerUrl(step.txHash)}
               target="_blank"
               rel="noreferrer"
-              style={{ display: "block", marginTop: 8, fontSize: 12, color: "#0000FF" }}
+              style={{ display: "block", marginTop: 8, fontSize: 12, color: "var(--qerin-accent)" }}
             >
               {shortHash(step.txHash)} — view on Basescan ↗
             </a>
@@ -243,14 +243,14 @@ export function TopupModal({
 
         {step.kind === "success" && (
           <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#12141A" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--qerin-text)" }}>
               ✓ Credited — balance is now ${step.balance}
             </div>
             <a
               href={explorerUrl(step.txHash)}
               target="_blank"
               rel="noreferrer"
-              style={{ display: "block", marginTop: 8, fontSize: 12, color: "#0000FF" }}
+              style={{ display: "block", marginTop: 8, fontSize: 12, color: "var(--qerin-accent)" }}
             >
               {shortHash(step.txHash)} — view on Basescan ↗
             </a>
@@ -259,18 +259,18 @@ export function TopupModal({
 
         {step.kind === "stuck" && (
           <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#B23B3B" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--qerin-danger)" }}>
               Your ${step.amountUsd} payment was sent but hasn't confirmed yet
             </div>
-            <div style={{ marginTop: 6, fontSize: 13, color: "#6B6E76" }}>{step.reason}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: "#6B6E76" }}>
+            <div style={{ marginTop: 6, fontSize: 13, color: "var(--qerin-text-muted)" }}>{step.reason}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "var(--qerin-text-muted)" }}>
               Do not send another payment — this one already happened and is safe to retry.
             </div>
             <a
               href={explorerUrl(step.txHash)}
               target="_blank"
               rel="noreferrer"
-              style={{ display: "block", marginTop: 8, fontSize: 12, color: "#0000FF" }}
+              style={{ display: "block", marginTop: 8, fontSize: 12, color: "var(--qerin-accent)" }}
             >
               {shortHash(step.txHash)} — view on Basescan ↗
             </a>
@@ -281,12 +281,12 @@ export function TopupModal({
                 marginTop: 16,
                 width: "100%",
                 height: 44,
-                background: "#0000FF",
+                background: "var(--qerin-accent)",
                 border: "none",
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 14,
-                color: "#F7F5F0",
+                color: "var(--qerin-accent-contrast)",
                 cursor: "pointer",
                 fontFamily: "var(--font-inter), sans-serif",
               }}
@@ -304,11 +304,11 @@ export function TopupModal({
               width: "100%",
               height: 44,
               background: "transparent",
-              border: "1px solid #D8D5CC",
+              border: "1px solid var(--qerin-border)",
               borderRadius: 8,
               fontWeight: 500,
               fontSize: 14,
-              color: "#12141A",
+              color: "var(--qerin-text)",
               cursor: "pointer",
               fontFamily: "var(--font-inter), sans-serif",
             }}

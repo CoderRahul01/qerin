@@ -29,19 +29,19 @@ export async function GET(request: Request) {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#F7F5F0",
+          background: "#FFF7F0",
           padding: 64,
           fontFamily: "sans-serif",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 20, height: 20, background: "#0000FF" }} />
-          <div style={{ fontWeight: 700, fontSize: 26, color: "#12141A" }}>qerin</div>
+          <div style={{ width: 20, height: 20, borderRadius: 4, background: "#F45B00" }} />
+          <div style={{ fontWeight: 700, fontSize: 26, color: "#151515" }}>Qerin</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div style={{ fontSize: 24, fontWeight: 500, color: "#6B6E76" }}>{question}</div>
-          <div style={{ fontSize: 34, lineHeight: 1.35, fontWeight: 600, color: "#12141A" }}>{answer}</div>
+          <div style={{ fontSize: 24, fontWeight: 500, color: "#6B6B6B" }}>{question}</div>
+          <div style={{ fontSize: 34, lineHeight: 1.35, fontWeight: 600, color: "#151515" }}>{answer}</div>
         </div>
 
         <div
@@ -49,12 +49,12 @@ export async function GET(request: Request) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            borderTop: "1px solid #D8D5CC",
+            borderTop: "1px solid #E9E9E9",
             paddingTop: 24,
           }}
         >
-          <div style={{ fontSize: 18, color: "#6B6E76" }}>{sourceLabel}</div>
-          <div style={{ fontSize: 18, color: "#6B6E76" }}>Ask anything. Qerin pays for the truth.</div>
+          <div style={{ fontSize: 18, color: "#6B6B6B" }}>{sourceLabel}</div>
+          <div style={{ fontSize: 18, color: "#6B6B6B" }}>Verified answers, paid in stablecoins.</div>
         </div>
       </div>
     ),

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Inter, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,17 +14,23 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
 });
 
-// Homepage-only display face (restrained B2B marketing pass) — Inter stays
-// the default everywhere else, including /app, unaffected by this addition.
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
-  weight: ["400", "500", "600", "700"],
+// Homepage-only display face for hero/H1 headlines, per brand guidelines —
+// Inter stays the default everywhere else, including /app.
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  weight: ["500", "700"],
   subsets: ["latin"],
 });
 
+// Inline, blocking (runs before first paint) — reads the saved theme choice
+// and stamps it on <html> immediately so there's no flash of the wrong
+// theme. Default is always light; dark is opt-in only, never inferred from
+// the OS/browser's prefers-color-scheme.
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("qerin-theme");if(t==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}})();`;
+
 export const metadata: Metadata = {
   title: "Qerin",
-  description: "Truth isn't free. Now you know what it costs.",
+  description: "Verified answers, paid in stablecoins.",
   // Base Build's "Verify with meta tag" step (App Router variant): the
   // dashboard's own snippet targets pages/index.tsx (Pages Router), which
   // this project doesn't use — `other` renders the equivalent <meta> tag
@@ -46,7 +52,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${ibmPlexMono.variable} ${ibmPlexSans.variable}`}>
+    <html lang="en" className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

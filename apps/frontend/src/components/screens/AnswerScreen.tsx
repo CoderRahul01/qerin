@@ -30,7 +30,7 @@ const zigzag = (
     <polyline
       points="0,10 10,0 20,10 30,0 40,10 50,0 60,10 70,0 80,10 90,0 100,10 110,0 120,10 130,0 140,10 150,0 160,10 170,0 180,10 190,0 200,10 210,0 220,10 230,0 240,10 250,0 260,10 270,0 280,10 290,0 300,10 310,0 320,10"
       fill="none"
-      stroke="#D8D5CC"
+      stroke="var(--qerin-border)"
       strokeWidth="1"
     />
   </svg>
@@ -87,7 +87,7 @@ export function AnswerScreen({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#F7F5F0",
+        background: "var(--qerin-bg-soft)",
         paddingBottom: 24,
         boxSizing: "border-box",
         overflowY: "auto",
@@ -95,8 +95,8 @@ export function AnswerScreen({
     >
       <LogoRow padding="0 24px" marginTop={20} />
       <div style={{ padding: "24px 24px 0" }}>
-        <div style={{ fontWeight: 500, fontSize: 14, color: "#6B6E76" }}>{question}</div>
-        <div style={{ marginTop: 16, fontSize: 17, lineHeight: 1.5, color: "#12141A" }}>{answer}</div>
+        <div style={{ fontWeight: 500, fontSize: 14, color: "var(--qerin-text-muted)" }}>{question}</div>
+        <div style={{ marginTop: 16, fontSize: 17, lineHeight: 1.5, color: "var(--qerin-text)" }}>{answer}</div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <button
             onClick={onDownload}
@@ -107,7 +107,7 @@ export function AnswerScreen({
               padding: 0,
               fontSize: 13,
               fontWeight: 500,
-              color: "#0000FF",
+              color: "var(--qerin-accent)",
               cursor: "pointer",
               fontFamily: "var(--font-inter), sans-serif",
             }}
@@ -122,7 +122,7 @@ export function AnswerScreen({
               marginTop: 16,
               fontSize: 13,
               fontWeight: 500,
-              color: "#0000FF",
+              color: "var(--qerin-accent)",
               fontFamily: "var(--font-inter), sans-serif",
             }}
           >
@@ -133,7 +133,7 @@ export function AnswerScreen({
       <div style={{ margin: "32px 24px 0" }}>
         <div style={{ position: "relative" }}>
           {zigzag}
-          <div style={{ background: "#F7F5F0", borderLeft: "1px solid #D8D5CC", borderRight: "1px solid #D8D5CC" }}>
+          <div style={{ background: "var(--qerin-bg-soft)", borderLeft: "1px solid var(--qerin-border)", borderRight: "1px solid var(--qerin-border)" }}>
             <div
               style={{
                 display: "flex",
@@ -142,25 +142,25 @@ export function AnswerScreen({
                 padding: "16px 20px",
               }}
             >
-              <div style={{ fontSize: 13, color: "#6B6E76" }}>Total paid</div>
+              <div style={{ fontSize: 13, color: "var(--qerin-text-muted)" }}>Total paid</div>
               <div
                 style={{
                   fontFamily: "var(--font-ibm-plex-mono), monospace",
                   fontWeight: 700,
                   fontSize: 28,
-                  color: "#12141A",
+                  color: "var(--qerin-text)",
                 }}
               >
                 {totalLabel}
               </div>
             </div>
-            <div style={{ height: 1, background: "#D8D5CC" }} />
+            <div style={{ height: 1, background: "var(--qerin-border)" }} />
             {receiptLines.map((line, i) => (
               <div
                 key={line.name}
                 style={{
                   padding: "16px 20px",
-                  borderBottom: i < receiptLines.length - 1 ? "1px solid #D8D5CC" : undefined,
+                  borderBottom: i < receiptLines.length - 1 ? "1px solid var(--qerin-border)" : undefined,
                   boxSizing: "border-box",
                 }}
               >
@@ -181,7 +181,7 @@ export function AnswerScreen({
                     <svg width="8" height="7" viewBox="0 0 8 7">
                       <path
                         d="M1 3.5l2.2 2.2L7 1"
-                        stroke="#F7F5F0"
+                        stroke="var(--qerin-bg-soft)"
                         strokeWidth="1.6"
                         fill="none"
                         strokeLinecap="round"
@@ -191,12 +191,12 @@ export function AnswerScreen({
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                      <div style={{ fontWeight: 500, fontSize: 15, color: "#12141A" }}>{line.name}</div>
+                      <div style={{ fontWeight: 500, fontSize: 15, color: "var(--qerin-text)" }}>{line.name}</div>
                       <div
                         style={{
                           fontFamily: "var(--font-ibm-plex-mono), monospace",
                           fontSize: 15,
-                          color: "#12141A",
+                          color: "var(--qerin-text)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -207,7 +207,7 @@ export function AnswerScreen({
                       style={{
                         fontFamily: "var(--font-ibm-plex-mono), monospace",
                         fontSize: 11,
-                        color: "#6B6E76",
+                        color: "var(--qerin-text-muted)",
                         marginTop: 4,
                       }}
                     >
@@ -216,7 +216,7 @@ export function AnswerScreen({
                         href={line.explorerUrl}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: "#0000FF", textDecoration: "underline" }}
+                        style={{ color: "var(--qerin-accent)", textDecoration: "underline" }}
                       >
                         View on Basescan
                       </a>
@@ -232,7 +232,7 @@ export function AnswerScreen({
                             padding: 0,
                             fontSize: 12,
                             fontWeight: 500,
-                            color: "#0000FF",
+                            color: "var(--qerin-accent)",
                             cursor: "pointer",
                             fontFamily: "var(--font-inter), sans-serif",
                           }}
@@ -244,12 +244,12 @@ export function AnswerScreen({
                             style={{
                               marginTop: 10,
                               padding: 12,
-                              background: "#FFFFFF",
-                              border: "1px solid #D8D5CC",
+                              background: "var(--qerin-surface)",
+                              border: "1px solid var(--qerin-border)",
                               borderRadius: 6,
                               fontSize: 13,
                               lineHeight: 1.55,
-                              color: "#12141A",
+                              color: "var(--qerin-text)",
                               whiteSpace: "pre-wrap",
                               maxHeight: 240,
                               overflowY: "auto",
@@ -275,11 +275,11 @@ export function AnswerScreen({
             width: "100%",
             height: 48,
             background: "transparent",
-            border: "1px solid #12141A",
+            border: "1px solid var(--qerin-text)",
             borderRadius: 8,
             fontWeight: 500,
             fontSize: 15,
-            color: "#12141A",
+            color: "var(--qerin-text)",
             cursor: "pointer",
             fontFamily: "var(--font-inter), sans-serif",
           }}
