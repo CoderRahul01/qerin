@@ -1,20 +1,6 @@
-const posts = [
-  {
-    date: "Aug 7",
-    quote:
-      "AI answers arrive with no proof. Qerin pays every source it reads — per query, in stablecoins. You get the answer plus an itemized receipt: source, amount, tx hash.",
-  },
-  {
-    date: "Aug 7",
-    quote:
-      "Live on Base today. Receipt contract deployed and source-verified on mainnet. Built and shipped solo.",
-  },
-  {
-    date: "Aug 7",
-    quote:
-      "One question in, one answer out, and a receipt you can open on the explorer and check yourself.",
-  },
-];
+import { Tweet } from "react-tweet";
+
+const TWEET_IDS = ["2089406704601719270", "2089429079691084061", "2089444150894878826", "2089601380491186248"];
 
 const PROFILE_URL = "https://x.com/qerinai_26";
 
@@ -33,7 +19,7 @@ export function SocialUpdates() {
       style={{ padding: "clamp(12px, 2.5vw, 20px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "220ms" }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--qerin-text)" }}>Recent updates</div>
+        <div style={{ fontSize: "clamp(20px, 2.8vw, 26px)", fontWeight: 700, color: "var(--qerin-text)" }}>People are noticing</div>
         <a
           href={PROFILE_URL}
           target="_blank"
@@ -45,38 +31,11 @@ export function SocialUpdates() {
         </a>
       </div>
 
-      <div
-        style={{
-          marginTop: 14,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 12,
-        }}
-      >
-        {posts.map((post) => (
-          <a
-            key={post.quote}
-            href={PROFILE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="qerin-pill-btn"
-            style={{
-              display: "block",
-              padding: 16,
-              borderRadius: 12,
-              border: "1px solid var(--qerin-border)",
-              background: "var(--qerin-surface)",
-              textDecoration: "none",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <XMark />
-              <span style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, color: "var(--qerin-text-muted)" }}>
-                {post.date}
-              </span>
-            </div>
-            <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.5, color: "var(--qerin-text)" }}>{post.quote}</p>
-          </a>
+      <div className="qerin-tweet-grid">
+        {TWEET_IDS.map((id) => (
+          <div key={id} className="qerin-tweet-card">
+            <Tweet id={id} />
+          </div>
         ))}
       </div>
     </section>
