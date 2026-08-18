@@ -31,15 +31,15 @@ export function StepsFlow({ steps, label }: { steps: FlowStep[]; label: string }
                 style={{
                   fontFamily: "var(--font-ibm-plex-mono), monospace",
                   fontSize: 11,
-                  color: "#6B6E76",
+                  color: "var(--qerin-text-muted)",
                   fontWeight: 600,
                   letterSpacing: "0.04em",
                 }}
               >
                 STEP {i + 1}
               </div>
-              <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: "#12141A" }}>{step.title}</div>
-              <div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5, color: "#6B6E76" }}>{step.body}</div>
+              <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: "var(--qerin-text)" }}>{step.title}</div>
+              <div style={{ marginTop: 4, fontSize: 13.5, lineHeight: 1.5, color: "var(--qerin-text-muted)" }}>{step.body}</div>
             </div>
           </div>
         );

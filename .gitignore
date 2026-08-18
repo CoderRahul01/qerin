@@ -14,3 +14,16 @@ apps/contracts/broadcast/**/dry-run
 
 # Local design-reference/inspiration files — not for the public repo.
 *.design.md
+
+# Rebrand reference material (brand PDF, AI-mockup renders, prior static
+# mockup) — used to redesign the site, never shipped themselves. The
+# derived production assets (qerin-mark-*.png, app icons, favicon) are
+# committed normally; only the raw references below are excluded.
+apps/frontend/public/Qerin_Brand_Guidelines.pdf
+apps/frontend/public/Graphics1.jpg
+apps/frontend/public/graphics2.jpg
+apps/frontend/public/graphics3.jpg
+apps/frontend/public/ref1image.jpg
+apps/frontend/public/logo.jpg
+apps/frontend/ref2imagedark.jpg
+apps/frontend/index.html

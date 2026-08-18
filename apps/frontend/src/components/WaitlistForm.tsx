@@ -39,7 +39,7 @@ export function WaitlistForm() {
 
   if (status === "done") {
     return (
-      <div style={{ fontSize: 15, fontWeight: 500, color: "#12141A" }}>{message}</div>
+      <div style={{ fontSize: 15, fontWeight: 500, color: "var(--qerin-text)" }}>{message}</div>
     );
   }
 
@@ -57,11 +57,11 @@ export function WaitlistForm() {
             height: 48,
             padding: "0 16px",
             borderRadius: 9999,
-            border: "1px solid #D8D5CC",
-            background: "#FFFFFF",
+            border: "1px solid var(--qerin-border)",
+            background: "var(--qerin-surface)",
             fontSize: 15,
-            fontFamily: "var(--font-ibm-plex-sans), var(--font-inter), sans-serif",
-            color: "#12141A",
+            fontFamily: "var(--font-inter), sans-serif",
+            color: "var(--qerin-text)",
           }}
         />
         <button
@@ -72,20 +72,20 @@ export function WaitlistForm() {
             padding: "0 24px",
             borderRadius: 9999,
             border: "none",
-            background: "#12141A",
-            color: "#FFFFFF",
+            background: "var(--qerin-accent)",
+            color: "var(--qerin-accent-contrast)",
             fontWeight: 600,
             fontSize: 15,
             cursor: status === "loading" ? "default" : "pointer",
             opacity: status === "loading" ? 0.7 : 1,
-            fontFamily: "var(--font-ibm-plex-sans), var(--font-inter), sans-serif",
+            fontFamily: "var(--font-inter), sans-serif",
           }}
         >
           {status === "loading" ? "Joining…" : "Join waitlist"}
         </button>
       </div>
       {status === "error" && (
-        <div style={{ fontSize: 13, color: "#B3261E" }}>{message}</div>
+        <div style={{ fontSize: 13, color: "var(--qerin-danger)" }}>{message}</div>
       )}
     </form>
   );

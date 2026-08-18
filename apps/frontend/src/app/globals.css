@@ -1,3 +1,31 @@
+:root {
+  /* Qerin brand tokens — light theme (default) */
+  --qerin-bg: #ffffff;
+  --qerin-bg-soft: #fff7f0;
+  --qerin-surface: #ffffff;
+  --qerin-text: #151515;
+  --qerin-text-muted: #6b6b6b;
+  --qerin-border: #e9e9e9;
+  --qerin-accent: #f45b00;
+  --qerin-accent-soft: #ff9a5c;
+  --qerin-accent-contrast: #ffffff;
+  --qerin-danger: #b3261e;
+  --qerin-gradient: linear-gradient(115deg, #f45b00, #ff9a5c);
+}
+
+:root[data-theme="dark"] {
+  --qerin-bg: #151515;
+  --qerin-bg-soft: #1c1c1c;
+  --qerin-surface: #1f1f1f;
+  --qerin-text: #f7f5f0;
+  --qerin-text-muted: #a3a3a3;
+  --qerin-border: #2b2b2b;
+  --qerin-accent: #f45b00;
+  --qerin-accent-soft: #ff9a5c;
+  --qerin-accent-contrast: #ffffff;
+  --qerin-danger: #ff6b5c;
+}
+
 html,
 body {
   max-width: 100vw;
@@ -19,9 +47,9 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: var(--font-inter), sans-serif;
-  /* Slightly distinct from the app shell's #F7F5F0 so the centered content
-     column on wide screens reads as deliberate, not empty/unstyled space. */
-  background: #ececE6;
+  background: var(--qerin-bg);
+  color: var(--qerin-text);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 /* Single responsive app shell — same DOM/CSS at every width, no separate
@@ -35,7 +63,7 @@ body {
   max-width: 480px;
   height: 100dvh;
   margin: 0 auto;
-  background: #f7f5f0;
+  background: var(--qerin-bg-soft);
   position: relative;
   box-sizing: border-box;
   /* Safety net — each screen is laid out to fit exactly, but if content
@@ -46,8 +74,8 @@ body {
 
 @media (min-width: 481px) {
   .qerin-app-shell {
-    border-left: 1px solid #d8d5cc;
-    border-right: 1px solid #d8d5cc;
+    border-left: 1px solid var(--qerin-border);
+    border-right: 1px solid var(--qerin-border);
   }
 }
 
@@ -56,11 +84,11 @@ body {
 }
 
 a {
-  color: #0000ff;
+  color: var(--qerin-accent);
 }
 
 a:hover {
-  color: #0000ff;
+  color: var(--qerin-accent);
   opacity: 0.72;
 }
 
@@ -69,12 +97,12 @@ a:hover {
 }
 
 .qerin-pill-btn:hover {
-  border-color: #0000ff;
-  background: #f0f0ff;
+  border-color: var(--qerin-accent);
+  background: var(--qerin-bg-soft);
 }
 
 .qerin-pill-btn:focus-visible {
-  outline: 2px solid #0000ff;
+  outline: 2px solid var(--qerin-accent);
   outline-offset: 2px;
 }
 
@@ -95,6 +123,100 @@ a:hover {
 @keyframes qerin-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+.qerin-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 32px;
+}
+
+.qerin-hero-grid > div:last-child {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+@media (min-width: 720px) {
+  .qerin-hero-grid {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 20px;
+  }
+
+  .qerin-hero-grid > div:last-child {
+    max-width: none;
+    margin: 0;
+  }
+}
+
+.qerin-nav-links {
+  display: none;
+  align-items: center;
+  gap: 24px;
+}
+
+@media (min-width: 640px) {
+  .qerin-nav-links {
+    display: flex;
+  }
+}
+
+@keyframes qerin-hero-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.qerin-hero-flow {
+  animation: qerin-hero-flow 1.1s linear infinite;
+}
+
+@keyframes qerin-badge-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.qerin-badge-float {
+  animation: qerin-badge-float 3.4s ease-in-out infinite;
+}
+
+@keyframes qerin-badge-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  70%, 100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.qerin-badge-pulse-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 14px;
+  border: 1.5px solid #1b7a4a;
+  animation: qerin-badge-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qerin-hero-flow {
+    animation: none;
+  }
+
+  .qerin-badge-float {
+    animation: none;
+  }
+
+  .qerin-badge-pulse-ring {
+    animation: none;
+    display: none;
   }
 }
 
@@ -140,15 +262,20 @@ a:hover {
   position: relative;
   border-radius: 17px;
   padding: 1px;
-  background: linear-gradient(115deg, #0000ff, #b3b3ff, #12141a, #0000ff, #b3b3ff);
+  background: linear-gradient(115deg, #f45b00, #ff9a5c, #151515, #f45b00, #ff9a5c);
   background-size: 300% 300%;
   animation: qerin-border-flow 7s ease infinite;
+}
+
+:root[data-theme="dark"] .qerin-glow-border {
+  background: linear-gradient(115deg, #f45b00, #ff9a5c, #ffffff, #f45b00, #ff9a5c);
+  background-size: 300% 300%;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .qerin-glow-border {
     animation: none;
-    background: #0000ff;
+    background: var(--qerin-accent);
   }
 }
 
@@ -185,8 +312,9 @@ a:hover {
   width: 40px;
   height: 40px;
   border-radius: 9999px;
-  background: #ffffff;
-  border: 1px solid #d8d5cc;
+  background: radial-gradient(circle at 32% 28%, var(--qerin-bg-soft), var(--qerin-surface) 70%);
+  border: 1px solid var(--qerin-border);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -204,7 +332,7 @@ a:hover {
 .qerin-flow-connector-line {
   position: absolute;
   inset: 0;
-  background: #d8d5cc;
+  background: var(--qerin-border);
 }
 
 .qerin-flow-dot {
@@ -213,7 +341,7 @@ a:hover {
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: #0000ff;
+  background: var(--qerin-accent);
   transform: translateX(-50%);
   animation: qerin-flow-dot-v 2.4s linear infinite;
 }

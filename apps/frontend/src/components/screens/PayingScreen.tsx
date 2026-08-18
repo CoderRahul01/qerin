@@ -12,21 +12,21 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "#F7F5F0",
+        background: "var(--qerin-bg-soft)",
         paddingBottom: 24,
         boxSizing: "border-box",
       }}
     >
       <LogoRow padding="0 24px" marginTop={20} />
-      <div style={{ padding: "32px 24px 0", fontWeight: 500, fontSize: 16, color: "#12141A" }}>
+      <div style={{ padding: "32px 24px 0", fontWeight: 500, fontSize: 16, color: "var(--qerin-text)" }}>
         {question}
       </div>
       <div style={{ marginTop: 32 }}>
         {paySteps.map((step, i) => {
           const statusText =
             step.status === "paid" ? `Paid $${fmt(step.amount)}` : step.status === "paying" ? "Paying…" : "Waiting";
-          const statusColor = step.status === "paid" ? "#1B7A4A" : step.status === "paying" ? "#6B6E76" : "#D8D5CC";
-          const nameColor = step.status === "waiting" ? "#6B6E76" : "#12141A";
+          const statusColor = step.status === "paid" ? "#1B7A4A" : step.status === "paying" ? "var(--qerin-text-muted)" : "var(--qerin-border)";
+          const nameColor = step.status === "waiting" ? "var(--qerin-text-muted)" : "var(--qerin-text)";
           return (
             <div
               key={step.name}
@@ -36,7 +36,7 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
                 justifyContent: "space-between",
                 height: 72,
                 padding: "0 24px",
-                borderBottom: i < paySteps.length - 1 ? "1px solid #D8D5CC" : "none",
+                borderBottom: i < paySteps.length - 1 ? "1px solid var(--qerin-border)" : "none",
                 boxSizing: "border-box",
               }}
             >
@@ -69,7 +69,7 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
                   <svg width="12" height="10" viewBox="0 0 12 10">
                     <path
                       d="M1 5l3.5 3.5L11 1"
-                      stroke="#F7F5F0"
+                      stroke="var(--qerin-bg-soft)"
                       strokeWidth="2"
                       fill="none"
                       strokeLinecap="round"
@@ -84,8 +84,8 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
                     width: 24,
                     height: 24,
                     borderRadius: 9999,
-                    border: "2px solid #D8D5CC",
-                    borderTopColor: "#0000FF",
+                    border: "2px solid var(--qerin-border)",
+                    borderTopColor: "var(--qerin-accent)",
                     animation: "qerin-spin 0.8s linear infinite",
                   }}
                 />
@@ -96,7 +96,7 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
                     width: 24,
                     height: 24,
                     borderRadius: 9999,
-                    border: "1.5px solid #D8D5CC",
+                    border: "1.5px solid var(--qerin-border)",
                   }}
                 />
               )}
@@ -104,7 +104,7 @@ export function PayingScreen({ question, paySteps }: { question: string; payStep
           );
         })}
       </div>
-      <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "#6B6E76" }}>
+      <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "var(--qerin-text-muted)" }}>
         Qerin is paying for verified sources
       </div>
     </div>

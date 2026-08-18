@@ -21,7 +21,7 @@ const PROFILE_URL = "https://x.com/qerinai_26";
 function XMark() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M2 2l12 12M14 2L2 14" stroke="#12141A" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M2 2l12 12M14 2L2 14" stroke="var(--qerin-text)" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -30,15 +30,15 @@ export function SocialUpdates() {
   return (
     <section
       className="qerin-fade-up"
-      style={{ padding: "clamp(12px, 2.5vw, 20px) 0", borderTop: "1px solid #D8D5CC", animationDelay: "220ms" }}
+      style={{ padding: "clamp(12px, 2.5vw, 20px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "220ms" }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "#12141A" }}>Recent updates</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--qerin-text)" }}>Recent updates</div>
         <a
           href={PROFILE_URL}
           target="_blank"
           rel="noreferrer"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: "#6B6E76" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: "var(--qerin-text-muted)" }}
         >
           <XMark />
           @qerinai_26
@@ -64,18 +64,18 @@ export function SocialUpdates() {
               display: "block",
               padding: 16,
               borderRadius: 12,
-              border: "1px solid #D8D5CC",
-              background: "#FFFFFF",
+              border: "1px solid var(--qerin-border)",
+              background: "var(--qerin-surface)",
               textDecoration: "none",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <XMark />
-              <span style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, color: "#6B6E76" }}>
+              <span style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, color: "var(--qerin-text-muted)" }}>
                 {post.date}
               </span>
             </div>
-            <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.5, color: "#12141A" }}>{post.quote}</p>
+            <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.5, color: "var(--qerin-text)" }}>{post.quote}</p>
           </a>
         ))}
       </div>
