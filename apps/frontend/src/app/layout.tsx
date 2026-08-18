@@ -25,8 +25,11 @@ const spaceGrotesk = Space_Grotesk({
 // Inline, blocking (runs before first paint) — reads the saved theme choice
 // and stamps it on <html> immediately so there's no flash of the wrong
 // theme. Default is always light; dark is opt-in only, never inferred from
-// the OS/browser's prefers-color-scheme.
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("qerin-theme");if(t==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}})();`;
+// the OS/browser's prefers-color-scheme. Always sets the attribute (never
+// leaves it absent) so third-party CSS that falls back to
+// prefers-color-scheme when data-theme is unset (e.g. react-tweet) can't
+// disagree with our own light/dark state.
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("qerin-theme");document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light");}catch(e){}})();`;
 
 export const metadata: Metadata = {
   title: "Qerin",
@@ -52,7 +55,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable}`}>
+    <html
+      lang="en"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable}`}
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
