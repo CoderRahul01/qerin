@@ -101,11 +101,16 @@ app.get("/v1/account/balance", async (c) => {
 // Lets the frontend build the USDC transfer without hardcoding addresses
 // in two places.
 app.get("/v1/network-info", (c) => {
-  const network = getNetwork();
+  const target = c.req.query("network");
+  const network = getNetwork(target);
   return c.json({
+    name: network.name,
     payTo: getQerinAccount().address,
-    chainId: network.caip2.split(":")[1],
-    usdc: network.usdc,
+    chainId: network.chainId.toString(),
+    usdc: network.usdc ?? null,
+    usdt: network.usdt ?? null,
+    currency: network.currency,
+    rpcUrl: network.rpcUrl,
   });
 });
 
@@ -152,7 +157,7 @@ app.post("/v1/answer", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const { question } = body ?? {};
+  const { question, network } = body ?? {};
   if (!question || typeof question !== "string") {
     return c.json({ error: "question is required" }, 400);
   }
@@ -175,7 +180,7 @@ app.post("/v1/answer", async (c) => {
 
   // Debit succeeded — from here on, any failure must refund it.
   try {
-    const result = await answerHandler(question, accountId);
+    const result = await answerHandler(question, accountId, typeof network === "string" ? network : undefined);
     if (result.status !== 200) {
       await creditBalance(accountId, ANSWER_PRICE_USD);
     }

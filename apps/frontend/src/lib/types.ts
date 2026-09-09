@@ -18,10 +18,22 @@ export interface ReceiptItem {
   content: unknown;
 }
 
+export interface PersonaInsights {
+  developer?: string;
+  founder?: string;
+  contentWriter?: string;
+  trader?: string;
+}
+
 export interface AnswerData {
   question: string;
+  topic?: string;
+  summary?: string;
   answer: string;
+  personaInsights?: PersonaInsights;
   receipt: ReceiptItem[];
   totalPaid: string;
   balance?: number;
+  network?: string;
+  chainId?: number;
 }

@@ -1,4 +1,4 @@
-import { getSql } from "./db.js";
+import { getDb, FieldValue } from "./db.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -7,17 +7,19 @@ export function isValidEmail(email: unknown): email is string {
 }
 
 /**
- * Idempotent on email — a duplicate submission returns joined: false rather
- * than erroring, mirroring recordDeposit's ON CONFLICT DO NOTHING pattern
- * in accounts.ts.
+ * Idempotent on email — uses the email address as the Firestore document ID,
+ * so a duplicate submission is a no-op: the doc already exists, the write
+ * is skipped, and joined:false is returned (mirrors the Neon ON CONFLICT pattern).
  */
 export async function joinWaitlist(email: string): Promise<{ joined: boolean }> {
-  const sql = getSql();
-  const rows = await sql`
-    INSERT INTO waitlist_signups (email)
-    VALUES (${email})
-    ON CONFLICT (email) DO NOTHING
-    RETURNING id
-  `;
-  return { joined: rows.length > 0 };
+  const db = getDb();
+  const ref = db.collection("waitlist").doc(email);
+  const doc = await ref.get();
+
+  if (doc.exists) {
+    return { joined: false };
+  }
+
+  await ref.set({ email, createdAt: FieldValue.serverTimestamp() });
+  return { joined: true };
 }

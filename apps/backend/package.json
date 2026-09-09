@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@base-org/account": "^2.5.8",
-    "@neondatabase/serverless": "^1.1.0",
     "@x402/core": "^2.21.0",
     "@x402/evm": "^2.21.0",
     "@x402/fetch": "^2.21.0",

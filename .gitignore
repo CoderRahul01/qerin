@@ -27,3 +27,6 @@ apps/frontend/public/ref1image.jpg
 apps/frontend/public/logo.jpg
 apps/frontend/ref2imagedark.jpg
 apps/frontend/index.html
+.dev.vars
+# sa key
+qerin-sa-key.json

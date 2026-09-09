@@ -1,81 +1,114 @@
-import { getSql } from "./db.js";
+import { getDb, FieldValue } from "./db.js";
+import crypto from "crypto";
+
+// Collection: accounts/{accountId}
+//   fields: { balance: number, createdAt: Timestamp }
+//
+// Sub-collection: accounts/{accountId}/deposits/{txId}
+//   fields: { amount: number, createdAt: Timestamp }
+//
+// This mirrors the Neon schema 1-to-1 while keeping the free Spark plan limits
+// in mind: each question = 1 read (balance) + 1 write (debit) — well within
+// 50 k reads / 20 k writes per day.
 
 export async function createAccount(): Promise<string> {
-  const sql = getSql();
-  const rows = await sql`INSERT INTO users DEFAULT VALUES RETURNING id`;
-  return rows[0].id as string;
+  const db = getDb();
+  const id = crypto.randomUUID();
+  await db.collection("accounts").doc(id).set({
+    balance: 0,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  return id;
 }
 
 export async function getBalance(accountId: string): Promise<number | null> {
-  const sql = getSql();
-  const rows = await sql`SELECT balance_usdc FROM users WHERE id = ${accountId}`;
-  if (rows.length === 0) return null;
-  return Number(rows[0].balance_usdc);
+  const db = getDb();
+  const doc = await db.collection("accounts").doc(accountId).get();
+  if (!doc.exists) return null;
+  return Number(doc.data()!.balance ?? 0);
 }
 
 /**
- * Atomically deducts `amountUsd` from the account's balance. Returns the
- * new balance, or null if the account doesn't exist or doesn't have
- * enough — the WHERE clause makes this a single round-trip
- * check-and-deduct with no race window between reading and writing.
+ * Atomically deducts `amountUsd` from the account balance.
+ * Returns the new balance, or null if the account is missing or has
+ * insufficient funds. Uses a Firestore transaction so there is no
+ * race window between read and write.
  */
-export async function debitBalance(accountId: string, amountUsd: number): Promise<number | null> {
-  const sql = getSql();
-  const rows = await sql`
-    UPDATE users
-    SET balance_usdc = balance_usdc - ${amountUsd}
-    WHERE id = ${accountId} AND balance_usdc >= ${amountUsd}
-    RETURNING balance_usdc
-  `;
-  if (rows.length === 0) return null;
-  return Number(rows[0].balance_usdc);
+export async function debitBalance(
+  accountId: string,
+  amountUsd: number
+): Promise<number | null> {
+  const db = getDb();
+  const ref = db.collection("accounts").doc(accountId);
+
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return null;
+    const current = Number(doc.data()!.balance ?? 0);
+    if (current < amountUsd) return null;
+    const next = current - amountUsd;
+    tx.update(ref, { balance: next });
+    return next;
+  });
 }
 
 /**
- * Mirror of debitBalance for refunds — used when an answer request fails
- * after the debit already ran (spend limit hit, no sources responded).
+ * Mirror of debitBalance for refunds — called when an answer request fails
+ * after the debit already ran.
  */
-export async function creditBalance(accountId: string, amountUsd: number): Promise<number | null> {
-  const sql = getSql();
-  const rows = await sql`
-    UPDATE users
-    SET balance_usdc = balance_usdc + ${amountUsd}
-    WHERE id = ${accountId}
-    RETURNING balance_usdc
-  `;
-  if (rows.length === 0) return null;
-  return Number(rows[0].balance_usdc);
+export async function creditBalance(
+  accountId: string,
+  amountUsd: number
+): Promise<number | null> {
+  const db = getDb();
+  const ref = db.collection("accounts").doc(accountId);
+
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return null;
+    const current = Number(doc.data()!.balance ?? 0);
+    const next = current + amountUsd;
+    tx.update(ref, { balance: next });
+    return next;
+  });
 }
 
 /**
- * Records a completed top-up and credits the balance in one transaction,
- * keyed on the Coinbase Onramp transaction id so re-syncing the same
- * transaction (polling is not exactly-once) never double-credits.
+ * Records a completed top-up and credits the balance.
+ * Keyed on txHash as the Firestore doc ID — idempotent by design
+ * (the same tx hash written twice is a no-op because doc already exists).
  */
 export async function recordDeposit(
   accountId: string,
-  onrampTxId: string,
+  txHash: string,
   amountUsd: number
 ): Promise<{ credited: boolean; balance: number; accountFound: boolean }> {
-  const sql = getSql();
-  const rows = await sql`
-    WITH inserted AS (
-      INSERT INTO deposits (user_id, onramp_tx_id, amount_usdc)
-      VALUES (${accountId}, ${onrampTxId}, ${amountUsd})
-      ON CONFLICT (onramp_tx_id) DO NOTHING
-      RETURNING id
-    )
-    UPDATE users
-    SET balance_usdc = balance_usdc + ${amountUsd} * (SELECT COUNT(*) FROM inserted)
-    WHERE id = ${accountId}
-    RETURNING balance_usdc, (SELECT COUNT(*) FROM inserted) AS inserted_count
-  `;
-  if (rows.length === 0) {
-    // Account row is missing entirely — shouldn't happen since accountId
-    // comes from createAccount, but callers must be able to tell this apart
-    // from "already credited" (accountFound:false vs credited:false).
-    return { credited: false, balance: 0, accountFound: false };
-  }
-  const insertedCount = Number(rows[0].inserted_count);
-  return { credited: insertedCount > 0, balance: Number(rows[0].balance_usdc), accountFound: true };
+  const db = getDb();
+  const accountRef = db.collection("accounts").doc(accountId);
+  const depositRef = accountRef.collection("deposits").doc(txHash);
+
+  return db.runTransaction(async (tx) => {
+    const [accountDoc, depositDoc] = await Promise.all([
+      tx.get(accountRef),
+      tx.get(depositRef),
+    ]);
+
+    if (!accountDoc.exists) {
+      return { credited: false, balance: 0, accountFound: false };
+    }
+    if (depositDoc.exists) {
+      // Already credited this tx — idempotent, return current balance.
+      return {
+        credited: false,
+        balance: Number(accountDoc.data()!.balance ?? 0),
+        accountFound: true,
+      };
+    }
+
+    const current = Number(accountDoc.data()!.balance ?? 0);
+    const next = current + amountUsd;
+    tx.update(accountRef, { balance: next });
+    tx.set(depositRef, { amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
+    return { credited: true, balance: next, accountFound: true };
+  });
 }

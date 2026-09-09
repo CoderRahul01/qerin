@@ -16,7 +16,11 @@ export interface AnswerResult {
 // is passed through to the answer_requests record for attribution when
 // called from the balance-gated path; index.ts owns debiting/refunding
 // that balance around this call.
-export async function answerHandler(question: string, accountId: string | null = null): Promise<AnswerResult> {
+export async function answerHandler(
+  question: string,
+  accountId: string | null = null,
+  targetNetwork?: string
+): Promise<AnswerResult> {
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
 
@@ -45,12 +49,12 @@ export async function answerHandler(question: string, accountId: string | null =
   const totalPaidNum = paidResults.reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
   await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
 
-  const answer = await synthesizeAnswer(question, paidResults);
+  const synthesized = await synthesizeAnswer(question, paidResults);
 
   // The summary above is the hook; the full paid content per source is the
   // actual deliverable Qerin sells access to — surface it alongside the
   // receipt rather than discarding it after synthesis.
-  const network = getNetwork();
+  const network = getNetwork(targetNetwork);
   const receipt = paidResults.map((r) => ({
     source: r.sourceName,
     amountPaid: r.amountPaid,
@@ -68,9 +72,14 @@ export async function answerHandler(question: string, accountId: string | null =
     status: 200,
     body: {
       question,
-      answer,
+      topic: synthesized.topic,
+      summary: synthesized.summary,
+      answer: synthesized.answer,
+      personaInsights: synthesized.personaInsights,
       receipt,
       totalPaid: totalPaidNum.toFixed(3),
+      network: network.name,
+      chainId: network.chainId,
     },
   };
 }

@@ -6,9 +6,23 @@ compatibility_date = "2025-04-01"
 # (lazily, at request time — see wallet.ts) rather than threading Hono's `c.env`.
 compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 
-# Non-secret defaults. Real values (and anything sensitive) are set with
-# `wrangler secret put <NAME>` instead — see apps/backend/.dev.vars.example
-# for the full list and 07-deployment.md for the deploy walkthrough.
+# ── Architecture: Monolithic Cloudflare Workers + Firebase ──────────────────
+# This single Workers deployment is the entire Qerin backend:
+#   • HTTP API layer — Hono (src/index.ts)
+#   • Database — Firebase Firestore (free Spark plan, accounts/balances/waitlist)
+#   • LLM synthesis — NVIDIA NIM API
+#   • On-chain payments — x402 / Base USDC
+#   • On-chain audit log — QerinReceiptRegistry contract
+# No Railway, no Neon, no separate microservices.
+# ────────────────────────────────────────────────────────────────────────────
+
+# Non-secret defaults. Sensitive values are stored with `wrangler secret put`:
+#   wrangler secret put FIREBASE_SERVICE_ACCOUNT   <- Firebase Admin SDK JSON (minified)
+#   wrangler secret put QERIN_WALLET_PRIVATE_KEY
+#   wrangler secret put NVIDIA_API_KEY
+#   wrangler secret put QERIN_INTERNAL_SECRET
+#   wrangler secret put CDP_API_KEY_ID
+#   wrangler secret put CDP_API_KEY_SECRET
 [vars]
 QERIN_NETWORK = "mainnet"
 QERIN_LLM_MODEL = "meta/llama-3.3-70b-instruct"
@@ -21,3 +35,4 @@ name = "RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 20, period = 60 }
+

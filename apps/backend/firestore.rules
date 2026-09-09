@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Qerin uses Firebase Admin SDK from Cloudflare Workers — all reads/writes
+// bypass these rules (Admin SDK has full access). These rules lock down
+// direct client-SDK access completely so no browser can ever bypass the
+// Workers auth layer.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

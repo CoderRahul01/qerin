@@ -21,10 +21,6 @@ import { recordDeposit } from "./accounts.js";
 const USDC_DECIMALS = 1_000_000; // USDC has 6 decimals on Base.
 const TRANSFER_TOPIC0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-const RPC_URLS: Record<"mainnet" | "testnet", string> = {
-  mainnet: "https://mainnet.base.org",
-  testnet: "https://sepolia.base.org",
-};
 
 interface RpcLog {
   address: string;
@@ -39,7 +35,7 @@ interface RpcReceipt {
 }
 
 async function getTransactionReceipt(txHash: string): Promise<RpcReceipt | null> {
-  const rpcUrl = RPC_URLS[getActiveNetwork()];
+  const rpcUrl = getNetwork().rpcUrl;
   const res = await fetch(rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -110,8 +106,9 @@ export async function verifyAndCreditCryptoDeposit(
   }
 
   let transferredAtomic = 0n;
+  const tokenAddress = (network.usdc ?? network.usdt ?? "").toLowerCase();
   for (const log of receipt.logs) {
-    if (log.address.toLowerCase() !== network.usdc.toLowerCase()) continue;
+    if (!tokenAddress || log.address.toLowerCase() !== tokenAddress) continue;
     if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC0) continue;
     // Transfer(address indexed from, address indexed to, uint256 value):
     // topics[1] = from, topics[2] = to (each a 32-byte-padded address),
