@@ -1,5 +1,6 @@
-import { QerinApp } from "@/components/QerinApp";
+import { QerinDashboard } from "@/components/dashboard/QerinDashboard";
 
 export default function AppPage() {
-  return <QerinApp />;
+  return <QerinDashboard />;
 }
+

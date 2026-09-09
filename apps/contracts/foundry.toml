@@ -8,8 +8,12 @@ remappings = ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"]
 [rpc_endpoints]
 base = "https://mainnet.base.org"
 base_sepolia = "https://sepolia.base.org"
+botchain = "https://rpc.botchain.ai"
+botchain_testnet = "https://bundler.bohr.life/rpc"
 
 [etherscan]
 base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.basescan.org/api" }
+botchain = { key = "any", chain = 677, url = "https://scan.botchain.ai/api" }
+botchain_testnet = { key = "any", chain = 968, url = "https://scan.botchain.ai/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

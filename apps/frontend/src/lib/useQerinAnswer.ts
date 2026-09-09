@@ -13,14 +13,14 @@ export function useQerinAnswer() {
   const [status, setStatus] = useState<AskStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function ask(question: string, accountId: string): Promise<AskResult> {
+  async function ask(question: string, accountId: string, network?: string): Promise<AskResult> {
     setStatus("paying");
     setErrorMessage(null);
     try {
       const res = await fetch("/api/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, network }),
       });
       const json = await res.json();
       if (!res.ok) {
