@@ -44,17 +44,17 @@ export async function recordReceiptOnChain(
   question: string,
   sourceCount: number,
   totalPaidUsd: number
-): Promise<void> {
+): Promise<string | null> {
   const registryAddress = getRegistryAddress();
   const client = getWalletClient();
-  if (!client || !registryAddress) return;
+  if (!client || !registryAddress) return null;
 
   try {
     const questionHash = keccak256(toBytes(question));
     const receiptId = keccak256(toBytes(crypto.randomUUID()));
     const totalPaidMicroUSDC = BigInt(Math.round(totalPaidUsd * 1_000_000));
 
-    await client.writeContract({
+    const hash = await client.writeContract({
       address: registryAddress,
       abi: REGISTRY_ABI,
       functionName: "recordReceipt",
@@ -62,7 +62,10 @@ export async function recordReceiptOnChain(
       chain: client.chain,
       account: client.account!,
     });
+    console.log(`QerinReceiptRegistry recorded receipt: ${hash}`);
+    return hash;
   } catch (err) {
     console.error("QerinReceiptRegistry write failed (non-fatal):", err);
+    return null;
   }
 }

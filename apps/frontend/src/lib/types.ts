@@ -25,13 +25,22 @@ export interface PersonaInsights {
   trader?: string;
 }
 
+export interface SourceCitation {
+  name: string;
+  citation: string;
+}
+
 export interface AnswerData {
   question: string;
   topic?: string;
   summary?: string;
   answer: string;
   personaInsights?: PersonaInsights;
+  sourceCitations?: SourceCitation[];
   receipt: ReceiptItem[];
+  registryTxHash?: string;
+  registryContract?: string;
+  registryExplorerUrl?: string;
   totalPaid: string;
   balance?: number;
   network?: string;
