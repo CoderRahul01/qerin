@@ -1,5 +1,15 @@
+import { isAddress, getAddress } from "viem";
 import { getDb, FieldValue } from "./db.js";
 import crypto from "crypto";
+
+export function normalizeAccountId(accountId?: string | null): string {
+  if (!accountId) return crypto.randomUUID();
+  const trimmed = accountId.trim();
+  if (isAddress(trimmed)) {
+    return getAddress(trimmed).toLowerCase();
+  }
+  return trimmed;
+}
 
 // Collection: accounts/{accountId}
 //   fields: { balance: number, createdAt: Timestamp }
@@ -19,7 +29,7 @@ export async function createAccount(): Promise<string> {
 
 export async function getOrCreateAccount(accountId?: string): Promise<{ accountId: string; balance: number }> {
   const db = getDb();
-  const id = accountId?.trim() || crypto.randomUUID();
+  const id = normalizeAccountId(accountId);
   const ref = db.collection("accounts").doc(id);
   const doc = await ref.get();
 
@@ -36,7 +46,8 @@ export async function getOrCreateAccount(accountId?: string): Promise<{ accountI
 
 export async function getBalance(accountId: string): Promise<number | null> {
   const db = getDb();
-  const doc = await db.collection("accounts").doc(accountId).get();
+  const id = normalizeAccountId(accountId);
+  const doc = await db.collection("accounts").doc(id).get();
   if (!doc.exists) return null;
   return Number(doc.data()!.balance ?? 0);
 }
@@ -50,7 +61,8 @@ export async function debitBalance(
   amountUsd: number
 ): Promise<number | null> {
   const db = getDb();
-  const ref = db.collection("accounts").doc(accountId);
+  const id = normalizeAccountId(accountId);
+  const ref = db.collection("accounts").doc(id);
 
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
@@ -72,7 +84,8 @@ export async function creditBalance(
   amountUsd: number
 ): Promise<number> {
   const db = getDb();
-  const ref = db.collection("accounts").doc(accountId);
+  const id = normalizeAccountId(accountId);
+  const ref = db.collection("accounts").doc(id);
 
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
@@ -97,7 +110,8 @@ export async function recordDeposit(
   amountUsd: number
 ): Promise<{ credited: boolean; balance: number; accountFound: boolean }> {
   const db = getDb();
-  const accountRef = db.collection("accounts").doc(accountId);
+  const id = normalizeAccountId(accountId);
+  const accountRef = db.collection("accounts").doc(id);
   const depositRef = accountRef.collection("deposits").doc(txHash);
 
   return db.runTransaction(async (tx) => {

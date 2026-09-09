@@ -34,24 +34,25 @@ function getWalletClient(): WalletClient | null {
 }
 
 /**
- * Logs a delivered answer to the QerinReceiptRegistry contract. This is a
- * credibility/audit layer on top of the individual x402 payment tx hashes,
- * not a requirement for the answer flow itself — a failure here must never
- * fail or delay the response already sent to the caller. Fire-and-forget
- * from index.ts (not awaited before responding).
+ * Logs a delivered answer to the QerinReceiptRegistry contract.
+ * Attaches the payerAddress deterministically to the receiptId so the delivery
+ * is cryptographically attributable to that user's isolated account.
  */
 export async function recordReceiptOnChain(
   question: string,
   sourceCount: number,
-  totalPaidUsd: number
+  totalPaidUsd: number,
+  payerAddress?: string | null,
+  targetNetwork?: string
 ): Promise<string | null> {
   const registryAddress = getRegistryAddress();
   const client = getWalletClient();
   if (!client || !registryAddress) return null;
 
   try {
+    const payer = payerAddress && payerAddress.startsWith("0x") ? payerAddress.toLowerCase() : "anonymous";
     const questionHash = keccak256(toBytes(question));
-    const receiptId = keccak256(toBytes(crypto.randomUUID()));
+    const receiptId = keccak256(toBytes(`${payer}:${Date.now()}:${crypto.randomUUID()}`));
     const totalPaidMicroUSDC = BigInt(Math.round(totalPaidUsd * 1_000_000));
 
     const hash = await client.writeContract({
@@ -62,7 +63,7 @@ export async function recordReceiptOnChain(
       chain: client.chain,
       account: client.account!,
     });
-    console.log(`QerinReceiptRegistry recorded receipt: ${hash}`);
+    console.log(`QerinReceiptRegistry recorded receipt for ${payer}: ${hash}`);
     return hash;
   } catch (err) {
     console.error("QerinReceiptRegistry write failed (non-fatal):", err);

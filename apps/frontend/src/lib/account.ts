@@ -1,8 +1,44 @@
 const STORAGE_KEY = "qerin_account_id";
 
-export async function getOrCreateAccountId(): Promise<string> {
+export async function getConnectedWalletAddress(): Promise<string | null> {
+  if (typeof window === "undefined" || !window.ethereum) return null;
+  try {
+    const accounts = (await window.ethereum.request({ method: "eth_accounts" })) as string[];
+    if (Array.isArray(accounts) && accounts.length > 0 && accounts[0].startsWith("0x")) {
+      return accounts[0].toLowerCase();
+    }
+  } catch {}
+  return null;
+}
+
+export async function requestWalletConnection(): Promise<string | null> {
+  if (typeof window === "undefined" || !window.ethereum) return null;
+  try {
+    const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
+    if (Array.isArray(accounts) && accounts.length > 0 && accounts[0].startsWith("0x")) {
+      return accounts[0].toLowerCase();
+    }
+  } catch {}
+  return null;
+}
+
+export async function getOrCreateAccountId(walletAddr?: string | null): Promise<string> {
   if (typeof window === "undefined") {
     throw new Error("getOrCreateAccountId can only run in the browser");
+  }
+
+  const targetWallet = walletAddr !== undefined ? walletAddr : (await getConnectedWalletAddress());
+  if (targetWallet && targetWallet.startsWith("0x")) {
+    const normalized = targetWallet.toLowerCase();
+    window.localStorage.setItem(STORAGE_KEY, normalized);
+    try {
+      await fetch("/api/account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress: normalized }),
+      });
+    } catch {}
+    return normalized;
   }
 
   const existing = window.localStorage.getItem(STORAGE_KEY);
