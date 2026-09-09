@@ -49,3 +49,16 @@ export async function confirmCryptoTopup(
   }
   return json.balance as number;
 }
+
+export async function claimDemoFuel(accountId: string): Promise<number> {
+  const res = await fetch("/api/account/topup/demo-claim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error || "Could not activate ecosystem review pass");
+  }
+  return json.balance as number;
+}
+

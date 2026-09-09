@@ -308,7 +308,11 @@ export function QerinDashboard() {
   const handleSubmit = async () => {
     const q = inputValue.trim();
     if (!q || isSubmitting) return;
-    if (balance !== null && balance < 0.15) { setTopupReason("Your balance is too low for another question."); setShowTopup(true); return; }
+    if (balance !== null && balance < 0.15) {
+      setTopupReason("Your Agent Settlement Fuel is depleted. Fund your treasury to fuel autonomous research queries.");
+      setShowTopup(true);
+      return;
+    }
 
     setInputValue("");
     setIsSubmitting(true);
@@ -359,7 +363,7 @@ export function QerinDashboard() {
           }),
         }));
       } else if (result.reason === "insufficient_balance") {
-        setTopupReason("Your balance ran out while asking that question.");
+        setTopupReason("Your Agent Settlement Fuel ran out while settling data source micropayments.");
         setShowTopup(true);
         updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId) }));
       } else {
@@ -786,7 +790,15 @@ export function QerinDashboard() {
         </div>
       </div>
 
-      {showTopup && accountId && <TopupModal accountId={accountId} reason={topupReason} onClose={() => setShowTopup(false)} onCredited={b => setBalance(b)} />}
+      {showTopup && accountId && (
+        <TopupModal
+          accountId={accountId}
+          initialNetwork={selectedNetwork}
+          reason={topupReason}
+          onClose={() => setShowTopup(false)}
+          onCredited={(b) => setBalance(b)}
+        />
+      )}
 
       <style>{`@media (max-width: 767px) { #qd-mobile-menu { display: flex !important; } }`}</style>
     </>
