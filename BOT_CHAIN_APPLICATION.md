@@ -106,27 +106,38 @@ Jainish
 
 1. **EVM Contract Deployment**:
    - `QerinReceiptRegistry.sol` is ready for BOT Chain Mainnet (Chain ID 677, RPC `https://rpc.botchain.ai`) and Testnet (Chain ID 968, RPC `https://rpc.bohr.life`).
-   - Deployment command for BOT Chain Mainnet:
+   - Deployment command for BOT Chain Mainnet (broadcast placed before constructor args):
      ```bash
      cd apps/contracts
      forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
-       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --broadcast \
        --rpc-url https://rpc.botchain.ai \
-       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2 \
-       --broadcast
+       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2
      ```
    - Deployment command for BOT Chain Testnet:
      ```bash
      cd apps/contracts
      forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
-       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --broadcast \
        --rpc-url https://rpc.bohr.life \
-       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2 \
-       --broadcast
+       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2
      ```
+
 2. **Frontend Multi-Chain Switcher**:
    - Integrated into [`apps/frontend/src/components/dashboard/QerinDashboard.tsx`](file:///Volumes/Powerhouse/Web3/qerin/apps/frontend/src/components/dashboard/QerinDashboard.tsx).
-   - Allows users to switch between **Base (8453)** and **BOT Chain (677)** and automatically prompts MetaMask/EVM wallets to add BOT Chain via `wallet_addEthereumChain`.
-3. **Backend Multi-Chain Support**:
+   - Allows users to switch between **Base (8453)** and **BOT Chain (677)** and automatically prompts MetaMask/EVM wallets to add BOT Chain via `wallet_addEthereumChain` (`chainId: 0x2A5`, `rpc: https://rpc.botchain.ai`, `explorer: https://scan.botchain.ai/`).
+
+3. **Backend Multi-Chain & Infrastructure Routing**:
    - Configured in [`apps/backend/src/networks.ts`](file:///Volumes/Powerhouse/Web3/qerin/apps/backend/src/networks.ts) and [`apps/backend/src/index.ts`](file:///Volumes/Powerhouse/Web3/qerin/apps/backend/src/index.ts).
-   - Automatically surfaces explorer URLs (`https://scan.botchain.ai/tx/...`), USDT tokens (`0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C`), and chain parameters.
+   - **Native & Wrapped Tokens**: Native `BOT`, WBOT (`0xD5452816194a3784dBa983426cCe7c122F4abd30`), USDT (`0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C`).
+   - **ERC-4337 Account Abstraction**: Mainnet Bundler (`https://bundler.botchain.ai/rpc`) and Testnet Bundler (`https://bundler.bohr.life/rpc`).
+   - **BDEX v3 Integration**: Universal Router (`0xaE6ae8630f7A888dDec0B9195C85F7515d5887655`), SwapRouter (`0x07032d47A1b9f8460cBeE9dC17c1d3E438693929`), Factory (`0x1C51c173323ec11BB4e3C4fD2314c225Dc4b5419`), QuoterV2 (`0x034A705b36067cff99ABf5C662Be881cBd8d0176`).
+   - **Real-Time WebSocket**: `wss://ws-rpc.botchain.ai`.
+   - **Security Audits Verified**: CertiK Skynet score & official chain audit reports integrated.
+
+4. **Institutional Dune Analytics & Intelligence Hub**:
+   - Live public dashboard: `https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub`
+   - Features real-time KPI counters, network throughput benchmarks (BOT Chain 5,000 TPS vs Base/ETH), 6-month adoption curves, and on-chain verification ledgers.
+
