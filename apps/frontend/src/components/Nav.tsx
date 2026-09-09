@@ -2,9 +2,11 @@ import { LogoLockup } from "@/components/LogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
+  { href: "/app", label: "App" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#for-builders", label: "For builders" },
+  { href: "#features", label: "Features" },
   { href: "#proof", label: "Proof" },
+  { href: "https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub", label: "Dune Analytics ↗" },
 ];
 
 export function Nav() {
@@ -30,7 +32,7 @@ export function Nav() {
           gap: 16,
         }}
       >
-        <a href="#top" style={{ textDecoration: "none" }}>
+        <a href="/" style={{ textDecoration: "none" }}>
           <LogoLockup size={22} />
         </a>
 
@@ -39,6 +41,8 @@ export function Nav() {
             <a
               key={link.href}
               href={link.href}
+              target={link.href.startsWith("http") ? "_blank" : undefined}
+              rel={link.href.startsWith("http") ? "noreferrer" : undefined}
               style={{
                 fontSize: 14,
                 fontWeight: 500,
@@ -54,7 +58,7 @@ export function Nav() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <ThemeToggle />
           <a
-            href="#waitlist"
+            href="/app"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -70,10 +74,11 @@ export function Nav() {
               whiteSpace: "nowrap",
             }}
           >
-            Join waitlist
+            Launch App →
           </a>
         </div>
       </div>
     </header>
   );
 }
+
