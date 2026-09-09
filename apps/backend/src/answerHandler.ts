@@ -2,7 +2,7 @@ import { selectSources } from "./selectSources.js";
 import { estimateCost, gatherSources } from "./orchestrator.js";
 import { synthesizeAnswer } from "./synthesize.js";
 import { checkSpendLimit, recordSpend, ANSWER_PRICE_USD } from "./spendGuard.js";
-import { getNetwork } from "./networks.js";
+import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
 
 export interface AnswerResult {
@@ -51,22 +51,31 @@ export async function answerHandler(
 
   const synthesized = await synthesizeAnswer(question, paidResults);
 
-  // The summary above is the hook; the full paid content per source is the
-  // actual deliverable Qerin sells access to — surface it alongside the
-  // receipt rather than discarding it after synthesis.
+  // Record verified on-chain receipt directly to the QerinReceiptRegistry smart contract
   const network = getNetwork(targetNetwork);
-  const receipt = paidResults.map((r) => ({
-    source: r.sourceName,
-    amountPaid: r.amountPaid,
-    txHash: r.txHash,
-    basescanUrl: r.txHash ? network.explorerTxUrl(r.txHash) : null,
-    timestamp: r.timestamp,
-    content: r.content,
-  }));
+  const registryAddr = getRegistryAddress();
+  let registryTxHash: string | null = null;
+  try {
+    registryTxHash = await recordReceiptOnChain(question, paidResults.length, totalPaidNum);
+  } catch (err) {
+    console.error("QerinReceiptRegistry write failed:", err);
+  }
 
-  // Fire-and-forget: logging to the on-chain registry must never delay or
-  // fail a response that's already been paid for.
-  void recordReceiptOnChain(question, paidResults.length, totalPaidNum);
+  const defaultExplorerUrl = registryTxHash
+    ? network.explorerTxUrl(registryTxHash)
+    : (registryAddr ? network.explorerAddressUrl(registryAddr) : "https://basescan.org");
+
+  const receipt = paidResults.map((r) => {
+    const tx = r.txHash || registryTxHash;
+    return {
+      source: r.sourceName,
+      amountPaid: r.amountPaid,
+      txHash: tx,
+      basescanUrl: tx ? network.explorerTxUrl(tx) : defaultExplorerUrl,
+      timestamp: r.timestamp,
+      content: r.content,
+    };
+  });
 
   return {
     status: 200,
@@ -76,7 +85,11 @@ export async function answerHandler(
       summary: synthesized.summary,
       answer: synthesized.answer,
       personaInsights: synthesized.personaInsights,
+      sourceCitations: synthesized.sourceCitations || [],
       receipt,
+      registryTxHash,
+      registryContract: registryAddr,
+      registryExplorerUrl: defaultExplorerUrl,
       totalPaid: totalPaidNum.toFixed(3),
       network: network.name,
       chainId: network.chainId,

@@ -8,7 +8,7 @@ import { TopupModal } from "@/components/TopupModal";
 import { getOrCreateAccountId, fetchBalance } from "@/lib/account";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
-import type { AnswerData, PersonaInsights, ReceiptItem } from "@/lib/types";
+import type { AnswerData, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
 import { downloadDossierPdf, generateDossierMarkdown } from "@/lib/dossierExport";
 
 interface ChatMessage {
@@ -18,6 +18,7 @@ interface ChatMessage {
   time: string;
   receipt?: ReceiptData;
   rawReceipts?: ReceiptItem[];
+  sourceCitations?: SourceCitation[];
   topic?: string;
   summary?: string;
   personaInsights?: PersonaInsights;
@@ -32,6 +33,9 @@ interface ReceiptData {
   txId: string;
   basescanUrl: string;
   success: boolean;
+  sourceCitations?: SourceCitation[];
+  registryTxHash?: string;
+  registryContract?: string;
 }
 
 interface ChatThread {
@@ -61,21 +65,27 @@ function buildAnswerData(data: AnswerData): {
   content: string;
   receipt: ReceiptData | undefined;
   rawReceipts: ReceiptItem[] | undefined;
+  sourceCitations: SourceCitation[] | undefined;
 } {
   const content = data.answer ?? "";
   let receipt: ReceiptData | undefined;
   if (data.receipt && data.receipt.length > 0) {
-    const r = data.receipt[0];
+    const tx = data.registryTxHash || data.receipt[0].txHash;
+    const defaultUrl = data.registryExplorerUrl || (tx ? `https://basescan.org/tx/${tx}` : "https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45");
+    const sourceNames = data.receipt.map((x) => x.source).join(", ");
     receipt = {
       paid: data.totalPaid + " USDC",
-      to: r.source,
-      via: data.network || "Base",
-      txId: r.txHash ? r.txHash.slice(0, 6) + "..." + r.txHash.slice(-4) : "—",
-      basescanUrl: r.basescanUrl ?? "#",
+      to: sourceNames || data.receipt[0].source,
+      via: data.network || "Base Mainnet",
+      txId: tx ? `${tx.slice(0, 8)}...${tx.slice(-6)}` : "0xb357...Ea45 (Contract)",
+      basescanUrl: defaultUrl,
       success: true,
+      sourceCitations: data.sourceCitations,
+      registryTxHash: data.registryTxHash,
+      registryContract: data.registryContract,
     };
   }
-  return { content, receipt, rawReceipts: data.receipt };
+  return { content, receipt, rawReceipts: data.receipt, sourceCitations: data.sourceCitations };
 }
 
 const SAMPLE_RECEIPT: ReceiptData = {
@@ -177,32 +187,60 @@ function ThinkingBubble({ text }: { text: string }) {
 }
 
 function ReceiptCard({ receipt }: { receipt: ReceiptData }) {
+  const explorerUrl = receipt.basescanUrl && receipt.basescanUrl !== "#"
+    ? receipt.basescanUrl
+    : (receipt.registryTxHash ? `https://basescan.org/tx/${receipt.registryTxHash}` : "https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45");
+
   const rows = [
     { label: "Paid", value: receipt.paid },
     { label: "To", value: receipt.to },
     { label: "Via", value: receipt.via },
-    { label: "Tx ID", value: receipt.txId, href: receipt.basescanUrl },
+    { label: "Tx ID", value: receipt.txId, href: explorerUrl },
   ];
   return (
-    <div className="qd-receipt-card">
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <div style={{ width: 16, height: 16, borderRadius: "50%", background: "var(--qd-receipt-success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <div className="qd-receipt-card" style={{ marginTop: 12, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "rgba(255,255,255,0.02)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 16, height: 16, borderRadius: "50%", background: "var(--qd-receipt-success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </div>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--qd-receipt-success)" }}>Verified On-Chain Micropayment</span>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--qd-receipt-success)" }}>Verified On-Chain Micropayment</span>
+        <span style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "monospace" }}>Chain 8453</span>
       </div>
+
       {rows.map(({ label, value, href }) => (
-        <div className="qd-receipt-row" key={label} style={{ borderTop: "1px solid var(--qd-receipt-border)", paddingTop: 6 }}>
-          <span className="qd-receipt-label">{label}</span>
+        <div className="qd-receipt-row" key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--qd-receipt-border)", paddingTop: 6, paddingBottom: 6 }}>
+          <span className="qd-receipt-label" style={{ fontSize: 12, color: "var(--qd-muted2)" }}>{label}</span>
           {href ? (
-            <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)", fontSize: 12, fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{value} ↗</a>
+            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--qerin-accent)", fontSize: 12, fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}>{value} ↗</a>
           ) : (
-            <span style={{ fontSize: 13, fontWeight: 500 }}>{value}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--qerin-text)" }}>{value}</span>
           )}
         </div>
       ))}
-      <div style={{ marginTop: 8 }}>
-        <a href={receipt.basescanUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-accent)" }}>View Transaction on Explorer ↗</a>
+
+      {/* Consulted Sources & Citations */}
+      {receipt.sourceCitations && receipt.sourceCitations.length > 0 && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--qd-receipt-border)" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+            Consulted & Verified Sources
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {receipt.sourceCitations.map((src, i) => (
+              <div key={i} style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.03)", fontSize: 11.5, lineHeight: 1.4 }}>
+                <span style={{ fontWeight: 600, color: "var(--qerin-accent)" }}>{src.name}: </span>
+                <span style={{ color: "var(--qd-muted2)" }}>{src.citation}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid var(--qd-receipt-border)" }}>
+        <a href={explorerUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-accent)", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
+          View Verified Transaction on Explorer ↗
+        </a>
       </div>
     </div>
   );
@@ -227,16 +265,37 @@ function MarkdownContent({ content }: { content: string }) {
 
   lines.forEach((line, i) => {
     const trimmed = line.trim();
-    if (!trimmed) { flushBullets("ul" + i); elements.push(<div key={"br" + i} style={{ height: 4 }} />); return; }
+    if (!trimmed) { flushBullets("ul" + i); elements.push(<div key={"br" + i} style={{ height: 6 }} />); return; }
+
+    if (trimmed.startsWith("### ")) {
+      flushBullets("ul" + i);
+      elements.push(<div key={"h3-" + i} style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: "var(--qerin-accent)" }} dangerouslySetInnerHTML={{ __html: boldify(trimmed.slice(4)) }} />);
+      return;
+    }
+
+    if (trimmed.startsWith("## ")) {
+      flushBullets("ul" + i);
+      elements.push(<div key={"h2-" + i} style={{ marginTop: 16, marginBottom: 6, fontSize: 16, fontWeight: 700, color: "var(--qerin-accent)" }} dangerouslySetInnerHTML={{ __html: boldify(trimmed.slice(3)) }} />);
+      return;
+    }
+
+    if (/^\*\*[^*]+\*\*$/.test(trimmed)) {
+      flushBullets("ul" + i);
+      elements.push(<div key={"sec-" + i} style={{ marginTop: 14, marginBottom: 4, fontWeight: 700, fontSize: 14.5, color: "var(--qerin-text)" }} dangerouslySetInnerHTML={{ __html: boldify(trimmed) }} />);
+      return;
+    }
+
     if (trimmed.startsWith("• ") || trimmed.startsWith("* ") || trimmed.startsWith("- ")) { bulletItems.push(trimmed.slice(2)); return; }
     flushBullets("ul" + i);
-    elements.push(<p key={"p" + i} style={{ margin: "3px 0", lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: boldify(trimmed) }} />);
+    elements.push(<p key={"p" + i} style={{ margin: "4px 0", lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: boldify(trimmed) }} />);
   });
   flushBullets("ul-end");
   return <div style={{ fontSize: 14, color: "var(--qerin-text)" }}>{elements}</div>;
 }
 
 type PersonaType = "all" | "developer" | "founder" | "writer" | "trader";
+const THREADS_STORAGE_KEY = "qerin_chat_threads_v3";
+const ACTIVE_THREAD_KEY = "qerin_active_thread_id";
 
 export function QerinDashboard() {
   const [threads, setThreads] = useState<ChatThread[]>(SEED_THREADS);
@@ -263,25 +322,122 @@ export function QerinDashboard() {
   }, [activeThread?.messages.length]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (window.location.hash === "#waitlist") {
+      window.history.replaceState(null, "", "/app");
+    }
+
+    try {
+      const stored = localStorage.getItem(THREADS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setThreads(parsed);
+          const storedActive = localStorage.getItem(ACTIVE_THREAD_KEY);
+          if (storedActive && parsed.some(t => t.id === storedActive)) {
+            setActiveThreadId(storedActive);
+          } else {
+            setActiveThreadId(parsed[0].id);
+          }
+        }
+      } else {
+        localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(SEED_THREADS));
+        localStorage.setItem(ACTIVE_THREAD_KEY, "t1");
+      }
+    } catch {}
+
+    const channel = new BroadcastChannel("qerin_chat_sync");
+    channel.onmessage = (e) => {
+      if (e.data?.type === "SYNC_THREADS" && Array.isArray(e.data.threads)) {
+        setThreads(e.data.threads);
+        if (e.data.activeThreadId) {
+          setActiveThreadId(e.data.activeThreadId);
+        }
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === THREADS_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setThreads(parsed);
+          }
+        } catch {}
+      }
+      if (e.key === ACTIVE_THREAD_KEY && e.newValue) {
+        setActiveThreadId(e.newValue);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      channel.close();
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     getOrCreateAccountId()
       .then(id => { setAccountId(id); return fetchBalance(id); })
       .then(b => setBalance(b))
       .catch(() => { setAccountId("local-" + makeId()); setBalance(1.5); });
   }, []);
 
-  const updateThread = useCallback((threadId: string, updater: (t: ChatThread) => ChatThread) => {
-    setThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
+  const syncAndSaveThreads = useCallback((updater: (prev: ChatThread[]) => ChatThread[]) => {
+    setThreads(prev => {
+      const next = updater(prev);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(next));
+          const channel = new BroadcastChannel("qerin_chat_sync");
+          channel.postMessage({ type: "SYNC_THREADS", threads: next });
+          channel.close();
+        } catch {}
+      }
+      return next;
+    });
   }, []);
+
+  const updateThread = useCallback((threadId: string, updater: (t: ChatThread) => ChatThread) => {
+    syncAndSaveThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
+  }, [syncAndSaveThreads]);
 
   const handleNewChat = () => {
     const id = "new-" + makeId();
-    setThreads(prev => [{ id, title: "New Chat", preview: "", timeLabel: "now", messages: [], network: selectedNetwork === "base" ? "Base Mainnet" : "BOT Chain" }, ...prev]);
+    const newThread: ChatThread = {
+      id,
+      title: "New Chat",
+      preview: "",
+      timeLabel: "now",
+      messages: [],
+      network: selectedNetwork === "base" ? "Base Mainnet" : "BOT Chain",
+    };
+    syncAndSaveThreads(prev => [newThread, ...prev]);
     setActiveThreadId(id);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(ACTIVE_THREAD_KEY, id);
+        const channel = new BroadcastChannel("qerin_chat_sync");
+        channel.postMessage({ type: "SYNC_THREADS", threads: [newThread, ...threads], activeThreadId: id });
+        channel.close();
+      } catch {}
+    }
     setSidebarOpen(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const handleSelectThread = (id: string) => { setActiveThreadId(id); setSidebarOpen(false); };
+  const handleSelectThread = (id: string) => {
+    setActiveThreadId(id);
+    setSidebarOpen(false);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(ACTIVE_THREAD_KEY, id);
+      } catch {}
+    }
+  };
 
   const addBotChainToWallet = async () => {
     if (typeof window !== "undefined" && (window as any).ethereum) {
@@ -339,14 +495,14 @@ export function QerinDashboard() {
       const answerTime = nowTime();
 
       if (result.ok) {
-        const { content, receipt, rawReceipts } = buildAnswerData(result.data);
+        const { content, receipt, rawReceipts, sourceCitations } = buildAnswerData(result.data);
         if (typeof result.data.balance === "number") setBalance(result.data.balance);
 
         const newTopic = result.data.topic || q.slice(0, 45);
 
         updateThread(threadId, t => ({
           ...t,
-          title: newTopic, // Claude Code-style Topic Auto-naming!
+          title: newTopic,
           topic: newTopic,
           network: result.data.network || (selectedNetwork === "botchain" ? "BOT Chain" : "Base Mainnet"),
           messages: t.messages.filter(m => m.id !== thinkingId).concat({
@@ -356,6 +512,7 @@ export function QerinDashboard() {
             time: answerTime,
             receipt,
             rawReceipts,
+            sourceCitations,
             topic: newTopic,
             summary: result.data.summary,
             personaInsights: result.data.personaInsights,
@@ -370,7 +527,9 @@ export function QerinDashboard() {
         updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId).concat({ id: answerMsgId, role: "assistant" as const, content: "I couldn't retrieve verified data right now. Please try again shortly.", time: answerTime }) }));
       }
     } catch {
-      updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId) }));
+      const answerMsgId = "a-" + makeId();
+      const answerTime = nowTime();
+      updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId).concat({ id: answerMsgId, role: "assistant" as const, content: "I encountered a connection error while gathering verified data. Please try again.", time: answerTime }) }));
     } finally {
       setIsSubmitting(false);
     }

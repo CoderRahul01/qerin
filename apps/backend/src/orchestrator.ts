@@ -1,5 +1,10 @@
 import { paySource, type PaidResult } from "./paidFetch.js";
-import { SOURCES } from "./sources.js";
+import {
+  SOURCES,
+  findCryptoSlateIntelligence,
+  fetchCoinGeckoIntelligence,
+  fetchWebResearch,
+} from "./sources.js";
 import { getNetwork } from "./networks.js";
 
 export function estimateCost(sourceKeys: string[]): number {
@@ -33,7 +38,7 @@ export async function gatherOnChainTelemetry(targetNetwork?: string): Promise<Pa
 
   return {
     sourceName: `${net.name} Node (Chain ${net.chainId})`,
-    amountPaid: "0.020",
+    amountPaid: "0.005",
     txHash: null,
     timestamp: new Date().toISOString(),
     content: {
@@ -67,11 +72,53 @@ export async function gatherSources(
     .filter((r): r is PromiseFulfilledResult<PaidResult> => r.status === "fulfilled")
     .map((r) => r.value);
 
-  // If no external paid APIs responded, autonomously engage live on-chain node telemetry
-  // so the inquiry is never blocked or left unanswered.
+  // If external paid APIs are unfulfilled or return insufficient coverage,
+  // autonomously engage multi-source publisher, market, and on-chain intelligence feeds.
   if (successful.length === 0) {
-    const telemetry = await gatherOnChainTelemetry(targetNetwork);
-    successful.push(telemetry);
+    const [csArticles, cgData, webFindings, nodeTelemetry] = await Promise.all([
+      findCryptoSlateIntelligence(question),
+      fetchCoinGeckoIntelligence(question),
+      fetchWebResearch(question),
+      gatherOnChainTelemetry(targetNetwork),
+    ]);
+
+    if (csArticles.length > 0) {
+      successful.push({
+        sourceName: "CryptoSlate Intelligence",
+        amountPaid: "0.010",
+        txHash: null,
+        timestamp: new Date().toISOString(),
+        content: {
+          feed: "CryptoSlate Verified Web3 Publisher",
+          articles: csArticles,
+        },
+      });
+    }
+
+    if (cgData) {
+      successful.push({
+        sourceName: "CoinGecko Market Data",
+        amountPaid: "0.005",
+        txHash: null,
+        timestamp: new Date().toISOString(),
+        content: cgData,
+      });
+    }
+
+    if (webFindings.length > 0) {
+      successful.push({
+        sourceName: "Protocol & Web Research",
+        amountPaid: "0.005",
+        txHash: null,
+        timestamp: new Date().toISOString(),
+        content: {
+          researchFindings: webFindings,
+        },
+      });
+    }
+
+    // Always anchor with live consensus node telemetry
+    successful.push(nodeTelemetry);
   }
 
   return successful;

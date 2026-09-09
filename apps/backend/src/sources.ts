@@ -51,6 +51,68 @@ async function findCryptoSlateArticle(query: string): Promise<string> {
   return scored[0].item.link;
 }
 
+export async function findCryptoSlateIntelligence(query: string): Promise<Array<{ title: string; link: string; summary: string }>> {
+  try {
+    const res = await fetch("https://cryptoslate.com/feed/", { headers: { "User-Agent": "QerinResearchAgent/1.0" } });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items = parseRss(xml);
+    if (items.length === 0) return [];
+    const scored = items.map((item) => ({ item, score: scoreMatch(query, item) }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 2).map((s) => ({
+      title: s.item.title,
+      link: s.item.link,
+      summary: s.item.description.replace(/<[^>]+>/g, "").trim().slice(0, 300),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchCoinGeckoIntelligence(query: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as any;
+    if (json && Array.isArray(json.coins) && json.coins.length > 0) {
+      return {
+        matchedCoins: json.coins.slice(0, 4).map((c: any) => ({
+          name: c.name,
+          symbol: c.symbol,
+          marketCapRank: c.market_cap_rank,
+        })),
+        categories: json.categories?.slice(0, 2) || [],
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchWebResearch(query: string): Promise<Array<{ title: string; snippet: string }>> {
+  try {
+    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1`, {
+      headers: { "User-Agent": "QerinResearchAgent/1.0" },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as any;
+    const hits = json?.query?.search;
+    if (Array.isArray(hits) && hits.length > 0) {
+      return hits.slice(0, 3).map((h: any) => ({
+        title: h.title,
+        snippet: (h.snippet || "").replace(/<[^>]+>/g, "").trim(),
+      }));
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export const SOURCES: Record<string, SourceDef> = {
   cryptoslate: {
     key: "cryptoslate",
