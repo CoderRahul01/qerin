@@ -6,10 +6,6 @@ import crypto from "crypto";
 //
 // Sub-collection: accounts/{accountId}/deposits/{txId}
 //   fields: { amount: number, createdAt: Timestamp }
-//
-// This mirrors the Neon schema 1-to-1 while keeping the free Spark plan limits
-// in mind: each question = 1 read (balance) + 1 write (debit) — well within
-// 50 k reads / 20 k writes per day.
 
 export async function createAccount(): Promise<string> {
   const db = getDb();
@@ -21,6 +17,23 @@ export async function createAccount(): Promise<string> {
   return id;
 }
 
+export async function getOrCreateAccount(accountId?: string): Promise<{ accountId: string; balance: number }> {
+  const db = getDb();
+  const id = accountId?.trim() || crypto.randomUUID();
+  const ref = db.collection("accounts").doc(id);
+  const doc = await ref.get();
+
+  if (doc.exists) {
+    return { accountId: id, balance: Number(doc.data()!.balance ?? 0) };
+  }
+
+  await ref.set({
+    balance: 0,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  return { accountId: id, balance: 0 };
+}
+
 export async function getBalance(accountId: string): Promise<number | null> {
   const db = getDb();
   const doc = await db.collection("accounts").doc(accountId).get();
@@ -30,9 +43,7 @@ export async function getBalance(accountId: string): Promise<number | null> {
 
 /**
  * Atomically deducts `amountUsd` from the account balance.
- * Returns the new balance, or null if the account is missing or has
- * insufficient funds. Uses a Firestore transaction so there is no
- * race window between read and write.
+ * Returns the new balance, or null if the account has insufficient funds.
  */
 export async function debitBalance(
   accountId: string,
@@ -53,19 +64,22 @@ export async function debitBalance(
 }
 
 /**
- * Mirror of debitBalance for refunds — called when an answer request fails
- * after the debit already ran.
+ * Atomically credits `amountUsd` to the account balance.
+ * If the account doc does not exist yet, creates it on-the-fly.
  */
 export async function creditBalance(
   accountId: string,
   amountUsd: number
-): Promise<number | null> {
+): Promise<number> {
   const db = getDb();
   const ref = db.collection("accounts").doc(accountId);
 
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
-    if (!doc.exists) return null;
+    if (!doc.exists) {
+      tx.set(ref, { balance: amountUsd, createdAt: FieldValue.serverTimestamp() });
+      return amountUsd;
+    }
     const current = Number(doc.data()!.balance ?? 0);
     const next = current + amountUsd;
     tx.update(ref, { balance: next });
@@ -75,8 +89,7 @@ export async function creditBalance(
 
 /**
  * Records a completed top-up and credits the balance.
- * Keyed on txHash as the Firestore doc ID — idempotent by design
- * (the same tx hash written twice is a no-op because doc already exists).
+ * Idempotent by design — keyed on txHash.
  */
 export async function recordDeposit(
   accountId: string,
@@ -94,10 +107,12 @@ export async function recordDeposit(
     ]);
 
     if (!accountDoc.exists) {
-      return { credited: false, balance: 0, accountFound: false };
+      tx.set(accountRef, { balance: amountUsd, createdAt: FieldValue.serverTimestamp() });
+      tx.set(depositRef, { amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
+      return { credited: true, balance: amountUsd, accountFound: true };
     }
+
     if (depositDoc.exists) {
-      // Already credited this tx — idempotent, return current balance.
       return {
         credited: false,
         balance: Number(accountDoc.data()!.balance ?? 0),
