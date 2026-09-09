@@ -1,33 +1,33 @@
 import { Nav } from "@/components/Nav";
 import { LogoMark } from "@/components/LogoMark";
-import { WaitlistForm } from "@/components/WaitlistForm";
 import { StepsFlow, type FlowStep } from "@/components/StepsFlow";
 import { SocialUpdates } from "@/components/SocialUpdates";
 import { HeroScene } from "@/components/HeroScene";
 import { SOURCES, SourceIcon } from "@/components/SourceIcon";
 import { DimensionalBadge } from "@/components/DimensionalBadge";
 
-const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS;
+const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
+const DUNE_HUB_URL = "https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub";
 
 const featureStrip = [
   {
     label: "x402 Micropayments",
-    detail: "Built for machine-to-machine payments.",
+    detail: "Built for autonomous machine-to-machine payments.",
     icon: <path d="M11 2L4 12h6l-1 8 8-11h-6l1-7Z" fill="var(--qerin-accent)" />,
   },
   {
-    label: "USDC Payments",
-    detail: "Every payment is made in USDC stablecoin.",
+    label: "Multi-Persona Synthesis",
+    detail: "Developer, Founder, Content Writer, and Trader insights.",
     icon: (
       <>
-        <circle cx="10" cy="10" r="7.5" stroke="var(--qerin-accent)" strokeWidth="1.6" fill="none" />
-        <path d="M7 12.6c.5.9 1.5 1.5 3 1.5 1.8 0 3-.9 3-2.2 0-1.3-1.4-1.8-3-2.1-1.6-.3-3-.8-3-2.1 0-1.3 1.2-2.2 3-2.2 1.5 0 2.5.6 3 1.5" stroke="var(--qerin-accent)" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        <circle cx="10" cy="7" r="3.5" stroke="var(--qerin-accent)" strokeWidth="1.5" fill="none" />
+        <path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="var(--qerin-accent)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
       </>
     ),
   },
   {
-    label: "Base Blockchain",
-    detail: "Secure, fast, low cost. Built to scale.",
+    label: "Dual-Chain Settlement",
+    detail: "Base Mainnet (8453) + BOT Chain Layer 1 (677).",
     icon: (
       <>
         <circle cx="10" cy="10" r="7.5" stroke="var(--qerin-accent)" strokeWidth="1.6" fill="none" />
@@ -36,8 +36,8 @@ const featureStrip = [
     ),
   },
   {
-    label: "On-Chain Receipts",
-    detail: "Transparent receipts, verifiable on Basescan.",
+    label: "Verified PDF Dossiers",
+    detail: "Downloadable research reports backed by on-chain proofs.",
     icon: (
       <>
         <path d="M5 2.5h7l3 3v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-14a.5.5 0 0 1 .5-.5Z" stroke="var(--qerin-accent)" strokeWidth="1.4" fill="none" strokeLinejoin="round" />
@@ -49,8 +49,8 @@ const featureStrip = [
 
 const howItWorks: FlowStep[] = [
   {
-    title: "Your platform sends a query",
-    body: "One call through Qerin's API — no wallet, no x402 client, no crypto integration on your end.",
+    title: "1. Submit your research query",
+    body: "Ask any technical, market, or strategic question in natural language. Qerin auto-generates a dynamic topic name.",
     icon: (
       <path
         d="M9 8L5 12L9 16M15 8L19 12L15 16"
@@ -63,8 +63,8 @@ const howItWorks: FlowStep[] = [
     ),
   },
   {
-    title: "Qerin pays the source",
-    body: "Directly, in USDC, on Base — the paywalled publisher gets paid in real time, not scraped.",
+    title: "2. Qerin executes on-chain micropayment",
+    body: "Autonomous x402 micropayments settle directly on Base or BOT Chain — paying publishers and APIs for raw, premium data.",
     icon: (
       <>
         <circle cx="12" cy="12" r="7" stroke="var(--qerin-accent)" strokeWidth="1.8" fill="none" />
@@ -80,8 +80,8 @@ const howItWorks: FlowStep[] = [
     ),
   },
   {
-    title: "The real content is retrieved",
-    body: "The actual content behind the paywall comes back to Qerin — not a scrape, not a cache.",
+    title: "3. Multi-persona intelligence synthesis",
+    body: "Content is analyzed and partitioned into an Executive Summary plus specialized Developer, Founder, Writer, and Trader lenses.",
     icon: (
       <>
         <path
@@ -96,24 +96,8 @@ const howItWorks: FlowStep[] = [
     ),
   },
   {
-    title: "A synthesized answer comes back",
-    body: "The paid content is distilled into a short, direct answer — not a wall of links.",
-    icon: (
-      <>
-        <path
-          d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-4 3.5v-3.5H6.5a2 2 0 0 1-2-2v-7Z"
-          stroke="var(--qerin-accent)"
-          strokeWidth="1.5"
-          fill="none"
-          strokeLinejoin="round"
-        />
-        <path d="M8 9.5h8M8 12.5h5" stroke="var(--qerin-accent)" strokeWidth="1.3" strokeLinecap="round" />
-      </>
-    ),
-  },
-  {
-    title: "An on-chain receipt is generated",
-    body: "Verifiable, itemized, tied to the transaction — checkable on Basescan, not just claimed.",
+    title: "4. Cryptographic receipt minted on-chain",
+    body: "Receipt is recorded to QerinReceiptRegistry.sol with transaction hash and itemized paywall disbursements.",
     icon: (
       <>
         <path
@@ -124,6 +108,15 @@ const howItWorks: FlowStep[] = [
           strokeLinejoin="round"
         />
         <path d="M9 13l2.2 2.2L16 10" stroke="var(--qerin-accent)" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </>
+    ),
+  },
+  {
+    title: "5. Download verified research dossier",
+    body: "Export a complete, publication-ready PDF research dossier complete with on-chain links and methodology citations.",
+    icon: (
+      <>
+        <path d="M4 17h16M12 3v11M8 10l4 4 4-4" stroke="var(--qerin-accent)" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ),
   },
@@ -145,21 +138,24 @@ function Eyebrow({ children }: { children: string }) {
   );
 }
 
-function PillLink({ href, children }: { href: string; children: string }) {
+function PillLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
       style={{
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         height: 48,
-        padding: "0 24px",
+        padding: "0 26px",
         borderRadius: 9999,
         background: "var(--qerin-accent)",
         color: "var(--qerin-accent-contrast)",
         fontWeight: 600,
         fontSize: 15,
         textDecoration: "none",
+        boxShadow: "0 4px 16px rgba(244,91,0,0.25)",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
       }}
     >
       {children}
@@ -167,23 +163,27 @@ function PillLink({ href, children }: { href: string; children: string }) {
   );
 }
 
-function OutlinePillLink({ href, children }: { href: string; children: string }) {
+function OutlinePillLink({ href, children, external }: { href: string; children: React.ReactNode; external?: boolean }) {
   return (
     <a
       href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
       className="qerin-pill-btn"
       style={{
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         height: 48,
         padding: "0 24px",
         borderRadius: 9999,
-        background: "transparent",
+        background: "var(--qerin-surface)",
         border: "1px solid var(--qerin-border)",
         color: "var(--qerin-text)",
         fontWeight: 600,
         fontSize: 15,
         textDecoration: "none",
+        transition: "border-color 0.15s ease, background 0.15s ease",
       }}
     >
       {children}
@@ -216,6 +216,7 @@ export default function Home() {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
+                gap: 6,
                 height: 28,
                 padding: "0 12px",
                 borderRadius: 9999,
@@ -225,10 +226,11 @@ export default function Home() {
                 fontSize: 10.5,
                 fontWeight: 600,
                 letterSpacing: "0.06em",
-                color: "var(--qerin-text-muted)",
+                color: "var(--qerin-accent)",
               }}
             >
-              AI AGENTS. REAL PAYMENTS. VERIFIED SOURCES.
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+              LIVE ON PRODUCTION • BASE + BOT CHAIN
             </div>
             <h1
               style={{
@@ -246,12 +248,14 @@ export default function Home() {
               <span style={{ color: "var(--qerin-accent)" }}>paid in stablecoins.</span>
             </h1>
             <p style={{ marginTop: 16, fontSize: "clamp(15px, 1.9vw, 18px)", lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 480 }}>
-              Qerin is an AI agent that pays real x402 micropayments to paywalled sources, retrieves verified
-              content, and hands you an on-chain receipt for every answer.
+              Qerin is an autonomous AI agent protocol that pays real x402 micropayments to premium data sources,
+              retrieves verified intelligence, and provides on-chain cryptographic receipts and multi-persona research dossiers.
             </p>
             <div style={{ marginTop: 28, display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <PillLink href="#waitlist">Join waitlist</PillLink>
-              <OutlinePillLink href="#how-it-works">How it works</OutlinePillLink>
+              <PillLink href="/app">Launch Agent Workspace →</PillLink>
+              <OutlinePillLink href={DUNE_HUB_URL} external>
+                Dune Analytics Hub ↗
+              </OutlinePillLink>
             </div>
           </div>
           <div style={{ minWidth: 0 }}>
@@ -262,7 +266,7 @@ export default function Home() {
         {/* Trusted sources */}
         <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 20px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "60ms" }}>
           <div style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--qerin-text-muted)" }}>
-            TRUSTED SOURCES
+            VERIFIED DATA SOURCES & NETWORKS
           </div>
           <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
             {SOURCES.map((source) => (
@@ -286,11 +290,45 @@ export default function Home() {
                 <span style={{ fontSize: 13.5, fontWeight: 600 }}>{source.label}</span>
               </div>
             ))}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                height: 34,
+                padding: "0 12px",
+                borderRadius: 9999,
+                border: "1px solid rgba(139,92,246,0.35)",
+                background: "rgba(139,92,246,0.08)",
+                color: "#8b5cf6",
+                fontSize: 13.5,
+                fontWeight: 600,
+              }}
+            >
+              <span>BOT Chain L1 (677)</span>
+            </div>
           </div>
         </section>
 
-        {/* Problem */}
-        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "100ms" }}>
+        {/* Feature strip */}
+        <section id="features" className="qerin-fade-up" style={{ padding: "clamp(20px, 3.5vw, 32px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "100ms" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20 }}>
+            {featureStrip.map((f) => (
+              <div key={f.label} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
+                  {f.icon}
+                </svg>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--qerin-text)" }}>{f.label}</div>
+                  <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5, color: "var(--qerin-text-muted)" }}>{f.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* The Problem */}
+        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "140ms" }}>
           <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
             <DimensionalBadge
               tone="neutral"
@@ -308,15 +346,15 @@ export default function Home() {
                 AI can&apos;t pay for what it reads
               </div>
               <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-                Paywalled publishers and data sources block AI agents or require a human to approve every
-                payment. There&apos;s no record of what was actually paid for, or to whom.
+                Paywalled publishers, proprietary datasets, and premium API services block AI agents or demand manual human billing.
+                There is zero verifiable cryptographic record of what was accessed, how much was paid, or the authentic source provenance.
               </p>
             </div>
           </div>
         </section>
 
-        {/* Solution */}
-        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "140ms" }}>
+        {/* The Solution */}
+        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "180ms" }}>
           <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
             <DimensionalBadge
               tone="orange"
@@ -330,69 +368,26 @@ export default function Home() {
             <div style={{ minWidth: 0 }}>
               <Eyebrow>THE SOLUTION</Eyebrow>
               <div style={{ marginTop: 8, fontSize: "clamp(20px, 2.8vw, 26px)", fontWeight: 700, color: "var(--qerin-text)" }}>
-                An agent that pays, verifies, and proves it
+                An agent that pays, verifies, and delivers institutional intelligence
               </div>
               <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-                Qerin pays x402 micropayments in USDC on Base, retrieves the real content behind the paywall,
-                and returns a short synthesized answer. Every transaction is logged on-chain — an itemized
-                receipt showing exactly what was paid and to whom.
+                Qerin executes machine-to-machine x402 micropayments in USDC on Base and BOT Chain, retrieves the verified payload,
+                and partitions the answer across specialized personas (Developer, Founder, Content Writer, Trader) with an on-chain receipt registry.
               </p>
             </div>
           </div>
         </section>
 
         {/* How it works */}
-        <section id="how-it-works" className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "180ms" }}>
+        <section id="how-it-works" className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "220ms" }}>
           <Eyebrow>HOW IT WORKS</Eyebrow>
           <div style={{ marginTop: 16 }}>
             <StepsFlow steps={howItWorks} label="How Qerin works" />
           </div>
         </section>
 
-        {/* For builders */}
-        <section id="for-builders" className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "220ms" }}>
-          <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-            <DimensionalBadge
-              tone="orange"
-              icon={
-                <>
-                  <path d="M18 18 H30 L40 28 L30 38 H18 a2 2 0 0 1 -2 -2 V20 a2 2 0 0 1 2 -2 Z" />
-                  <circle cx="22.5" cy="23.5" r="1.6" fill="#ffffff" stroke="none" />
-                </>
-              }
-            />
-            <div style={{ minWidth: 0 }}>
-              <Eyebrow>FOR BUILDERS</Eyebrow>
-              <div style={{ marginTop: 8, fontSize: "clamp(20px, 2.8vw, 26px)", fontWeight: 700, color: "var(--qerin-text)" }}>
-                Pay only for delivered answers
-              </div>
-              <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-                Qerin is B2B infrastructure. Embed the API and pay per successfully delivered, verified
-                answer — outcome-based pricing, not seat licenses or flat fees.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Feature strip */}
-        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "260ms" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20 }}>
-            {featureStrip.map((f) => (
-              <div key={f.label} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
-                  {f.icon}
-                </svg>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--qerin-text)" }}>{f.label}</div>
-                  <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5, color: "var(--qerin-text-muted)" }}>{f.detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Proof */}
-        <section id="proof" className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "300ms" }}>
+        <section id="proof" className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "260ms" }}>
           <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
             <DimensionalBadge
               tone="success"
@@ -405,46 +400,81 @@ export default function Home() {
               }
             />
             <div style={{ minWidth: 0 }}>
-              <Eyebrow>PROOF</Eyebrow>
+              <Eyebrow>ON-CHAIN PROOF & TRANSPARENCY</Eyebrow>
               <div style={{ marginTop: 8, fontSize: "clamp(20px, 2.8vw, 26px)", fontWeight: 700, color: "var(--qerin-text)" }}>
-                Verified on-chain
+                Verified on-chain smart contracts & Dune analytics
               </div>
               <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-                QerinReceiptRegistry is deployed and source-verified on Base mainnet. Every receipt is
-                checkable, not just claimed.
-                {REGISTRY_ADDRESS && (
-                  <>
-                    {" "}
-                    <a href={`https://basescan.org/address/${REGISTRY_ADDRESS}`} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)" }}>
-                      View the contract on Basescan ↗
-                    </a>
-                  </>
-                )}
+                <code>QerinReceiptRegistry.sol</code> is deployed and source-verified on Base mainnet and fully prepared for BOT Chain mainnet deployment.
+                Track live verification metrics and throughput on our official Dune Intelligence Hub.
               </p>
+              <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 14 }}>
+                <a
+                  href={`https://basescan.org/address/${REGISTRY_ADDRESS}#code`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 13.5, fontWeight: 600, color: "var(--qerin-accent)", textDecoration: "none" }}
+                >
+                  View Smart Contract on Basescan ↗
+                </a>
+                <span style={{ color: "var(--qerin-border)" }}>•</span>
+                <a
+                  href={DUNE_HUB_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 13.5, fontWeight: 600, color: "#8b5cf6", textDecoration: "none" }}
+                >
+                  Official Dune Analytics Hub ↗
+                </a>
+                <span style={{ color: "var(--qerin-border)" }}>•</span>
+                <a
+                  href="https://scan.botchain.ai/"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 13.5, fontWeight: 600, color: "var(--qerin-text-muted)", textDecoration: "none" }}
+                >
+                  BOT Chain Explorer ↗
+                </a>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Status */}
-        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "340ms" }}>
-          <Eyebrow>WHERE WE ARE</Eyebrow>
+        {/* Production Status */}
+        <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 24px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "300ms" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+            <Eyebrow>PRODUCTION PROTOCOL STATUS</Eyebrow>
+          </div>
           <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-            Qerin is pre-launch. No live users or transaction volume yet — we&apos;d rather tell you that
-            directly than dress it up.
+            Qerin is fully live in production. You can execute real autonomous AI queries, verify on-chain settlements,
+            switch seamlessly between Base (8453) and BOT Chain (677), and export verified PDF research dossiers right now.
           </p>
         </section>
 
         <SocialUpdates />
 
-        {/* Footer CTA / waitlist */}
-        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(8px, 2vw, 16px)", animationDelay: "420ms" }}>
-          <section id="waitlist" style={{ padding: "clamp(18px, 3.5vw, 32px)", borderRadius: 16, background: "var(--qerin-surface)" }}>
-            <div style={{ fontSize: "clamp(19px, 2.6vw, 24px)", fontWeight: 700, color: "var(--qerin-text)" }}>Build with Qerin</div>
-            <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.5, color: "var(--qerin-text-muted)", maxWidth: 520 }}>
-              Join the waitlist for early API access.
+        {/* Launch App Card (Replaces Waitlist) */}
+        <div className="qerin-glow-border qerin-fade-up" style={{ marginTop: "clamp(12px, 2.5vw, 24px)", animationDelay: "380ms" }}>
+          <section style={{ padding: "clamp(24px, 4vw, 36px)", borderRadius: 16, background: "var(--qerin-surface)", textAlign: "center" }}>
+            <div style={{ fontSize: "clamp(22px, 3vw, 28px)", fontWeight: 700, color: "var(--qerin-text)" }}>
+              Ready to experience autonomous AI settlement?
+            </div>
+            <p style={{ marginTop: 10, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 540, margin: "10px auto 0" }}>
+              No waitlist or credit card required. Launch the workspace to ask questions, view multi-persona synthesis, and verify cryptographic receipts live.
             </p>
-            <div style={{ marginTop: 16 }}>
-              <WaitlistForm />
+            <div style={{ marginTop: 24, display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+              <PillLink href="/app">Launch Qerin App Now →</PillLink>
+              <OutlinePillLink href={DUNE_HUB_URL} external>
+                View Live Dune Hub ↗
+              </OutlinePillLink>
+            </div>
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 18, flexWrap: "wrap", fontSize: 12.5, color: "var(--qerin-text-muted)" }}>
+              <span>⚡ Sub-second synthesis</span>
+              <span>•</span>
+              <span>🛡️ 100% Cryptographic verification</span>
+              <span>•</span>
+              <span>📄 Instant PDF dossier export</span>
             </div>
           </section>
         </div>
@@ -460,14 +490,18 @@ export default function Home() {
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: 12,
-            animationDelay: "460ms",
+            animationDelay: "420ms",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <LogoMark size={16} />
-            <span style={{ fontSize: 12.5, color: "var(--qerin-text-muted)" }}>© {new Date().getFullYear()} Qerin</span>
+            <span style={{ fontSize: 12.5, color: "var(--qerin-text-muted)" }}>© {new Date().getFullYear()} Qerin Protocol</span>
           </div>
-          <span style={{ fontSize: 12.5, color: "var(--qerin-text-muted)" }}>Verified answers, paid in stablecoins.</span>
+          <div style={{ display: "flex", gap: 16, fontSize: 12.5, color: "var(--qerin-text-muted)" }}>
+            <a href="/app" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>App</a>
+            <a href={DUNE_HUB_URL} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>Dune Analytics</a>
+            <a href="https://x.com/qerinai_26" target="_blank" rel="noreferrer" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>Twitter (X)</a>
+          </div>
         </footer>
       </main>
     </div>

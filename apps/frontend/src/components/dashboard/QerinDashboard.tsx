@@ -480,13 +480,15 @@ export function QerinDashboard() {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ position: "relative" }}>
-                <Image src="/qerin-mark-orange.png" alt="Qerin" width={32} height={32} style={{ borderRadius: 8 }} />
-                <div className="qd-status-dot" style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid var(--qd-header-bg)" }} />
-              </div>
+              <a href="/" title="Back to Landing Page" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+                <div style={{ position: "relative" }}>
+                  <Image src="/qerin-mark-orange.png" alt="Qerin" width={32} height={32} style={{ borderRadius: 8 }} />
+                  <div className="qd-status-dot" style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid var(--qd-header-bg)" }} />
+                </div>
+              </a>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)" }}>Qerin</span>
+                  <a href="/" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "1px 7px", borderRadius: 999, background: "rgba(34,197,94,0.12)", fontSize: 11, fontWeight: 600, color: "#16a34a" }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
                     AI Agent
@@ -539,6 +541,27 @@ export function QerinDashboard() {
                   BOT Chain (677)
                 </button>
               </div>
+
+              <a
+                href="https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  border: "1px solid var(--qd-border)",
+                  background: "var(--qd-surface)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "var(--qerin-text)",
+                  textDecoration: "none",
+                }}
+              >
+                Dune Hub ↗
+              </a>
 
               <ThemeToggle />
             </div>
