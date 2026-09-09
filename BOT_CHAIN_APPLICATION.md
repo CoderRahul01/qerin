@@ -64,9 +64,9 @@ BOT Chain Foundry Deployment Script: apps/contracts/script/DeployQerinReceiptReg
 ```
 
 ### 11. On-chain Interaction Records
-- **Official Live Dune Dashboard**:
+- **Official Live Dune Analytics Hub & Dashboard**:
 ```text
-https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-micropayments
+https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub
 ```
 - **Verified Smart Contract Explorer (Base)**:
 ```text
