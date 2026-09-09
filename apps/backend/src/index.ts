@@ -146,6 +146,30 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   }
 });
 
+// Ecosystem & Reviewer Fuel Pass: allows evaluators, grant committees, and
+// developers to activate an initial $1.50 Protocol Research Fuel to experience
+// autonomous multi-source research without being blocked by empty test wallets.
+app.post("/v1/account/topup/demo-claim", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+
+  const accountId = c.req.header("x-qerin-account-id");
+  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+
+  try {
+    const current = await getBalance(accountId);
+    if (current === null) return c.json({ error: "Unknown account" }, 404);
+    if (current >= 1.50) {
+      return c.json({ balance: current, message: "Account already has active research fuel." });
+    }
+    const credited = await creditBalance(accountId, 1.50);
+    return c.json({ balance: credited, credited: 1.50 });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal error" }, 500);
+  }
+});
+
+
 // Free-app path: gated by the internal secret (only Qerin's own frontend
 // can reach it) AND a prepaid balance — the consumer paywall. Debits
 // ANSWER_PRICE_USD before running the request, refunds it if the request

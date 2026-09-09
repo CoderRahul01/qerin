@@ -102,7 +102,7 @@ export function QerinApp() {
     // balance can't cover it — the backend re-checks anyway (race-safe),
     // this is purely to avoid a pointless animation cycle.
     if (balance !== null && balance < ANSWER_PRICE_USD) {
-      setTopupReason("Your balance is too low for another question.");
+      setTopupReason("Your Agent Settlement Fuel is depleted. Fund your treasury to fuel autonomous research queries.");
       setShowTopup(true);
       return;
     }
@@ -127,7 +127,7 @@ export function QerinApp() {
         responseData.current = result.data;
       } else if (result.reason === "insufficient_balance") {
         responseFailed.current = true;
-        setTopupReason("Your balance ran out while asking that question.");
+        setTopupReason("Your Agent Settlement Fuel ran out while settling data source micropayments.");
         setShowTopup(true);
         if (accountId) refreshBalance(accountId);
       } else {
