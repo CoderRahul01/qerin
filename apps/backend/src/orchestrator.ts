@@ -6,6 +6,7 @@ import {
   fetchWebResearch,
 } from "./sources.js";
 import { getNetwork } from "./networks.js";
+import { withTimeout } from "./withTimeout.js";
 
 export function estimateCost(sourceKeys: string[]): number {
   return sourceKeys.reduce((sum, key) => {
@@ -19,14 +20,18 @@ export async function gatherOnChainTelemetry(targetNetwork?: string): Promise<Pa
   let blockNum = 0;
   let gasGwei = "0.001";
   try {
-    const res = await fetch(net.rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify([
-        { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] },
-        { jsonrpc: "2.0", id: 2, method: "eth_gasPrice", params: [] },
-      ]),
-    });
+    const res = await withTimeout(
+      fetch(net.rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([
+          { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] },
+          { jsonrpc: "2.0", id: 2, method: "eth_gasPrice", params: [] },
+        ]),
+      }),
+      8_000,
+      `${net.name} RPC telemetry`
+    );
     const data = (await res.json()) as Array<{ result?: string }>;
     if (Array.isArray(data)) {
       blockNum = parseInt(data[0]?.result || "0", 16);
