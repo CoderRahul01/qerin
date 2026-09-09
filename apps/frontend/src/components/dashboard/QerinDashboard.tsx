@@ -480,7 +480,7 @@ export function QerinDashboard() {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href="/" title="Back to Landing Page" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+              <a href="/landing" title="View Architecture & Overview" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
                 <div style={{ position: "relative" }}>
                   <Image src="/qerin-mark-orange.png" alt="Qerin" width={32} height={32} style={{ borderRadius: 8 }} />
                   <div className="qd-status-dot" style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid var(--qd-header-bg)" }} />
@@ -488,7 +488,7 @@ export function QerinDashboard() {
               </a>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <a href="/" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
+                  <a href="/landing" title="View Architecture & Overview" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "1px 7px", borderRadius: 999, background: "rgba(34,197,94,0.12)", fontSize: 11, fontWeight: 600, color: "#16a34a" }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
                     AI Agent
@@ -507,6 +507,25 @@ export function QerinDashboard() {
 
             {/* Network Selector & Actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <a
+                href="/landing"
+                title="View Protocol Architecture & Overview"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  border: "1px solid var(--qd-border)",
+                  background: "var(--qd-surface)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "var(--qd-muted2)",
+                  textDecoration: "none",
+                }}
+              >
+                Overview
+              </a>
               {/* Network Pill */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--qd-surface)", border: "1px solid var(--qd-border)", borderRadius: 8, padding: "2px 4px" }}>
                 <button
