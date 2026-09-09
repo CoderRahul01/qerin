@@ -88,7 +88,16 @@ export function getNetwork(networkName?: string): NetworkConfig {
   return NETWORKS[getActiveNetwork()];
 }
 
-// QerinReceiptRegistry contract address (apps/contracts).
-export function getRegistryAddress(): `0x${string}` | undefined {
-  return process.env.QERIN_REGISTRY_ADDRESS as `0x${string}` | undefined;
+// QerinReceiptRegistry contract address (apps/contracts). A registry deployed
+// on Base has a different address than one deployed on BOT Chain — they are
+// separate contracts on separate chains, not one contract reachable from
+// both. Per-network env vars (QERIN_REGISTRY_ADDRESS_MAINNET,
+// QERIN_REGISTRY_ADDRESS_BOTCHAIN, etc.) take precedence; QERIN_REGISTRY_ADDRESS
+// remains as a fallback so a single-chain (Base-only) deployment keeps
+// working unchanged.
+export function getRegistryAddress(networkName?: string): `0x${string}` | undefined {
+  const net = (networkName && networkName in NETWORKS ? networkName : getActiveNetwork()) as SupportedNetwork;
+  const perNetworkVar = `QERIN_REGISTRY_ADDRESS_${net.toUpperCase()}`;
+  const value = process.env[perNetworkVar] || process.env.QERIN_REGISTRY_ADDRESS;
+  return value as `0x${string}` | undefined;
 }

@@ -24,7 +24,7 @@ export async function answerHandler(
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
 
-  if (!(await checkSpendLimit(estimatedCost))) {
+  if (!(await checkSpendLimit(estimatedCost, accountId))) {
     return {
       status: 429,
       body: {
@@ -53,7 +53,7 @@ export async function answerHandler(
 
   // Record verified on-chain receipt directly to the QerinReceiptRegistry smart contract
   const network = getNetwork(targetNetwork);
-  const registryAddr = getRegistryAddress();
+  const registryAddr = getRegistryAddress(targetNetwork);
   let registryTxHash: string | null = null;
   try {
     registryTxHash = await recordReceiptOnChain(question, paidResults.length, totalPaidNum, accountId, targetNetwork);
