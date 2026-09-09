@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoLockup } from "@/components/LogoMark";
 import { TopupModal } from "@/components/TopupModal";
@@ -10,6 +11,10 @@ import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
 import type { AnswerData, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
 import { downloadDossierPdf, generateDossierMarkdown } from "@/lib/dossierExport";
+
+interface EthereumProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}
 
 interface ChatMessage {
   id: string;
@@ -298,8 +303,40 @@ const THREADS_STORAGE_KEY = "qerin_chat_threads_v3";
 const ACTIVE_THREAD_KEY = "qerin_active_thread_id";
 
 export function QerinDashboard() {
-  const [threads, setThreads] = useState<ChatThread[]>(SEED_THREADS);
-  const [activeThreadId, setActiveThreadId] = useState("t1");
+  const [threads, setThreads] = useState<ChatThread[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(THREADS_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    return SEED_THREADS;
+  });
+
+  const [activeThreadId, setActiveThreadId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(THREADS_STORAGE_KEY);
+        const storedActive = localStorage.getItem(ACTIVE_THREAD_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (storedActive && parsed.some((t: ChatThread) => t.id === storedActive)) {
+              return storedActive;
+            }
+            return parsed[0].id;
+          }
+        }
+      } catch {}
+    }
+    return "t1";
+  });
+
   const [inputValue, setInputValue] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -330,18 +367,7 @@ export function QerinDashboard() {
 
     try {
       const stored = localStorage.getItem(THREADS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setThreads(parsed);
-          const storedActive = localStorage.getItem(ACTIVE_THREAD_KEY);
-          if (storedActive && parsed.some(t => t.id === storedActive)) {
-            setActiveThreadId(storedActive);
-          } else {
-            setActiveThreadId(parsed[0].id);
-          }
-        }
-      } else {
+      if (!stored) {
         localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(SEED_THREADS));
         localStorage.setItem(ACTIVE_THREAD_KEY, "t1");
       }
@@ -440,9 +466,10 @@ export function QerinDashboard() {
   };
 
   const addBotChainToWallet = async () => {
-    if (typeof window !== "undefined" && (window as any).ethereum) {
+    const ethereum = typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined;
+    if (ethereum) {
       try {
-        await (window as any).ethereum.request({
+        await ethereum.request({
           method: "wallet_addEthereumChain",
           params: [{
             chainId: "0x2A5", // 677
@@ -579,11 +606,11 @@ export function QerinDashboard() {
         {/* SIDEBAR */}
         <aside className={"qd-sidebar" + (sidebarOpen ? " open" : "")}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 6px" }}>
-            <a href="/" title="Back to Qerin Protocol Landing Page" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+            <Link href="/" title="Back to Qerin Protocol Landing Page" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
               <LogoLockup size={20} />
-            </a>
+            </Link>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <a
+              <Link
                 href="/"
                 title="View Protocol Landing Page"
                 style={{
@@ -601,7 +628,7 @@ export function QerinDashboard() {
                 }}
               >
                 Landing ↗
-              </a>
+              </Link>
               <button aria-label="Open in new tab" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--qd-muted2)", display: "flex", padding: 4, borderRadius: 6 }} onClick={() => window.open(window.location.href, "_blank")}>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M6 2H2v10h10V8M9 1h4v4M13 1L7 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
@@ -647,9 +674,9 @@ export function QerinDashboard() {
                 <div className="qd-status-dot" />
                 Verifiable. On-Chain.
               </div>
-              <a href="/" style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textDecoration: "none" }}>
+              <Link href="/" style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textDecoration: "none" }}>
                 Landing ↗
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -672,15 +699,15 @@ export function QerinDashboard() {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href="/" title="View Protocol Landing Page & Architecture" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+              <Link href="/" title="View Protocol Landing Page & Architecture" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
                 <div style={{ position: "relative" }}>
                   <Image src="/qerin-mark-orange.png" alt="Qerin" width={32} height={32} style={{ borderRadius: 8 }} />
                   <div className="qd-status-dot" style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid var(--qd-header-bg)" }} />
                 </div>
-              </a>
+              </Link>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <a href="/" title="View Protocol Landing Page & Architecture" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
+                  <Link href="/" title="View Protocol Landing Page & Architecture" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</Link>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "1px 7px", borderRadius: 999, background: "rgba(34,197,94,0.12)", fontSize: 11, fontWeight: 600, color: "#16a34a" }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
                     AI Agent
@@ -699,7 +726,7 @@ export function QerinDashboard() {
 
             {/* Network Selector & Actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a
+              <Link
                 href="/"
                 title="View Protocol Architecture & Overview"
                 style={{
@@ -717,7 +744,7 @@ export function QerinDashboard() {
                 }}
               >
                 Overview
-              </a>
+              </Link>
               {/* Network Pill */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--qd-surface)", border: "1px solid var(--qd-border)", borderRadius: 8, padding: "2px 4px" }}>
                 <button
