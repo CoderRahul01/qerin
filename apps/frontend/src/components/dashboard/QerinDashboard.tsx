@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoLockup } from "@/components/LogoMark";
 import { TopupModal } from "@/components/TopupModal";
-import { getOrCreateAccountId, fetchBalance } from "@/lib/account";
+import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
 import type { AnswerData, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
@@ -340,6 +340,7 @@ export function QerinDashboard() {
   const [inputValue, setInputValue] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
@@ -406,11 +407,69 @@ export function QerinDashboard() {
   }, []);
 
   useEffect(() => {
-    getOrCreateAccountId()
-      .then(id => { setAccountId(id); return fetchBalance(id); })
-      .then(b => setBalance(b))
-      .catch(() => { setAccountId("local-" + makeId()); setBalance(1.5); });
+    let isMounted = true;
+
+    async function initAccount(targetAddr?: string | null) {
+      try {
+        const activeAddr = targetAddr !== undefined ? targetAddr : await getConnectedWalletAddress();
+        if (!isMounted) return;
+        setConnectedWallet(activeAddr);
+        const id = await getOrCreateAccountId(activeAddr);
+        if (!isMounted) return;
+        setAccountId(id);
+        const b = await fetchBalance(id);
+        if (!isMounted) return;
+        setBalance(b);
+      } catch {
+        if (!isMounted) return;
+        setAccountId("local-" + makeId());
+        setBalance(1.5);
+      }
+    }
+
+    initAccount();
+
+    if (
+      typeof window !== "undefined" &&
+      (window as unknown as { ethereum?: { on?: (event: string, handler: (accounts: string[]) => void) => void; removeListener?: (event: string, handler: (accounts: string[]) => void) => void } }).ethereum
+    ) {
+      const eth = (window as unknown as { ethereum: { on?: (event: string, handler: (accounts: string[]) => void) => void; removeListener?: (event: string, handler: (accounts: string[]) => void) => void } }).ethereum;
+      const handleAccountsChanged = (accounts: string[]) => {
+        const nextAddr = accounts.length > 0 ? accounts[0] : null;
+        initAccount(nextAddr);
+      };
+
+      if (eth.on) {
+        eth.on("accountsChanged", handleAccountsChanged);
+      }
+      return () => {
+        isMounted = false;
+        if (eth.removeListener) {
+          eth.removeListener("accountsChanged", handleAccountsChanged);
+        }
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const handleConnectWallet = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const addr = await requestWalletConnection();
+      if (addr) {
+        setConnectedWallet(addr);
+        const id = await getOrCreateAccountId(addr);
+        setAccountId(id);
+        const b = await fetchBalance(id);
+        setBalance(b);
+      }
+    } catch (err) {
+      console.error("Wallet connection error:", err);
+    }
+  };
 
   const syncAndSaveThreads = useCallback((updater: (prev: ChatThread[]) => ChatThread[]) => {
     setThreads(prev => {
@@ -681,13 +740,62 @@ export function QerinDashboard() {
           </div>
 
           <div className="qd-user-bar" onClick={() => { setTopupReason(null); setShowTopup(true); }}>
-            <Avatar letter="U" size={30} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>User Wallet</div>
-              <div style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{truncatedAddr}</div>
+            <div style={{ position: "relative" }}>
+              <Avatar letter={connectedWallet ? "W" : "U"} size={30} />
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  right: -1,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: connectedWallet ? "#22c55e" : "#eab308",
+                  border: "1.5px solid var(--qd-sidebar-bg, #0a0e17)",
+                }}
+              />
             </div>
-            {balance !== null && <div style={{ fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)", flexShrink: 0 }}>${balance.toFixed(2)}</div>}
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color: "var(--qd-muted2)", flexShrink: 0 }}><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {connectedWallet ? "Connected Wallet" : "Web3 Identity"}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                {truncatedAddr}
+              </div>
+            </div>
+            {!connectedWallet ? (
+              <button
+                type="button"
+                onClick={handleConnectWallet}
+                style={{
+                  background: "rgba(255, 107, 0, 0.12)",
+                  border: "1px solid rgba(255, 107, 0, 0.35)",
+                  color: "#ff7700",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  flexShrink: 0,
+                }}
+              >
+                Connect
+              </button>
+            ) : (
+              balance !== null && (
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)", flexShrink: 0 }}>
+                  ${balance.toFixed(2)}
+                </div>
+              )
+            )}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color: "var(--qd-muted2)", flexShrink: 0 }}>
+              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
         </aside>
 

@@ -56,7 +56,7 @@ export async function answerHandler(
   const registryAddr = getRegistryAddress();
   let registryTxHash: string | null = null;
   try {
-    registryTxHash = await recordReceiptOnChain(question, paidResults.length, totalPaidNum);
+    registryTxHash = await recordReceiptOnChain(question, paidResults.length, totalPaidNum, accountId, targetNetwork);
   } catch (err) {
     console.error("QerinReceiptRegistry write failed:", err);
   }

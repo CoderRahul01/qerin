@@ -72,6 +72,19 @@ app.post("/v1/account", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
 
   try {
+    let walletAddress: string | undefined;
+    try {
+      const body = await c.req.json();
+      if (body?.walletAddress && typeof body.walletAddress === "string") {
+        walletAddress = body.walletAddress;
+      }
+    } catch {}
+
+    if (walletAddress) {
+      const account = await getOrCreateAccount(walletAddress);
+      return c.json({ accountId: account.accountId, balance: account.balance });
+    }
+
     const accountId = await createAccount();
     return c.json({ accountId });
   } catch (err) {
