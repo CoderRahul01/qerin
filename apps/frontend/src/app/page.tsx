@@ -1,5 +1,1 @@
-import { redirect } from "next/navigation";
-
-export default function RootPage() {
-  redirect("/app");
-}
+export { default } from "./landing/page";
