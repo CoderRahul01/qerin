@@ -324,8 +324,8 @@ export function QerinDashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (window.location.hash === "#waitlist") {
-      window.history.replaceState(null, "", "/app");
+    if (window.location.hash && window.location.hash.includes("waitlist")) {
+      window.history.replaceState(null, "", window.location.pathname);
     }
 
     try {
@@ -579,10 +579,33 @@ export function QerinDashboard() {
         {/* SIDEBAR */}
         <aside className={"qd-sidebar" + (sidebarOpen ? " open" : "")}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 6px" }}>
-            <LogoLockup size={20} />
-            <button aria-label="Open in new tab" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--qd-muted2)", display: "flex", padding: 4, borderRadius: 6 }} onClick={() => window.open(window.location.href, "_blank")}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M6 2H2v10h10V8M9 1h4v4M13 1L7 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
+            <a href="/" title="Back to Qerin Protocol Landing Page" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+              <LogoLockup size={20} />
+            </a>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <a
+                href="/"
+                title="View Protocol Landing Page"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "3px 7px",
+                  borderRadius: 6,
+                  border: "1px solid var(--qd-border)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--qd-muted2)",
+                  textDecoration: "none",
+                  background: "var(--qd-surface)",
+                }}
+              >
+                Landing ↗
+              </a>
+              <button aria-label="Open in new tab" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--qd-muted2)", display: "flex", padding: 4, borderRadius: 6 }} onClick={() => window.open(window.location.href, "_blank")}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M6 2H2v10h10V8M9 1h4v4M13 1L7 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </div>
           </div>
 
           <button className="qd-new-chat-btn" onClick={handleNewChat}>
@@ -604,7 +627,8 @@ export function QerinDashboard() {
                     <div style={{ fontSize: 13, fontWeight: 500, color: "var(--qerin-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{thread.title}</div>
                     <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", marginTop: 1, display: "flex", gap: 6 }}>
                       <span>{thread.timeLabel}</span>
-                      {thread.network && <span>• {thread.network}</span>}
+                      <span>•</span>
+                      <span>{thread.network === "botchain" ? "BOT Chain" : "Base Mainnet"}</span>
                     </div>
                   </div>
                 </div>
@@ -618,9 +642,14 @@ export function QerinDashboard() {
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--qerin-text)" }}>Qerin Agentic Engine</span>
             </div>
             <p style={{ fontSize: 12, color: "var(--qd-muted2)", margin: 0, lineHeight: 1.5 }}>Pays x402 micropayments on Base & BOT Chain. Verifiable live intelligence.</p>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 8, padding: "3px 8px", borderRadius: 999, background: "rgba(244,91,0,0.1)", fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)" }}>
-              <div className="qd-status-dot" />
-              Verifiable. On-Chain.
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 999, background: "rgba(244,91,0,0.1)", fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)" }}>
+                <div className="qd-status-dot" />
+                Verifiable. On-Chain.
+              </div>
+              <a href="/" style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textDecoration: "none" }}>
+                Landing ↗
+              </a>
             </div>
           </div>
 
@@ -643,7 +672,7 @@ export function QerinDashboard() {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href="/landing" title="View Architecture & Overview" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+              <a href="/" title="View Protocol Landing Page & Architecture" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
                 <div style={{ position: "relative" }}>
                   <Image src="/qerin-mark-orange.png" alt="Qerin" width={32} height={32} style={{ borderRadius: 8 }} />
                   <div className="qd-status-dot" style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid var(--qd-header-bg)" }} />
@@ -651,7 +680,7 @@ export function QerinDashboard() {
               </a>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <a href="/landing" title="View Architecture & Overview" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
+                  <a href="/" title="View Protocol Landing Page & Architecture" style={{ fontWeight: 700, fontSize: 15, color: "var(--qerin-text)", textDecoration: "none" }}>Qerin</a>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "1px 7px", borderRadius: 999, background: "rgba(34,197,94,0.12)", fontSize: 11, fontWeight: 600, color: "#16a34a" }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
                     AI Agent
@@ -671,7 +700,7 @@ export function QerinDashboard() {
             {/* Network Selector & Actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <a
-                href="/landing"
+                href="/"
                 title="View Protocol Architecture & Overview"
                 style={{
                   display: "inline-flex",
