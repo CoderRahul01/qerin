@@ -2,6 +2,15 @@ import { x402Client, x402HTTPClient, wrapFetchWithPayment } from "@x402/fetch";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
+import { withTimeout } from "./withTimeout.js";
+
+// A single source (its own server, or the x402 facilitator settling
+// payment) hanging with no response used to hang the entire /v1/answer
+// request indefinitely — gatherSources() awaits every source via
+// Promise.allSettled, which waits for every promise to *settle*, not just
+// the fast ones. One dead source meant no response ever reached the user,
+// with no error and no timeout screen — just an infinite "Paying..." state.
+const SOURCE_TIMEOUT_MS = 15_000;
 
 export interface PaidResult {
   content: unknown;
@@ -43,7 +52,7 @@ export async function paySource(
   init: RequestInit = { method: "GET" }
 ): Promise<PaidResult> {
   const { fetchWithPayment, httpClient } = getPaymentClient();
-  const response = await fetchWithPayment(url, init);
+  const response = await withTimeout(fetchWithPayment(url, init), SOURCE_TIMEOUT_MS, sourceName);
 
   if (!response.ok) {
     throw new Error(`${sourceName} responded ${response.status}`);

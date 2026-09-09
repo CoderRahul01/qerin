@@ -2,6 +2,15 @@ import { createWalletClient, defineChain, http, keccak256, toBytes, type Chain, 
 import { base, baseSepolia } from "viem/chains";
 import { getQerinAccount } from "./wallet.js";
 import { getActiveNetwork, getRegistryAddress, NETWORKS, type SupportedNetwork } from "./networks.js";
+import { withTimeout } from "./withTimeout.js";
+
+// The registry write is already non-fatal (wrapped in try/catch below,
+// answers still ship without a registryTxHash if this fails) — but with no
+// timeout, an RPC node that stalls mid-request used to hold up the entire
+// /v1/answer response anyway, since answerHandler.ts awaits this before
+// returning. If the underlying write does eventually land on-chain after
+// this gives up on it, it's simply not reflected in this answer's receipt.
+const REGISTRY_WRITE_TIMEOUT_MS = 10_000;
 
 const REGISTRY_ABI = [
   {
@@ -92,14 +101,18 @@ export async function recordReceiptOnChain(
     const receiptId = keccak256(toBytes(`${payer}:${Date.now()}:${crypto.randomUUID()}`));
     const totalPaidMicroUSDC = BigInt(Math.round(totalPaidUsd * 1_000_000));
 
-    const hash = await client.writeContract({
-      address: registryAddress,
-      abi: REGISTRY_ABI,
-      functionName: "recordReceipt",
-      args: [receiptId, questionHash, BigInt(sourceCount), totalPaidMicroUSDC],
-      chain: client.chain,
-      account: client.account!,
-    });
+    const hash = await withTimeout(
+      client.writeContract({
+        address: registryAddress,
+        abi: REGISTRY_ABI,
+        functionName: "recordReceipt",
+        args: [receiptId, questionHash, BigInt(sourceCount), totalPaidMicroUSDC],
+        chain: client.chain,
+        account: client.account!,
+      }),
+      REGISTRY_WRITE_TIMEOUT_MS,
+      `QerinReceiptRegistry write (${networkName})`
+    );
     console.log(`QerinReceiptRegistry (${networkName}) recorded receipt for ${payer}: ${hash}`);
     return hash;
   } catch (err) {

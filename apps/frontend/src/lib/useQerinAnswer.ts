@@ -21,6 +21,11 @@ export function useQerinAnswer() {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
         body: JSON.stringify({ question, network }),
+        // Slightly longer than /api/answer's own 45s backend timeout, so
+        // that route's controlled error response is what the user sees —
+        // this is only a last-resort net in case the proxy itself never
+        // returns at all.
+        signal: AbortSignal.timeout(50_000),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -35,7 +40,12 @@ export function useQerinAnswer() {
       setStatus("done");
       return { ok: true, data: json as AnswerData };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Qerin couldn't reach a paid source. Try again.";
+      const timedOut = err instanceof Error && err.name === "TimeoutError";
+      const message = timedOut
+        ? "Qerin took too long to respond. No charge was made — try again."
+        : err instanceof Error
+          ? err.message
+          : "Qerin couldn't reach a paid source. Try again.";
       setStatus("error");
       setErrorMessage(message);
       return { ok: false, reason: "error", message };

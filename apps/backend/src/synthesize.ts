@@ -9,6 +9,13 @@ const OPENROUTER_MODELS = [
   "qwen/qwen-2.5-72b-instruct",
 ];
 
+// Neither client below previously set an explicit timeout, so a stalled
+// upstream model call had no bound — the OpenAI SDK's own default is 10
+// minutes, far longer than anyone would wait on an answer. This keeps a
+// single hung model in the cascade from ever costing more than this many
+// milliseconds before falling through to the next fallback.
+const LLM_TIMEOUT_MS = 20_000;
+
 export interface PersonaInsights {
   developer: string;
   founder: string;
@@ -169,6 +176,7 @@ Return ONLY the raw JSON object without additional surrounding text.`;
     const openRouterClient = new OpenAI({
       apiKey: openRouterKey,
       baseURL: "https://openrouter.ai/api/v1",
+      timeout: LLM_TIMEOUT_MS,
       defaultHeaders: {
         "HTTP-Referer": "https://qerin.vercel.app",
         "X-Title": "Qerin AI Agent",
@@ -201,6 +209,7 @@ Return ONLY the raw JSON object without additional surrounding text.`;
       const nimClient = new OpenAI({
         apiKey: nvidiaKey,
         baseURL: "https://integrate.api.nvidia.com/v1",
+        timeout: LLM_TIMEOUT_MS,
       });
       const model = process.env.QERIN_LLM_MODEL || "meta/llama-3.3-70b-instruct";
       const completion = await nimClient.chat.completions.create({

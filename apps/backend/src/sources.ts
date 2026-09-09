@@ -1,3 +1,11 @@
+import { withTimeout } from "./withTimeout.js";
+
+// Applies to the free-tier fallback lookups below (RSS/CoinGecko/Wikipedia),
+// not the paid x402 sources (those have their own, longer timeout in
+// paidFetch.ts) — these are meant to be quick, best-effort context, so a
+// tighter budget keeps a slow one from delaying the whole fallback path.
+const FALLBACK_FETCH_TIMEOUT_MS = 8_000;
+
 export interface SourceRequest {
   url: string;
   init: RequestInit;
@@ -40,7 +48,7 @@ function scoreMatch(query: string, item: RssItem): number {
 }
 
 async function findCryptoSlateArticle(query: string): Promise<string> {
-  const res = await fetch("https://cryptoslate.com/feed/");
+  const res = await withTimeout(fetch("https://cryptoslate.com/feed/"), FALLBACK_FETCH_TIMEOUT_MS, "CryptoSlate RSS lookup");
   const xml = await res.text();
   const items = parseRss(xml);
   if (items.length === 0) {
@@ -53,7 +61,11 @@ async function findCryptoSlateArticle(query: string): Promise<string> {
 
 export async function findCryptoSlateIntelligence(query: string): Promise<Array<{ title: string; link: string; summary: string }>> {
   try {
-    const res = await fetch("https://cryptoslate.com/feed/", { headers: { "User-Agent": "QerinResearchAgent/1.0" } });
+    const res = await withTimeout(
+      fetch("https://cryptoslate.com/feed/", { headers: { "User-Agent": "QerinResearchAgent/1.0" } }),
+      FALLBACK_FETCH_TIMEOUT_MS,
+      "CryptoSlate intelligence fallback"
+    );
     if (!res.ok) return [];
     const xml = await res.text();
     const items = parseRss(xml);
@@ -72,9 +84,13 @@ export async function findCryptoSlateIntelligence(query: string): Promise<Array<
 
 export async function fetchCoinGeckoIntelligence(query: string): Promise<Record<string, unknown> | null> {
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`, {
-      headers: { Accept: "application/json" },
-    });
+    const res = await withTimeout(
+      fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`, {
+        headers: { Accept: "application/json" },
+      }),
+      FALLBACK_FETCH_TIMEOUT_MS,
+      "CoinGecko fallback"
+    );
     if (!res.ok) return null;
     const json = (await res.json()) as any;
     if (json && Array.isArray(json.coins) && json.coins.length > 0) {
@@ -95,9 +111,13 @@ export async function fetchCoinGeckoIntelligence(query: string): Promise<Record<
 
 export async function fetchWebResearch(query: string): Promise<Array<{ title: string; snippet: string }>> {
   try {
-    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1`, {
-      headers: { "User-Agent": "QerinResearchAgent/1.0" },
-    });
+    const res = await withTimeout(
+      fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1`, {
+        headers: { "User-Agent": "QerinResearchAgent/1.0" },
+      }),
+      FALLBACK_FETCH_TIMEOUT_MS,
+      "Wikipedia research fallback"
+    );
     if (!res.ok) return [];
     const json = (await res.json()) as any;
     const hits = json?.query?.search;
