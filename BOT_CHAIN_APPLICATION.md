@@ -64,11 +64,15 @@ BOT Chain Foundry Deployment Script: apps/contracts/script/DeployQerinReceiptReg
 ```
 
 ### 11. On-chain Interaction Records
-- Provide the verified explorer URL:
+- **Official Live Dune Dashboard**:
+```text
+https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-micropayments
+```
+- **Verified Smart Contract Explorer (Base)**:
 ```text
 https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45#code
 ```
-- Or upload a screenshot of the contract transactions from Basescan.
+- **Dune Analytics Query**: `https://dune.com/queries/8654407` (Tracks autonomous AI agent micropayments and receipt registry interactions)
 
 ### 12. Support Tier
 - [x] **Option C: Community Growth Support**
@@ -101,14 +105,24 @@ Jainish
 ## Summary of BOT Chain Technical Integration in Qerin
 
 1. **EVM Contract Deployment**:
-   - `QerinReceiptRegistry.sol` is ready for BOT Chain Mainnet (Chain ID 677, RPC `https://rpc.botchain.ai`).
-   - Deployment command:
+   - `QerinReceiptRegistry.sol` is ready for BOT Chain Mainnet (Chain ID 677, RPC `https://rpc.botchain.ai`) and Testnet (Chain ID 968, RPC `https://rpc.bohr.life`).
+   - Deployment command for BOT Chain Mainnet:
      ```bash
      cd apps/contracts
-     forge script script/DeployQerinReceiptRegistryBotChain.s.sol:DeployQerinReceiptRegistryBotChain \
-       --rpc-url botchain \
-       --broadcast \
-       --private-key $QERIN_WALLET_PRIVATE_KEY
+     forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
+       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --rpc-url https://rpc.botchain.ai \
+       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2 \
+       --broadcast
+     ```
+   - Deployment command for BOT Chain Testnet:
+     ```bash
+     cd apps/contracts
+     forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
+       --private-key $QERIN_WALLET_PRIVATE_KEY \
+       --rpc-url https://rpc.bohr.life \
+       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2 \
+       --broadcast
      ```
 2. **Frontend Multi-Chain Switcher**:
    - Integrated into [`apps/frontend/src/components/dashboard/QerinDashboard.tsx`](file:///Volumes/Powerhouse/Web3/qerin/apps/frontend/src/components/dashboard/QerinDashboard.tsx).
