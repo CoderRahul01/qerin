@@ -10,7 +10,7 @@ import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
-import { ANSWER_PRICE_USD } from "./spendGuard.js";
+import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
 
@@ -62,6 +62,20 @@ app.post("/v1/keys", async (c) => {
 function requireInternalSecret(c: { req: { header: (name: string) => string | undefined } }): boolean {
   const internalSecret = process.env.QERIN_INTERNAL_SECRET;
   return Boolean(internalSecret) && c.req.header("x-qerin-internal-secret") === internalSecret;
+}
+
+// Shared by both answer routes. An unbounded question string is both a cost
+// vector (every extra character is paid-source query text and LLM input)
+// and, on the balance-gated path, ends up hashed into an on-chain receipt —
+// bounding it here, before any source is paid, is cheaper than discovering
+// the problem downstream.
+function validateQuestion(question: unknown): string | null {
+  if (!question || typeof question !== "string") return "question is required";
+  if (question.trim().length === 0) return "question is required";
+  if (question.length > MAX_QUESTION_LENGTH) {
+    return `question must be ${MAX_QUESTION_LENGTH} characters or fewer`;
+  }
+  return null;
 }
 
 // Consumer accounts: anonymous, no email/password — the account id itself
@@ -212,8 +226,9 @@ app.post("/v1/answer", async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const { question, network } = body ?? {};
-  if (!question || typeof question !== "string") {
-    return c.json({ error: "question is required" }, 400);
+  const questionError = validateQuestion(question);
+  if (questionError) {
+    return c.json({ error: questionError }, 400);
   }
 
   let balanceAfterDebit: number | null;
@@ -299,13 +314,15 @@ function getPaidMiddleware(): MiddlewareHandler {
   return paidMiddleware;
 }
 
+app.use("/v1/paid/answer", rateLimit);
 app.use("/v1/paid/answer", (c, next) => getPaidMiddleware()(c, next));
 
 app.post("/v1/paid/answer", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { question } = body ?? {};
-  if (!question || typeof question !== "string") {
-    return c.json({ error: "question is required" }, 400);
+  const questionError = validateQuestion(question);
+  if (questionError) {
+    return c.json({ error: questionError }, 400);
   }
 
   try {

@@ -65,9 +65,15 @@ npx wrangler secret put CDP_API_KEY_ID              # CDP facilitator auth (x402
 npx wrangler secret put CDP_API_KEY_SECRET
 npx wrangler secret put NVIDIA_API_KEY
 npx wrangler secret put QERIN_INTERNAL_SECRET        # `openssl rand -hex 32`; must match the frontend's copy
-npx wrangler secret put QERIN_REGISTRY_ADDRESS       # once the registry contract is deployed
-npx wrangler secret put DATABASE_URL                 # Neon Postgres connection string
+npx wrangler secret put QERIN_REGISTRY_ADDRESS       # once the registry contract is deployed (Base); see per-network vars below for BOT Chain etc.
+npx wrangler secret put FIREBASE_SERVICE_ACCOUNT     # Firebase Admin SDK service account JSON, minified — the entire database (free Spark plan)
 ```
+
+`QERIN_REGISTRY_ADDRESS_MAINNET` / `_TESTNET` / `_BOTCHAIN` / `_BOTCHAIN_TESTNET`
+are optional per-network overrides for the registry address — a registry
+deployed on Base is a different contract than one deployed on BOT Chain.
+Set whichever ones you've actually deployed to; `QERIN_REGISTRY_ADDRESS`
+above remains the fallback.
 
 No fiat payment provider secrets are needed — consumer top-ups are direct
 on-chain USDC on Base (`apps/backend/src/cryptoTopup.ts`), verified
@@ -144,14 +150,14 @@ Workers-native `crypto.getRandomValues` directly.
 - [ ] `QERIN_INTERNAL_SECRET` set identically on both the backend (Worker
       secret) and the frontend (Vercel env var) — the consumer app's
       `/v1/answer` calls fail closed (403) if these don't match
-- [ ] `DATABASE_URL` pointed at the live Neon project, with
-      `apps/backend/migrations/*.sql` applied in order (`users` /
-      `deposits` / `answer_requests` / `api_keys` / `waitlist_signups`
-      tables present) — these were previously created by hand on Neon and
-      are now committed migrations; run them against any new environment
-      (e.g. `psql "$DATABASE_URL" -f apps/backend/migrations/001_init.sql`)
-- [ ] `QerinReceiptRegistry` deployed and verified on Basescan,
-      `QERIN_REGISTRY_ADDRESS` / `NEXT_PUBLIC_REGISTRY_ADDRESS` set
+- [ ] `FIREBASE_SERVICE_ACCOUNT` set to a real Firebase Admin SDK service
+      account on the free Spark plan — this is the entire database
+      (accounts/balances, the daily spend counters + audit log, API keys,
+      waitlist). `apps/backend/migrations/*.sql` and `DATABASE_URL` are
+      stale, from an earlier Neon/Postgres design — ignore them.
+- [ ] `QerinReceiptRegistry` deployed and verified on Basescan (and on BOT
+      Chain's own scanner, once deployed there), `QERIN_REGISTRY_ADDRESS_*`
+      / `NEXT_PUBLIC_REGISTRY_ADDRESS` set per network
 - [ ] Confirm each real x402 source endpoint (CryptoSlate, Superhighway,
       Veles, Tavily, Otto AI Crypto News, Otto AI TradFi Data) is
       currently live and responding — third-party API uptime is out of

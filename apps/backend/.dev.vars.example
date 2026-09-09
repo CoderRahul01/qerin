@@ -26,10 +26,28 @@ NVIDIA_API_KEY=
 QERIN_INTERNAL_SECRET=
 
 # Deployed QerinReceiptRegistry contract address (apps/contracts). Optional —
-# leave unset to skip on-chain receipt logging entirely.
+# leave unset to skip on-chain receipt logging entirely. This is the
+# fallback used when no network-specific var below is set (so a Base-only
+# deployment can just set this one).
 QERIN_REGISTRY_ADDRESS=
 
-# Postgres connection string (Neon). Required — stores issued API keys and
-# per-request spend/usage records that back the daily spend cap, plus
-# consumer accounts/balances/deposits (accounts.ts).
-DATABASE_URL=
+# Per-network overrides — a registry deployed on Base is a different contract
+# address than one deployed on BOT Chain (separate chains, separate
+# contracts). Set whichever networks you've actually deployed the registry
+# to; recordReceipt.ts checks these before falling back to
+# QERIN_REGISTRY_ADDRESS above. See apps/contracts/script/ for the deploy
+# scripts per network.
+QERIN_REGISTRY_ADDRESS_MAINNET=
+QERIN_REGISTRY_ADDRESS_TESTNET=
+QERIN_REGISTRY_ADDRESS_BOTCHAIN=
+QERIN_REGISTRY_ADDRESS_BOTCHAIN_TESTNET=
+
+# Firebase Admin SDK service account JSON, minified to a single line
+# (project_id/client_email/private_key). Required — this is the entire
+# database: accounts/balances/deposits (accounts.ts), the daily spend
+# counters and audit log (spendGuard.ts), issued API keys (apiKeys.ts), and
+# waitlist signups (waitlist.ts), all on Firestore's free Spark plan via the
+# zero-dependency REST client in db.ts. No Postgres/Neon — that was an
+# earlier design; if you see DATABASE_URL referenced anywhere else, it's
+# stale.
+FIREBASE_SERVICE_ACCOUNT=
