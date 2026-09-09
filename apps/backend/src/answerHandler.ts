@@ -34,7 +34,7 @@ export async function answerHandler(
     };
   }
 
-  const paidResults = await gatherSources(question, sourceKeys);
+  const paidResults = await gatherSources(question, sourceKeys, targetNetwork);
 
   if (paidResults.length === 0) {
     return {
