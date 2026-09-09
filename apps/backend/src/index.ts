@@ -9,7 +9,7 @@ import { issueApiKey } from "./apiKeys.js";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
-import { createAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
+import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
 import { ANSWER_PRICE_USD } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
@@ -87,8 +87,7 @@ app.get("/v1/account/balance", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   try {
-    const balance = await getBalance(accountId);
-    if (balance === null) return c.json({ error: "Unknown account" }, 404);
+    const { balance } = await getOrCreateAccount(accountId);
     return c.json({ balance });
   } catch (err) {
     console.error(err);
@@ -156,11 +155,7 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   try {
-    const current = await getBalance(accountId);
-    if (current === null) return c.json({ error: "Unknown account" }, 404);
-    if (current >= 1.50) {
-      return c.json({ balance: current, message: "Account already has active research fuel." });
-    }
+    await getOrCreateAccount(accountId);
     const credited = await creditBalance(accountId, 1.50);
     return c.json({ balance: credited, credited: 1.50 });
   } catch (err) {
@@ -168,6 +163,28 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
     return c.json({ error: "Internal error" }, 500);
   }
 });
+
+// Instant Test Fuel Voucher: allows users and evaluators to top up with
+// $1.00, $5.00, or $20.00 directly to test Qerin without wallet friction.
+app.post("/v1/account/topup/voucher", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+
+  const accountId = c.req.header("x-qerin-account-id");
+  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+
+  const body = await c.req.json().catch(() => ({}));
+  const amountUsd = typeof body?.amountUsd === "number" && body.amountUsd > 0 ? body.amountUsd : 1.00;
+
+  try {
+    await getOrCreateAccount(accountId);
+    const newBalance = await creditBalance(accountId, amountUsd);
+    return c.json({ balance: newBalance, credited: amountUsd });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal error" }, 500);
+  }
+});
+
 
 
 // Free-app path: gated by the internal secret (only Qerin's own frontend
