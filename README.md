@@ -41,7 +41,7 @@ Qerin operates natively on EVM networks:
 | Network | Chain ID | Contract Address / Status | Explorer |
 |---|---|---|---|
 | **Base Mainnet** | `8453` | [`0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`](https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45#code) | [Basescan](https://basescan.org) |
-| **BOT Chain Mainnet** | `677` | Deployment Script: `apps/contracts/script/DeployQerinReceiptRegistryBotChain.s.sol` | [BOT Scan](https://scan.botchain.ai) |
+| **BOT Chain Mainnet** | `677` | [`0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`](https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45) (Verified) | [BOT Scan](https://scan.botchain.ai) |
 
 ### Contract Verification
 The `QerinReceiptRegistry` stores keccak256 hashes of inquiries alongside micro-settlement amounts and source counts, providing cryptographic non-repudiation while preserving privacy.

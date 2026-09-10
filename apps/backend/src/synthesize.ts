@@ -4,17 +4,12 @@ import type { PaidResult } from "./paidFetch.js";
 // OpenRouter: Access to top open-weight models (DeepSeek V3, Llama 3.3 70B, Qwen 2.5 72B)
 // with automatic failover and high-throughput reasoning.
 const OPENROUTER_MODELS = [
-  "deepseek/deepseek-chat",
   "meta-llama/llama-3.3-70b-instruct",
   "qwen/qwen-2.5-72b-instruct",
+  "deepseek/deepseek-chat",
 ];
 
-// Neither client below previously set an explicit timeout, so a stalled
-// upstream model call had no bound — the OpenAI SDK's own default is 10
-// minutes, far longer than anyone would wait on an answer. This keeps a
-// single hung model in the cascade from ever costing more than this many
-// milliseconds before falling through to the next fallback.
-const LLM_TIMEOUT_MS = 20_000;
+const LLM_TIMEOUT_MS = 12_000;
 
 export interface PersonaInsights {
   developer: string;

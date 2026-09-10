@@ -301,7 +301,7 @@ export function downloadDossierPdf(opt: DossierOptions): void {
   ` : ""}
 
   <div class="footer">
-    Verified by Qerin Receipt Registry — Base (0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45) & BOT Chain (Chain 677)<br/>
+    Verified by Qerin Receipt Registry — Base (0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45) & BOT Chain Mainnet (0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45 | Chain ID 677)<br/>
     Autonomous agent micropayment settlement via x402 protocol.
   </div>
 

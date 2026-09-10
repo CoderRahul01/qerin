@@ -41,6 +41,7 @@ interface ReceiptData {
   sourceCitations?: SourceCitation[];
   registryTxHash?: string;
   registryContract?: string;
+  chainId?: number;
 }
 
 interface ChatThread {
@@ -76,18 +77,26 @@ function buildAnswerData(data: AnswerData): {
   let receipt: ReceiptData | undefined;
   if (data.receipt && data.receipt.length > 0) {
     const tx = data.registryTxHash || data.receipt[0].txHash;
-    const defaultUrl = data.registryExplorerUrl || (tx ? `https://basescan.org/tx/${tx}` : "https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45");
+    const isBotChain = data.chainId === 677 || (data.network && data.network.toLowerCase().includes("bot"));
+    const botContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
+    const baseContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
+    const defaultUrl = data.registryExplorerUrl || (
+      isBotChain
+        ? (tx ? `https://scan.botchain.ai/tx/${tx}` : `https://scan.botchain.ai/address/${botContract}`)
+        : (tx ? `https://basescan.org/tx/${tx}` : `https://basescan.org/address/${baseContract}`)
+    );
     const sourceNames = data.receipt.map((x) => x.source).join(", ");
     receipt = {
       paid: data.totalPaid + " USDC",
       to: sourceNames || data.receipt[0].source,
-      via: data.network || "Base Mainnet",
+      via: data.network || (isBotChain ? "BOT Chain Mainnet" : "Base Mainnet"),
       txId: tx ? `${tx.slice(0, 8)}...${tx.slice(-6)}` : "0xb357...Ea45 (Contract)",
       basescanUrl: defaultUrl,
       success: true,
       sourceCitations: data.sourceCitations,
       registryTxHash: data.registryTxHash,
-      registryContract: data.registryContract,
+      registryContract: data.registryContract || (isBotChain ? botContract : baseContract),
+      chainId: data.chainId || (isBotChain ? 677 : 8453),
     };
   }
   return { content, receipt, rawReceipts: data.receipt, sourceCitations: data.sourceCitations };
@@ -192,9 +201,15 @@ function ThinkingBubble({ text }: { text: string }) {
 }
 
 function ReceiptCard({ receipt }: { receipt: ReceiptData }) {
+  const isBotChain = receipt.chainId === 677 || (receipt.via && receipt.via.toLowerCase().includes("bot"));
+  const defaultAddress = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
   const explorerUrl = receipt.basescanUrl && receipt.basescanUrl !== "#"
     ? receipt.basescanUrl
-    : (receipt.registryTxHash ? `https://basescan.org/tx/${receipt.registryTxHash}` : "https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45");
+    : (receipt.registryTxHash
+        ? (isBotChain ? `https://scan.botchain.ai/tx/${receipt.registryTxHash}` : `https://basescan.org/tx/${receipt.registryTxHash}`)
+        : (isBotChain ? `https://scan.botchain.ai/address/${defaultAddress}` : `https://basescan.org/address/${defaultAddress}`));
+
+  const chainLabel = isBotChain ? "BOT Chain (677)" : "Chain 8453";
 
   const rows = [
     { label: "Paid", value: receipt.paid },
@@ -211,7 +226,7 @@ function ReceiptCard({ receipt }: { receipt: ReceiptData }) {
           </div>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--qd-receipt-success)" }}>Verified On-Chain Micropayment</span>
         </div>
-        <span style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "monospace" }}>Chain 8453</span>
+        <span style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "monospace" }}>{chainLabel}</span>
       </div>
 
       {rows.map(({ label, value, href }) => (
@@ -310,7 +325,12 @@ export function QerinDashboard() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            return parsed.map((t: ChatThread) => ({
+              ...t,
+              messages: Array.isArray(t.messages)
+                ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
+                : [],
+            }));
           }
         }
       } catch {}
@@ -591,7 +611,7 @@ export function QerinDashboard() {
           title: newTopic,
           topic: newTopic,
           network: result.data.network || (selectedNetwork === "botchain" ? "BOT Chain" : "Base Mainnet"),
-          messages: t.messages.filter(m => m.id !== thinkingId).concat({
+          messages: t.messages.filter(m => m.role !== "thinking").concat({
             id: answerMsgId,
             role: "assistant" as const,
             content,
@@ -608,14 +628,14 @@ export function QerinDashboard() {
       } else if (result.reason === "insufficient_balance") {
         setTopupReason("Your Agent Settlement Fuel ran out while settling data source micropayments.");
         setShowTopup(true);
-        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId) }));
+        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking") }));
       } else {
-        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId).concat({ id: answerMsgId, role: "assistant" as const, content: "I couldn't retrieve verified data right now. Please try again shortly.", time: answerTime }) }));
+        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking").concat({ id: answerMsgId, role: "assistant" as const, content: "I couldn't retrieve verified data right now. Please try again shortly.", time: answerTime }) }));
       }
     } catch {
       const answerMsgId = "a-" + makeId();
       const answerTime = nowTime();
-      updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.id !== thinkingId).concat({ id: answerMsgId, role: "assistant" as const, content: "I encountered a connection error while gathering verified data. Please try again.", time: answerTime }) }));
+      updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking").concat({ id: answerMsgId, role: "assistant" as const, content: "I encountered a connection error while gathering verified data. Please try again.", time: answerTime }) }));
     } finally {
       setIsSubmitting(false);
     }

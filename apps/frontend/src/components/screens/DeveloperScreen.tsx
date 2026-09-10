@@ -1,6 +1,7 @@
 "use client";
 
-const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS;
+const REGISTRY_ADDRESS_BASE = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
+const REGISTRY_ADDRESS_BOTCHAIN = process.env.NEXT_PUBLIC_BOTCHAIN_REGISTRY_ADDRESS || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
 
 export function DeveloperScreen({ onGoHome }: { onGoHome: () => void }) {
   return (
@@ -134,20 +135,24 @@ export function DeveloperScreen({ onGoHome }: { onGoHome: () => void }) {
       </div>
 
       <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "var(--qerin-text-muted)" }}>
-        Every call is receipted on-chain.
-        {REGISTRY_ADDRESS && (
-          <>
-            {" "}
-            <a
-              href={`https://basescan.org/address/${REGISTRY_ADDRESS}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "var(--qerin-accent)", textDecoration: "underline" }}
-            >
-              View the receipt registry ↗
-            </a>
-          </>
-        )}
+        Every call is receipted on-chain:{" "}
+        <a
+          href={`https://basescan.org/address/${REGISTRY_ADDRESS_BASE}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "var(--qerin-accent)", textDecoration: "underline", marginRight: 8 }}
+        >
+          Base Registry ↗
+        </a>
+        •
+        <a
+          href={`https://scan.botchain.ai/address/${REGISTRY_ADDRESS_BOTCHAIN}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "var(--qerin-accent)", textDecoration: "underline", marginLeft: 8 }}
+        >
+          BOT Chain Registry (Chain 677) ↗
+        </a>
       </div>
     </div>
   );

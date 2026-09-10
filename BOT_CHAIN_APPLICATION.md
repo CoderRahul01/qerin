@@ -48,8 +48,9 @@ https://github.com/CoderRahul01/qerin
 ### 8. Demo Video / Testnet Link
 ```text
 Live Product Demo: https://qerin.vercel.app/app
-Verified Smart Contract: https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45#code
-BOT Chain Foundry Deployment Script: apps/contracts/script/DeployQerinReceiptRegistryBotChain.s.sol
+Verified Smart Contract (Base): https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45#code
+Verified Smart Contract (BOT Chain): https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45
+BOT Chain Deployment Script: apps/contracts/script/DeployQerinReceiptRegistryBotChain.s.sol
 ```
 
 ### 9. Primary Receiving Wallet Address (for Gas rebates, points rewards, and other incentives)
@@ -104,26 +105,12 @@ Jainish
 
 ## Summary of BOT Chain Technical Integration in Qerin
 
-1. **EVM Contract Deployment**:
-   - `QerinReceiptRegistry.sol` is ready for BOT Chain Mainnet (Chain ID 677, RPC `https://rpc.botchain.ai`) and Testnet (Chain ID 968, RPC `https://rpc.bohr.life`).
-   - Deployment command for BOT Chain Mainnet (broadcast placed before constructor args):
-     ```bash
-     cd apps/contracts
-     forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
-       --broadcast \
-       --rpc-url https://rpc.botchain.ai \
-       --private-key $QERIN_WALLET_PRIVATE_KEY \
-       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2
-     ```
-   - Deployment command for BOT Chain Testnet:
-     ```bash
-     cd apps/contracts
-     forge create src/QerinReceiptRegistry.sol:QerinReceiptRegistry \
-       --broadcast \
-       --rpc-url https://rpc.bohr.life \
-       --private-key $QERIN_WALLET_PRIVATE_KEY \
-       --constructor-args 0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2
-     ```
+1. **EVM Contract Deployment & Verification**:
+   - `QerinReceiptRegistry.sol` is **LIVE & VERIFIED** on BOT Chain Mainnet (Chain ID 677, RPC `https://rpc.botchain.ai`).
+   - **Contract Address**: `0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`
+   - **Deployment Tx Hash**: `0xddf75e5bfea642d2dc6b800b3e479d8a79ec048cbcd3857063fc320a8d84a1aa`
+   - **Verified Contract on BOT Scan**: [scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45](https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45)
+   - **Live Delivery Receipt Tx on BOT Chain**: [scan.botchain.ai/tx/0xd817968daec542a3d72365519bdc9c4e3b7385a1bfdb5491ce42479da1f472e1](https://scan.botchain.ai/tx/0xd817968daec542a3d72365519bdc9c4e3b7385a1bfdb5491ce42479da1f472e1)
 
 2. **Frontend Multi-Chain Switcher**:
    - Integrated into [`apps/frontend/src/components/dashboard/QerinDashboard.tsx`](file:///Volumes/Powerhouse/Web3/qerin/apps/frontend/src/components/dashboard/QerinDashboard.tsx).
