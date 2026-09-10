@@ -136,7 +136,7 @@ export async function fetchWebResearch(query: string): Promise<Array<{ title: st
 export const SOURCES: Record<string, SourceDef> = {
   cryptoslate: {
     key: "cryptoslate",
-    name: "CryptoSlate",
+    name: "Web3 Protocol Research",
     priceUsd: "0.01",
     buildRequest: async (query) => {
       const contentUrl = await findCryptoSlateArticle(query);
@@ -152,7 +152,7 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   superhighway: {
     key: "superhighway",
-    name: "Superhighway",
+    name: "Superhighway Intelligence Node",
     priceUsd: "0.001",
     buildRequest: async (query) => ({
       url: `https://superhighway.walls.sh/search?q=${encodeURIComponent(query)}&limit=5`,
@@ -161,7 +161,7 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   veles: {
     key: "veles",
-    name: "Veles Finance Agent",
+    name: "Financial Intelligence Agent",
     priceUsd: "0.02",
     buildRequest: async (query) => ({
       url: "https://veles-finance-gateway.fly.dev/ask",
@@ -172,15 +172,9 @@ export const SOURCES: Record<string, SourceDef> = {
       },
     }),
   },
-  // The three below were found live via the CDP x402 Bazaar discovery API
-  // (GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources),
-  // which lists every x402 resource currently registered with the CDP
-  // facilitator along with real usage counts — not hand-picked from a
-  // third-party directory. Request shapes below match each resource's own
-  // published `extensions.bazaar.info` schema.
   tavily: {
     key: "tavily",
-    name: "Tavily Search",
+    name: "Autonomous Web Research Node",
     priceUsd: "0.01",
     buildRequest: async (query) => ({
       url: "https://x402.tavily.com/search",
@@ -193,7 +187,7 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   ottoaiCryptoNews: {
     key: "ottoaiCryptoNews",
-    name: "Otto AI Crypto News",
+    name: "Crypto Intelligence Stream",
     priceUsd: "0.001",
     buildRequest: async () => ({
       url: "https://x402.ottoai.services/crypto-news",
@@ -202,11 +196,9 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   ottoaiTradfiData: {
     key: "ottoaiTradfiData",
-    name: "Otto AI TradFi Data",
+    name: "TradFi Market Feed",
     priceUsd: "0.003",
     buildRequest: async (query) => {
-      // TradFi data needs a ticker symbol, not free text — this source is
-      // only selected (see selectSources.ts) when one can be extracted.
       const symbol = extractTickerSymbol(query);
       const params = symbol ? `?symbol=${encodeURIComponent(symbol)}` : "";
       return {
@@ -215,20 +207,9 @@ export const SOURCES: Record<string, SourceDef> = {
       };
     },
   },
-  // The three below were verified live the same way as tavily/ottoai above:
-  // GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources
-  // (paginated through all ~15k registered resources), filtered to entries
-  // whose resource host matches these providers and whose `accepts[].network`
-  // is `eip155:8453` (Base) — Qerin's wallet only pays on Base, so any
-  // resource priced on another chain (e.g. CoinMarketCap's BNB-chain quotes
-  // endpoint) was excluded. Of each provider's Base-priced endpoints, we
-  // picked the one whose `extensions.bazaar.info.input.queryParams` takes a
-  // single free-text field, matching the `buildRequest(query)` shape used
-  // throughout this file (tavily, superhighway, veles) rather than one
-  // requiring a pre-resolved contract address or pair address.
   coingecko: {
     key: "coingecko",
-    name: "CoinGecko Onchain Search",
+    name: "On-Chain Market Search",
     priceUsd: "0.01",
     buildRequest: async (query) => ({
       url: `https://pro-api.coingecko.com/api/v3/x402/onchain/search/pools?query=${encodeURIComponent(query)}&include=base_token`,
@@ -237,7 +218,7 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   coinmarketcap: {
     key: "coinmarketcap",
-    name: "CoinMarketCap DEX Search",
+    name: "DEX Liquidity Feed",
     priceUsd: "0.01",
     buildRequest: async (query) => ({
       url: `https://pro-api.coinmarketcap.com/x402/v1/dex/search?q=${encodeURIComponent(query)}`,
@@ -246,7 +227,7 @@ export const SOURCES: Record<string, SourceDef> = {
   },
   messari: {
     key: "messari",
-    name: "Messari Signal",
+    name: "Institutional Signal Node",
     priceUsd: "0.55",
     buildRequest: async (query) => ({
       url: `https://api.messari.io/signal/v1/assets?search=${encodeURIComponent(query)}&limit=10&page=1`,

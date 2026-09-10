@@ -14,6 +14,8 @@ import { downloadDossierPdf, generateDossierMarkdown } from "@/lib/dossierExport
 
 interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, handler: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
 }
 
 interface ChatMessage {
@@ -104,7 +106,7 @@ function buildAnswerData(data: AnswerData): {
 
 const SAMPLE_RECEIPT: ReceiptData = {
   paid: "0.0200 USDC",
-  to: "Messari",
+  to: "Institutional Signal Node",
   via: "Base",
   txId: "0x3fa7...8c1e",
   basescanUrl: "https://basescan.org",
@@ -133,7 +135,7 @@ const SEED_THREADS: ChatThread[] = [
           contentWriter: "'Ethereum's Pectra upgrade marks the biggest leap in account abstraction since ERC-4337.'",
           trader: "Lower blob fees and optimized validator economics improve L2 throughput and ETH staking yield efficiency.",
         },
-        content: "Ethereum's upcoming upgrade, Pectra, is set to go live on mainnet in Q2 2025. It combines the Prague execution layer and Electra consensus layer upgrades to improve scalability, UX, and staking efficiency.\n\nKey highlights:\n• **EIP-7702**: Enables smart contract wallets for EOAs\n• **Increased validator stake limit** from 32 ETH to 2,048 ETH\n• **Blob throughput** improvement for L2 scalability\n• **Better UX** for staking and withdrawals\n\nSource: Messari, Ethereum.org",
+        content: "Ethereum's upcoming upgrade, Pectra, is set to go live on mainnet in Q2 2025. It combines the Prague execution layer and Electra consensus layer upgrades to improve scalability, UX, and staking efficiency.\n\nKey highlights:\n• **EIP-7702**: Enables smart contract wallets for EOAs\n• **Increased validator stake limit** from 32 ETH to 2,048 ETH\n• **Blob throughput** improvement for L2 scalability\n• **Better UX** for staking and withdrawals\n\nSource: Decentralized Research Protocol, Ethereum Foundation",
         time: "10:43 AM",
         receipt: SAMPLE_RECEIPT,
       },
@@ -160,9 +162,9 @@ const SEED_THREADS: ChatThread[] = [
           contentWriter: "The L1 battle between monolithic speed (Solana) and modular subnets (Avalanche) enters a new phase.",
           trader: "Watch SOL DEX volumes vs AVAX institutional subnet announcements as key valuation drivers.",
         },
-        content: "**Solana (SOL)** and **Avalanche (AVAX)** are both high-performance L1 blockchains but with different architectural approaches.\n\n**Solana:** ~65,000 TPS theoretical, sub-400ms finality, single-shard design with Proof of History.\n\n**Avalanche:** ~4,500 TPS on C-Chain, ~1s finality, tri-chain architecture. Strong subnet customization.\n\nSource: CryptoSlate, CoinGecko",
+        content: "**Solana (SOL)** and **Avalanche (AVAX)** are both high-performance L1 blockchains but with different architectural approaches.\n\n**Solana:** ~65,000 TPS theoretical, sub-400ms finality, single-shard design with Proof of History.\n\n**Avalanche:** ~4,500 TPS on C-Chain, ~1s finality, tri-chain architecture. Strong subnet customization.\n\nSource: Web3 Protocol Research, On-Chain Market Search",
         time: "9:13 AM",
-        receipt: { paid: "0.0200 USDC", to: "CryptoSlate", via: "Base", txId: "0x9ab2...f1d3", basescanUrl: "https://basescan.org", success: true },
+        receipt: { paid: "0.0200 USDC", to: "Web3 Protocol Research", via: "Base", txId: "0x9ab2...f1d3", basescanUrl: "https://basescan.org", success: true },
       },
     ],
   },
@@ -388,7 +390,19 @@ export function QerinDashboard() {
 
     try {
       const stored = localStorage.getItem(THREADS_STORAGE_KEY);
-      if (!stored) {
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed.map((t: ChatThread) => ({
+            ...t,
+            messages: Array.isArray(t.messages)
+              ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
+              : [],
+          }));
+          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
+          setThreads(cleaned);
+        }
+      } else {
         localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(SEED_THREADS));
         localStorage.setItem(ACTIVE_THREAD_KEY, "t1");
       }
@@ -397,7 +411,11 @@ export function QerinDashboard() {
     const channel = new BroadcastChannel("qerin_chat_sync");
     channel.onmessage = (e) => {
       if (e.data?.type === "SYNC_THREADS" && Array.isArray(e.data.threads)) {
-        setThreads(e.data.threads);
+        const cleaned = e.data.threads.map((t: ChatThread) => ({
+          ...t,
+          messages: Array.isArray(t.messages) ? t.messages.filter((m: ChatMessage) => m.role !== "thinking") : [],
+        }));
+        setThreads(cleaned);
         if (e.data.activeThreadId) {
           setActiveThreadId(e.data.activeThreadId);
         }
@@ -409,7 +427,10 @@ export function QerinDashboard() {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setThreads(parsed);
+            setThreads(parsed.map((t: ChatThread) => ({
+              ...t,
+              messages: Array.isArray(t.messages) ? t.messages.filter((m: ChatMessage) => m.role !== "thinking") : [],
+            })));
           }
         } catch {}
       }
@@ -440,43 +461,48 @@ export function QerinDashboard() {
         const b = await fetchBalance(id);
         if (!isMounted) return;
         setBalance(b);
-      } catch {
-        if (!isMounted) return;
-        setAccountId("local-" + makeId());
-        setBalance(1.5);
+      } catch (err) {
+        console.error("Account initialization failed:", err);
       }
     }
 
     initAccount();
 
-    if (
-      typeof window !== "undefined" &&
-      (window as unknown as { ethereum?: { on?: (event: string, handler: (accounts: string[]) => void) => void; removeListener?: (event: string, handler: (accounts: string[]) => void) => void } }).ethereum
-    ) {
-      const eth = (window as unknown as { ethereum: { on?: (event: string, handler: (accounts: string[]) => void) => void; removeListener?: (event: string, handler: (accounts: string[]) => void) => void } }).ethereum;
-      const handleAccountsChanged = (accounts: string[]) => {
-        const nextAddr = accounts.length > 0 ? accounts[0] : null;
-        initAccount(nextAddr);
-      };
-
-      if (eth.on) {
-        eth.on("accountsChanged", handleAccountsChanged);
+    const handleAccountSync = (e: MessageEvent) => {
+      if (e.data?.type === "ACCOUNT_SYNC") {
+        if (e.data.accountId) setAccountId(e.data.accountId);
+        if (typeof e.data.balance === "number") setBalance(e.data.balance);
       }
-      return () => {
-        isMounted = false;
-        if (eth.removeListener) {
-          eth.removeListener("accountsChanged", handleAccountsChanged);
-        }
-      };
+    };
+
+    const channel = new BroadcastChannel("qerin_account_sync");
+    channel.addEventListener("message", handleAccountSync);
+
+    const handleAccountsChanged = (...args: unknown[]) => {
+      const accounts = args[0] as string[];
+      if (accounts && accounts.length > 0) {
+        initAccount(accounts[0]);
+      } else {
+        initAccount(null);
+      }
+    };
+
+    const ethereum = typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined;
+    if (ethereum?.on) {
+      ethereum.on("accountsChanged", handleAccountsChanged);
     }
 
     return () => {
       isMounted = false;
+      channel.removeEventListener("message", handleAccountSync);
+      channel.close();
+      if (ethereum?.removeListener) {
+        ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      }
     };
   }, []);
 
-  const handleConnectWallet = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleConnectWallet = async () => {
     try {
       const addr = await requestWalletConnection();
       if (addr) {
@@ -496,9 +522,15 @@ export function QerinDashboard() {
       const next = updater(prev);
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(next));
+          const sanitized = next.map(t => ({
+            ...t,
+            messages: Array.isArray(t.messages)
+              ? t.messages.filter(m => m.role !== "thinking")
+              : [],
+          }));
+          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(sanitized));
           const channel = new BroadcastChannel("qerin_chat_sync");
-          channel.postMessage({ type: "SYNC_THREADS", threads: next });
+          channel.postMessage({ type: "SYNC_THREADS", threads: sanitized });
           channel.close();
         } catch {}
       }
@@ -537,6 +569,20 @@ export function QerinDashboard() {
   const handleSelectThread = (id: string) => {
     setActiveThreadId(id);
     setSidebarOpen(false);
+    setThreads(prev => {
+      const hasThinking = prev.some(t => t.messages.some(m => m.role === "thinking"));
+      if (!hasThinking) return prev;
+      const cleaned = prev.map(t => ({
+        ...t,
+        messages: Array.isArray(t.messages) ? t.messages.filter(m => m.role !== "thinking") : [],
+      }));
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
+        } catch {}
+      }
+      return cleaned;
+    });
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(ACTIVE_THREAD_KEY, id);
@@ -589,9 +635,9 @@ export function QerinDashboard() {
       ...t,
       title: t.title === "New Chat" ? q.slice(0, 40) : t.title,
       preview: q.slice(0, 60),
-      messages: [...t.messages,
+      messages: [...t.messages.filter(m => m.role !== "thinking"),
         { id: userMsgId, role: "user" as const, content: q, time },
-        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingFor: "Paying & synthesizing from " + (sourceNames || "live sources") + "..." },
+        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingFor: "Agentic Layer: Settling x402 micropayments across verified intelligence sources..." },
       ],
     }));
 
@@ -950,7 +996,11 @@ export function QerinDashboard() {
               const msgPersona = activePersona[msg.id] || "all";
 
               if (msg.role === "thinking") {
-                return <ThinkingBubble key={msg.id} text={msg.thinkingFor ?? "Thinking and fetching..."} />;
+                if (!isSubmitting) return null;
+                const cleanThinkingText = (msg.thinkingFor && !msg.thinkingFor.toLowerCase().includes("tavily") && !msg.thinkingFor.toLowerCase().includes("tably"))
+                  ? msg.thinkingFor
+                  : "Agentic Layer: Settling x402 micropayments across verified intelligence sources...";
+                return <ThinkingBubble key={msg.id} text={cleanThinkingText} />;
               }
 
               if (msg.role === "user") {

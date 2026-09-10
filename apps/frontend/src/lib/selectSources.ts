@@ -11,15 +11,15 @@ export interface SourceMeta {
 }
 
 const SOURCE_META: Record<string, SourceMeta> = {
-  cryptoslate: { key: "cryptoslate", name: "CryptoSlate", priceUsd: 0.01 },
-  superhighway: { key: "superhighway", name: "Superhighway", priceUsd: 0.001 },
-  veles: { key: "veles", name: "Veles Finance Agent", priceUsd: 0.02 },
-  tavily: { key: "tavily", name: "Tavily Search", priceUsd: 0.01 },
-  ottoaiCryptoNews: { key: "ottoaiCryptoNews", name: "Otto AI Crypto News", priceUsd: 0.001 },
-  ottoaiTradfiData: { key: "ottoaiTradfiData", name: "Otto AI TradFi Data", priceUsd: 0.003 },
-  coingecko: { key: "coingecko", name: "CoinGecko Onchain Search", priceUsd: 0.01 },
-  coinmarketcap: { key: "coinmarketcap", name: "CoinMarketCap DEX Search", priceUsd: 0.01 },
-  messari: { key: "messari", name: "Messari Signal", priceUsd: 0.55 },
+  cryptoslate: { key: "cryptoslate", name: "Web3 Protocol Research", priceUsd: 0.01 },
+  superhighway: { key: "superhighway", name: "Superhighway Intelligence Node", priceUsd: 0.001 },
+  veles: { key: "veles", name: "Financial Intelligence Agent", priceUsd: 0.02 },
+  tavily: { key: "tavily", name: "Autonomous Web Research Node", priceUsd: 0.01 },
+  ottoaiCryptoNews: { key: "ottoaiCryptoNews", name: "Crypto Intelligence Stream", priceUsd: 0.001 },
+  ottoaiTradfiData: { key: "ottoaiTradfiData", name: "TradFi Market Feed", priceUsd: 0.003 },
+  coingecko: { key: "coingecko", name: "On-Chain Market Search", priceUsd: 0.01 },
+  coinmarketcap: { key: "coinmarketcap", name: "DEX Liquidity Feed", priceUsd: 0.01 },
+  messari: { key: "messari", name: "Institutional Signal Node", priceUsd: 0.55 },
 };
 
 const STOPWORD_CAPS = new Set(["I", "A", "THE", "AI", "US", "USD", "CEO", "CFO", "IPO", "SEC"]);
