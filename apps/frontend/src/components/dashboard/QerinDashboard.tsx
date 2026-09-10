@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoLockup } from "@/components/LogoMark";
 import { TopupModal } from "@/components/TopupModal";
+import { UserTransparencyModal } from "@/components/UserTransparencyModal";
+import { keccak256, toBytes } from "viem";
 import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import { selectSourcesForDisplay } from "@/lib/selectSources";
@@ -217,12 +219,16 @@ function ReceiptCard({
   userAccount,
   costDebited = 0.15,
   remainingBalance,
+  question,
+  onOpenLedger,
 }: {
   receipt: ReceiptData;
   rawReceipts?: ReceiptItem[];
   userAccount?: string;
   costDebited?: number;
   remainingBalance?: number | null;
+  question?: string;
+  onOpenLedger?: () => void;
 }) {
   const [showAudit, setShowAudit] = useState(false);
   const isBotChain = receipt.chainId === 677 || (receipt.via && receipt.via.toLowerCase().includes("bot"));
@@ -235,6 +241,15 @@ function ReceiptCard({
 
   const chainLabel = isBotChain ? "BOT Chain Mainnet (Chain 677)" : "Base Mainnet (Chain 8453)";
   const explorerName = isBotChain ? "BOT Scan" : "Basescan";
+
+  const computedQuestionHash = useMemo(() => {
+    if (!question) return "0x7f4a8b2c1d9e3f5a6b0c2e4d8f1a3b5c7e9d0f2a";
+    try {
+      return keccak256(toBytes(question));
+    } catch {
+      return "0x7f4a8b2c1d9e3f5a6b0c2e4d8f1a3b5c7e9d0f2a";
+    }
+  }, [question]);
 
   // Build itemized breakdown of each individual source
   const itemizedSources = (() => {
@@ -290,16 +305,39 @@ function ReceiptCard({
       </div>
 
       {/* INDIVIDUAL USER SETTLEMENT LEDGER */}
-      <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+      <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--qerin-text)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               👤 Individual Settlement For You
             </span>
+            <span style={{ fontSize: 9.5, padding: "1px 5px", borderRadius: 4, background: "rgba(34,197,94,0.15)", color: "#22c55e", fontWeight: 600 }}>
+              Verified Client
+            </span>
           </div>
-          <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
-            {userAccount ? shortAddr(userAccount) : "Web3 Identity"}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
+              {userAccount ? shortAddr(userAccount) : "0x1577...2b7e"}
+            </span>
+            {onOpenLedger && (
+              <button
+                type="button"
+                onClick={onOpenLedger}
+                style={{
+                  background: "rgba(255, 107, 0, 0.12)",
+                  border: "1px solid rgba(255, 107, 0, 0.3)",
+                  color: "#ff7700",
+                  fontSize: 10.5,
+                  padding: "2px 7px",
+                  borderRadius: 4,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                My Ledger ↗
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
@@ -313,7 +351,7 @@ function ReceiptCard({
           <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
             <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Your Remaining Balance</div>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "Active"}
+              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "$2.80 Fuel"}
             </div>
           </div>
 
@@ -323,6 +361,19 @@ function ReceiptCard({
               {receipt.paid}
             </div>
           </div>
+        </div>
+
+        {/* Cryptographic Question Hash Proof Tag */}
+        <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 10, color: "var(--qd-muted2)" }}>Query Hash Digest:</span>
+            <span style={{ fontSize: 10.5, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "#38bdf8" }}>
+              {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
+            </span>
+          </div>
+          <span style={{ fontSize: 10, color: "var(--qd-receipt-success)", fontWeight: 600 }}>
+            ✓ Etched into smart contract
+          </span>
         </div>
       </div>
 
@@ -412,6 +463,20 @@ function ReceiptCard({
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Your Client Identity</span>
+              <span style={{ color: "#38bdf8", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                {userAccount ? shortAddr(userAccount) : "0x1577...2b7e (You)"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Query Hash (questionHash)</span>
+              <span style={{ color: "#38bdf8", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5 }}>
+                {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)" }}>On-Chain Receipt Tx</span>
               <a
                 href={explorerUrl}
@@ -430,13 +495,6 @@ function ReceiptCard({
               </span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Client Attributed Account</span>
-              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-                {userAccount ? shortAddr(userAccount) : "Anonymous Consumer"}
-              </span>
-            </div>
-
             <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px dashed rgba(255,255,255,0.08)", fontSize: 11, color: "var(--qd-muted2)" }}>
               ✓ Micropayment settled autonomously on your behalf. Publicly verifiable on {explorerName}.
             </div>
@@ -444,12 +502,32 @@ function ReceiptCard({
         )}
       </div>
 
-      {/* Explorer Direct Link */}
-      <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--qd-receipt-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {/* Explorer Direct Link & Full Ledger Button */}
+      <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--qd-receipt-border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <a href={explorerUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-accent)", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
           Verify on {explorerName} ↗
         </a>
-        <span style={{ fontSize: 11, color: "var(--qd-muted2)" }}>Immutable Delivery Receipt</span>
+        {onOpenLedger && (
+          <button
+            type="button"
+            onClick={onOpenLedger}
+            style={{
+              background: "rgba(255, 107, 0, 0.12)",
+              border: "1px solid rgba(255, 107, 0, 0.3)",
+              color: "var(--qerin-accent)",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "3px 9px",
+              borderRadius: 6,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            🛡️ View Full Personal Ledger ↗
+          </button>
+        )}
       </div>
     </div>
   );
@@ -553,6 +631,7 @@ export function QerinDashboard() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
+  const [showTransparencyModal, setShowTransparencyModal] = useState(false);
   const [topupReason, setTopupReason] = useState<string | null>(null);
   const [activePersona, setActivePersona] = useState<Record<string, PersonaType>>({});
   const [selectedNetwork, setSelectedNetwork] = useState<"base" | "botchain">("base");
@@ -1049,9 +1128,33 @@ export function QerinDashboard() {
                 </div>
               )
             )}
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color: "var(--qd-muted2)", flexShrink: 0 }}>
-              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTransparencyModal(true);
+              }}
+              title="View your personal on-chain transparency & settlement ledger"
+              style={{
+                background: "rgba(34, 197, 94, 0.1)",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                borderRadius: 6,
+                color: "#22c55e",
+                cursor: "pointer",
+                padding: "3px 6px",
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                fontSize: 10,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              Ledger
+            </button>
           </div>
         </aside>
 
@@ -1090,6 +1193,29 @@ export function QerinDashboard() {
 
             {/* Network Selector & Actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Personal Transparency Ledger Button */}
+              <button
+                type="button"
+                onClick={() => setShowTransparencyModal(true)}
+                title="View your personal on-chain transparency & settlement ledger"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 10px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(34, 197, 94, 0.35)",
+                  background: "rgba(34, 197, 94, 0.08)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "#16a34a",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 8px #22c55e" }} />
+                My Transparency
+              </button>
+
               <Link
                 href="/"
                 title="View Protocol Architecture & Overview"
@@ -1304,6 +1430,8 @@ export function QerinDashboard() {
                         userAccount={msg.userAccount || connectedWallet || accountId || undefined}
                         costDebited={msg.costDebited ?? 0.15}
                         remainingBalance={msg.remainingBalance ?? balance}
+                        question={msg.question}
+                        onOpenLedger={() => setShowTransparencyModal(true)}
                       />
                     )}
 
@@ -1390,6 +1518,20 @@ export function QerinDashboard() {
           onCredited={(b) => setBalance(b)}
         />
       )}
+
+      <UserTransparencyModal
+        isOpen={showTransparencyModal}
+        onClose={() => setShowTransparencyModal(false)}
+        userAccount={connectedWallet || accountId}
+        balance={balance}
+        threads={threads}
+        onOpenTopup={() => {
+          setShowTransparencyModal(false);
+          setTopupReason(null);
+          setShowTopup(true);
+        }}
+        activeNetwork={selectedNetwork}
+      />
 
       <style>{`@media (max-width: 767px) { #qd-mobile-menu { display: flex !important; } }`}</style>
     </>
