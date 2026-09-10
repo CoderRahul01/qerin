@@ -9,7 +9,7 @@ import { issueApiKey } from "./apiKeys.js";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
-import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance } from "./accounts.js";
+import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance, claimEcosystemPass } from "./accounts.js";
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
@@ -114,8 +114,8 @@ app.get("/v1/account/balance", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   try {
-    const { balance } = await getOrCreateAccount(accountId);
-    return c.json({ balance });
+    const { balance, passClaimed } = await getOrCreateAccount(accountId);
+    return c.json({ balance, passClaimed: Boolean(passClaimed) });
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
@@ -172,9 +172,9 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   }
 });
 
-// Ecosystem & Reviewer Fuel Pass: allows evaluators, grant committees, and
-// developers to activate an initial $1.50 Protocol Research Fuel to experience
-// autonomous multi-source research without being blocked by empty test wallets.
+// Ecosystem & Reviewer Fuel Pass: STRICTLY ONE-TIME per individual user/wallet.
+// Allows evaluators, grant committees, and developers to activate an initial $1.50
+// Protocol Research Fuel to experience autonomous multi-source research.
 app.post("/v1/account/topup/demo-claim", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
 
@@ -182,17 +182,22 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   try {
-    await getOrCreateAccount(accountId);
-    const credited = await creditBalance(accountId, 1.50);
-    return c.json({ balance: credited, credited: 1.50 });
+    const result = await claimEcosystemPass(accountId, 1.50);
+    if (result.alreadyClaimed) {
+      return c.json({
+        error: "Ecosystem Review Pass has already been claimed for this account. Pass is strictly one-time per individual user.",
+        alreadyClaimed: true,
+        balance: result.balance,
+      }, 409);
+    }
+    return c.json({ balance: result.balance, credited: 1.50, alreadyClaimed: false });
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
   }
 });
 
-// Instant Test Fuel Voucher: allows users and evaluators to top up with
-// $1.00, $5.00, or $20.00 directly to test Qerin without wallet friction.
+// Fuel Voucher: restricted to authorized promo code
 app.post("/v1/account/topup/voucher", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
 
@@ -200,7 +205,13 @@ app.post("/v1/account/topup/voucher", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const amountUsd = typeof body?.amountUsd === "number" && body.amountUsd > 0 ? body.amountUsd : 1.00;
+  const code = typeof body?.code === "string" ? body.code.trim().toUpperCase() : "";
+
+  if (code !== "QERIN-ALPHA-PASS") {
+    return c.json({ error: "Invalid voucher code. Please deposit via your Web3 wallet." }, 403);
+  }
+
+  const amountUsd = typeof body?.amountUsd === "number" && body.amountUsd > 0 && body.amountUsd <= 5 ? body.amountUsd : 1.00;
 
   try {
     await getOrCreateAccount(accountId);

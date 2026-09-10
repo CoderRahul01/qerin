@@ -61,6 +61,27 @@ export async function getOrCreateAccountId(walletAddr?: string | null): Promise<
   return localId;
 }
 
+export interface AccountInfo {
+  balance: number;
+  passClaimed: boolean;
+}
+
+export async function fetchAccountInfo(accountId: string): Promise<AccountInfo> {
+  try {
+    const res = await fetch("/api/account/balance", {
+      headers: { "X-Qerin-Account-Id": accountId },
+    });
+    const json = await res.json();
+    if (res.ok && typeof json.balance === "number") {
+      return {
+        balance: json.balance as number,
+        passClaimed: Boolean(json.passClaimed),
+      };
+    }
+  } catch {}
+  return { balance: 0, passClaimed: false };
+}
+
 export async function fetchBalance(accountId: string): Promise<number> {
   try {
     const res = await fetch("/api/account/balance", {
@@ -119,18 +140,8 @@ export async function claimDemoFuel(accountId: string): Promise<number> {
     return json.balance as number;
   }
 
-  // Self-heal: If account was not found, mint a brand new account and claim
-  if (json?.error === "Unknown account" || res.status === 404) {
-    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
-    const freshId = await getOrCreateAccountId();
-    const retry = await fetch("/api/account/topup/demo-claim", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": freshId },
-    });
-    const retryJson = await retry.json();
-    if (retry.ok && typeof retryJson.balance === "number") {
-      return retryJson.balance as number;
-    }
+  if (res.status === 409 || json?.alreadyClaimed) {
+    throw new Error(json?.error || "Ecosystem Review Pass has already been claimed for this account. Pass is strictly one-time per user.");
   }
 
   throw new Error(json?.error || "Could not activate ecosystem review pass");

@@ -22,26 +22,75 @@ export async function createAccount(): Promise<string> {
   const id = crypto.randomUUID();
   await db.collection("accounts").doc(id).set({
     balance: 0,
+    passClaimed: false,
     createdAt: FieldValue.serverTimestamp(),
   });
   return id;
 }
 
-export async function getOrCreateAccount(accountId?: string): Promise<{ accountId: string; balance: number }> {
+export async function getOrCreateAccount(accountId?: string): Promise<{ accountId: string; balance: number; passClaimed: boolean }> {
   const db = getDb();
   const id = normalizeAccountId(accountId);
   const ref = db.collection("accounts").doc(id);
   const doc = await ref.get();
 
   if (doc.exists) {
-    return { accountId: id, balance: Number(doc.data()!.balance ?? 0) };
+    const data = doc.data()!;
+    return {
+      accountId: id,
+      balance: Number(data.balance ?? 0),
+      passClaimed: Boolean(data.passClaimed),
+    };
   }
 
   await ref.set({
     balance: 0,
+    passClaimed: false,
     createdAt: FieldValue.serverTimestamp(),
   });
-  return { accountId: id, balance: 0 };
+  return { accountId: id, balance: 0, passClaimed: false };
+}
+
+/**
+ * Atomically claims the one-time Ecosystem Review Pass ($1.50).
+ * Enforces that an individual user / account / wallet can ONLY claim it once.
+ */
+export async function claimEcosystemPass(
+  accountId: string,
+  amountUsd = 1.50
+): Promise<{ success: boolean; balance: number; alreadyClaimed: boolean }> {
+  const db = getDb();
+  const id = normalizeAccountId(accountId);
+  const ref = db.collection("accounts").doc(id);
+
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) {
+      tx.set(ref, {
+        balance: amountUsd,
+        passClaimed: true,
+        passClaimedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return { success: true, balance: amountUsd, alreadyClaimed: false };
+    }
+
+    const data = doc.data()!;
+    const isAlreadyClaimed = Boolean(data.passClaimed);
+    const currentBalance = Number(data.balance ?? 0);
+
+    if (isAlreadyClaimed) {
+      return { success: false, balance: currentBalance, alreadyClaimed: true };
+    }
+
+    const nextBalance = currentBalance + amountUsd;
+    tx.update(ref, {
+      balance: nextBalance,
+      passClaimed: true,
+      passClaimedAt: FieldValue.serverTimestamp(),
+    });
+    return { success: true, balance: nextBalance, alreadyClaimed: false };
+  });
 }
 
 export async function getBalance(accountId: string): Promise<number | null> {
