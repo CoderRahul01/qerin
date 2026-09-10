@@ -31,6 +31,9 @@ interface ChatMessage {
   personaInsights?: PersonaInsights;
   thinkingFor?: string;
   question?: string;
+  userAccount?: string;
+  costDebited?: number;
+  remainingBalance?: number | null;
 }
 
 interface ReceiptData {
@@ -138,6 +141,9 @@ const SEED_THREADS: ChatThread[] = [
         content: "Ethereum's upcoming upgrade, Pectra, is set to go live on mainnet in Q2 2025. It combines the Prague execution layer and Electra consensus layer upgrades to improve scalability, UX, and staking efficiency.\n\nKey highlights:\n• **EIP-7702**: Enables smart contract wallets for EOAs\n• **Increased validator stake limit** from 32 ETH to 2,048 ETH\n• **Blob throughput** improvement for L2 scalability\n• **Better UX** for staking and withdrawals\n\nSource: Decentralized Research Protocol, Ethereum Foundation",
         time: "10:43 AM",
         receipt: SAMPLE_RECEIPT,
+        userAccount: "0x1577...2b7e",
+        costDebited: 0.15,
+        remainingBalance: 2.80,
       },
     ],
   },
@@ -165,6 +171,9 @@ const SEED_THREADS: ChatThread[] = [
         content: "**Solana (SOL)** and **Avalanche (AVAX)** are both high-performance L1 blockchains but with different architectural approaches.\n\n**Solana:** ~65,000 TPS theoretical, sub-400ms finality, single-shard design with Proof of History.\n\n**Avalanche:** ~4,500 TPS on C-Chain, ~1s finality, tri-chain architecture. Strong subnet customization.\n\nSource: Web3 Protocol Research, On-Chain Market Search",
         time: "9:13 AM",
         receipt: { paid: "0.0200 USDC", to: "Web3 Protocol Research", via: "Base", txId: "0x9ab2...f1d3", basescanUrl: "https://basescan.org", success: true },
+        userAccount: "0x1577...2b7e",
+        costDebited: 0.15,
+        remainingBalance: 2.95,
       },
     ],
   },
@@ -202,7 +211,20 @@ function ThinkingBubble({ text }: { text: string }) {
   );
 }
 
-function ReceiptCard({ receipt }: { receipt: ReceiptData }) {
+function ReceiptCard({
+  receipt,
+  rawReceipts,
+  userAccount,
+  costDebited = 0.15,
+  remainingBalance,
+}: {
+  receipt: ReceiptData;
+  rawReceipts?: ReceiptItem[];
+  userAccount?: string;
+  costDebited?: number;
+  remainingBalance?: number | null;
+}) {
+  const [showAudit, setShowAudit] = useState(false);
   const isBotChain = receipt.chainId === 677 || (receipt.via && receipt.via.toLowerCase().includes("bot"));
   const defaultAddress = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
   const explorerUrl = receipt.basescanUrl && receipt.basescanUrl !== "#"
@@ -211,58 +233,223 @@ function ReceiptCard({ receipt }: { receipt: ReceiptData }) {
         ? (isBotChain ? `https://scan.botchain.ai/tx/${receipt.registryTxHash}` : `https://basescan.org/tx/${receipt.registryTxHash}`)
         : (isBotChain ? `https://scan.botchain.ai/address/${defaultAddress}` : `https://basescan.org/address/${defaultAddress}`));
 
-  const chainLabel = isBotChain ? "BOT Chain (677)" : "Chain 8453";
+  const chainLabel = isBotChain ? "BOT Chain Mainnet (Chain 677)" : "Base Mainnet (Chain 8453)";
+  const explorerName = isBotChain ? "BOT Scan" : "Basescan";
 
-  const rows = [
-    { label: "Paid", value: receipt.paid },
-    { label: "To", value: receipt.to },
-    { label: "Via", value: receipt.via },
-    { label: "Tx ID", value: receipt.txId, href: explorerUrl },
-  ];
+  // Build itemized breakdown of each individual source
+  const itemizedSources = (() => {
+    if (rawReceipts && rawReceipts.length > 0) {
+      return rawReceipts.map(r => ({
+        name: r.source,
+        cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} USDC` : "0.005 USDC",
+        protocol: r.source.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
+        citation: receipt.sourceCitations?.find(c => c.name.toLowerCase() === r.source.toLowerCase())?.citation,
+        txHash: r.txHash || receipt.registryTxHash,
+      }));
+    }
+    if (receipt.sourceCitations && receipt.sourceCitations.length > 0) {
+      return receipt.sourceCitations.map(c => ({
+        name: c.name,
+        cost: "0.005 USDC",
+        protocol: c.name.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
+        citation: c.citation,
+        txHash: receipt.registryTxHash,
+      }));
+    }
+    const names = (receipt.to || "").split(",").map(s => s.trim()).filter(Boolean);
+    return names.map(name => ({
+      name,
+      cost: "0.005 USDC",
+      protocol: "x402 Protocol (Exact EVM)",
+      citation: undefined as string | undefined,
+      txHash: receipt.registryTxHash,
+    }));
+  })();
+
+  const agentWallet = "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2";
+  const contractAddress = receipt.registryContract || defaultAddress;
+
   return (
-    <div className="qd-receipt-card" style={{ marginTop: 12, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "rgba(255,255,255,0.02)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 16, borderRadius: "50%", background: "var(--qd-receipt-success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    <div className="qd-receipt-card" style={{ marginTop: 14, padding: "16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "rgba(255,255,255,0.02)" }}>
+      {/* Top status bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 18, height: 18, borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "1px solid var(--qd-receipt-success)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="9" height="9" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2" stroke="var(--qd-receipt-success)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--qd-receipt-success)" }}>Verified On-Chain Micropayment</span>
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--qd-receipt-success)" }}>Autonomous Settlement Verified</span>
+            <span style={{ fontSize: 11, color: "var(--qd-muted2)", marginLeft: 6 }}>• On-Chain Proof</span>
+          </div>
         </div>
-        <span style={{ fontSize: 11, color: "var(--qd-muted2)", fontFamily: "monospace" }}>{chainLabel}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: isBotChain ? "rgba(255,107,0,0.12)" : "rgba(0,82,255,0.12)", color: isBotChain ? "#ff7700" : "#3b82f6", fontWeight: 600, border: `1px solid ${isBotChain ? "rgba(255,107,0,0.3)" : "rgba(0,82,255,0.3)"}` }}>
+            {chainLabel}
+          </span>
+        </div>
       </div>
 
-      {rows.map(({ label, value, href }) => (
-        <div className="qd-receipt-row" key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--qd-receipt-border)", paddingTop: 6, paddingBottom: 6 }}>
-          <span className="qd-receipt-label" style={{ fontSize: 12, color: "var(--qd-muted2)" }}>{label}</span>
-          {href ? (
-            <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--qerin-accent)", fontSize: 12, fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}>{value} ↗</a>
-          ) : (
-            <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--qerin-text)" }}>{value}</span>
-          )}
-        </div>
-      ))}
-
-      {/* Consulted Sources & Citations */}
-      {receipt.sourceCitations && receipt.sourceCitations.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--qd-receipt-border)" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-            Consulted & Verified Sources
+      {/* INDIVIDUAL USER SETTLEMENT LEDGER */}
+      <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--qerin-text)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              👤 Individual Settlement For You
+            </span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {receipt.sourceCitations.map((src, i) => (
-              <div key={i} style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.03)", fontSize: 11.5, lineHeight: 1.4 }}>
-                <span style={{ fontWeight: 600, color: "var(--qerin-accent)" }}>{src.name}: </span>
-                <span style={{ color: "var(--qd-muted2)" }}>{src.citation}</span>
+          <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
+            {userAccount ? shortAddr(userAccount) : "Web3 Identity"}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
+          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Query Cost (Your Fuel)</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#f87171", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+              -${costDebited.toFixed(3)} Fuel
+            </div>
+          </div>
+
+          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Your Remaining Balance</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "Active"}
+            </div>
+          </div>
+
+          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Agent Paid to Sources</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+              {receipt.paid}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ITEMIZED DATA SOURCE SETTLEMENTS */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--qd-muted2)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            ⚡ Itemized Source Settlements ({itemizedSources.length} Nodes Paid)
+          </span>
+          <span style={{ fontSize: 11, color: "var(--qd-muted2)" }}>via x402 Micropayments</span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {itemizedSources.map((src, i) => (
+            <div key={i} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-text)" }}>{src.name}</span>
+                  <span style={{ fontSize: 9.5, padding: "1px 5px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: "var(--qd-muted2)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                    {src.protocol}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                    {src.cost}
+                  </span>
+                  <span style={{ fontSize: 10, color: "var(--qd-receipt-success)", fontWeight: 600 }}>✓ Settled</span>
+                </div>
               </div>
-            ))}
-          </div>
+              {src.citation && (
+                <div style={{ fontSize: 11, color: "var(--qd-muted2)", lineHeight: 1.4, paddingLeft: 2 }}>
+                  {src.citation}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
-      <div style={{ marginTop: 10, paddingTop: 6, borderTop: "1px solid var(--qd-receipt-border)" }}>
+      {/* COLLAPSIBLE CRYPTOGRAPHIC & ON-CHAIN AUDIT TRAIL */}
+      <div style={{ borderTop: "1px solid var(--qd-receipt-border)", paddingTop: 10, marginTop: 10 }}>
+        <button
+          type="button"
+          onClick={() => setShowAudit(prev => !prev)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--qerin-accent)",
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            padding: "2px 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <span>🔐 View Cryptographic Proof & Smart Contract Audit</span>
+          <span style={{ fontSize: 10 }}>{showAudit ? "▲ Hide" : "▼ Expand"}</span>
+        </button>
+
+        {showAudit && (
+          <div style={{ marginTop: 10, padding: "10px", borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 11.5, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Registry Contract</span>
+              <a
+                href={isBotChain ? `https://scan.botchain.ai/address/${contractAddress}` : `https://basescan.org/address/${contractAddress}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}
+              >
+                {shortAddr(contractAddress)} ↗
+              </a>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Autonomous Agent Payer</span>
+              <a
+                href={isBotChain ? `https://scan.botchain.ai/address/${agentWallet}` : `https://basescan.org/address/${agentWallet}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}
+              >
+                {shortAddr(agentWallet)} ↗
+              </a>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>On-Chain Receipt Tx</span>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none", fontWeight: 600 }}
+              >
+                {receipt.txId} ↗
+              </a>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Smart Contract Method</span>
+              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5 }}>
+                recordReceipt(bytes32,uint256,uint256,string)
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--qd-muted2)" }}>Client Attributed Account</span>
+              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                {userAccount ? shortAddr(userAccount) : "Anonymous Consumer"}
+              </span>
+            </div>
+
+            <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px dashed rgba(255,255,255,0.08)", fontSize: 11, color: "var(--qd-muted2)" }}>
+              ✓ Micropayment settled autonomously on your behalf. Publicly verifiable on {explorerName}.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Explorer Direct Link */}
+      <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--qd-receipt-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <a href={explorerUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-accent)", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}>
-          View Verified Transaction on Explorer ↗
+          Verify on {explorerName} ↗
         </a>
+        <span style={{ fontSize: 11, color: "var(--qd-muted2)" }}>Immutable Delivery Receipt</span>
       </div>
     </div>
   );
@@ -669,6 +856,9 @@ export function QerinDashboard() {
             summary: result.data.summary,
             personaInsights: result.data.personaInsights,
             question: q,
+            userAccount: connectedWallet || accountId || undefined,
+            costDebited: 0.15,
+            remainingBalance: typeof result.data.balance === "number" ? result.data.balance : balance,
           }),
         }));
       } else if (result.reason === "insufficient_balance") {
@@ -1107,7 +1297,15 @@ export function QerinDashboard() {
                     )}
 
                     {/* RECEIPT CARD */}
-                    {msg.receipt && <ReceiptCard receipt={msg.receipt} />}
+                    {msg.receipt && (
+                      <ReceiptCard
+                        receipt={msg.receipt}
+                        rawReceipts={msg.rawReceipts}
+                        userAccount={msg.userAccount || connectedWallet || accountId || undefined}
+                        costDebited={msg.costDebited ?? 0.15}
+                        remainingBalance={msg.remainingBalance ?? balance}
+                      />
+                    )}
 
                     {/* ACTION BAR: EXPORT & PDF DOWNLOAD */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 6 }}>
