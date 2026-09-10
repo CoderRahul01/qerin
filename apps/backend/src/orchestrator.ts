@@ -89,12 +89,12 @@ export async function gatherSources(
 
     if (csArticles.length > 0) {
       successful.push({
-        sourceName: "CryptoSlate Intelligence",
+        sourceName: "Web3 Protocol Intelligence",
         amountPaid: "0.010",
         txHash: null,
         timestamp: new Date().toISOString(),
         content: {
-          feed: "CryptoSlate Verified Web3 Publisher",
+          feed: "Verified Web3 Protocol Intelligence",
           articles: csArticles,
         },
       });
@@ -102,7 +102,7 @@ export async function gatherSources(
 
     if (cgData) {
       successful.push({
-        sourceName: "CoinGecko Market Data",
+        sourceName: "On-Chain Market Search",
         amountPaid: "0.005",
         txHash: null,
         timestamp: new Date().toISOString(),
@@ -112,7 +112,7 @@ export async function gatherSources(
 
     if (webFindings.length > 0) {
       successful.push({
-        sourceName: "Protocol & Web Research",
+        sourceName: "Autonomous Web Research Node",
         amountPaid: "0.005",
         txHash: null,
         timestamp: new Date().toISOString(),
