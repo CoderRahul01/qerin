@@ -10,7 +10,7 @@ import { withTimeout } from "./withTimeout.js";
 // Promise.allSettled, which waits for every promise to *settle*, not just
 // the fast ones. One dead source meant no response ever reached the user,
 // with no error and no timeout screen — just an infinite "Paying..." state.
-const SOURCE_TIMEOUT_MS = 15_000;
+const SOURCE_TIMEOUT_MS = 5_000;
 
 export interface PaidResult {
   content: unknown;

@@ -26,6 +26,7 @@ compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 [vars]
 QERIN_NETWORK = "mainnet"
 QERIN_LLM_MODEL = "meta/llama-3.3-70b-instruct"
+QERIN_REGISTRY_ADDRESS_BOTCHAIN = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45"
 
 # Free-tier rate limiting binding (Cloudflare Workers native), applied to
 # both /v1/answer and /v1/paid/answer in src/index.ts. 20 requests per
