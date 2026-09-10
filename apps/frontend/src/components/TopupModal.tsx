@@ -13,7 +13,7 @@ import {
   type TopupNetwork,
   type WalletBalanceReport,
 } from "@/lib/cryptoTopup";
-import { confirmCryptoTopup, claimDemoFuel, claimVoucherFuel } from "@/lib/account";
+import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo } from "@/lib/account";
 
 const TIERS = [
   {
@@ -47,7 +47,7 @@ type Step =
   | { kind: "confirming"; txHash: string; amountUsd: number; attempt: number; network: TopupNetwork }
   | { kind: "success"; balance: number; txHash?: string; message?: string }
   | { kind: "stuck"; txHash: string; amountUsd: number; reason: string; network: TopupNetwork }
-  | { kind: "error"; message: string; retryTier?: number };
+  | { kind: "error"; message: string };
 
 function explorerUrl(txHash: string, network: TopupNetwork): string {
   return network === "botchain"
@@ -82,11 +82,37 @@ export function TopupModal({
   const [walletDiag, setWalletDiag] = useState<WalletBalanceReport | null>(null);
   const [watchAssetSuccess, setWatchAssetSuccess] = useState<boolean | null>(null);
   const [showMetaMaskHelp, setShowMetaMaskHelp] = useState(false);
+  const [passClaimed, setPassClaimed] = useState<boolean>(false);
 
   const activeMeta = TOPUP_NETWORKS[network];
 
   useEffect(() => {
+    let cancelled = false;
     setPending(getPendingTopup(accountId));
+
+    // Check cached pass claimed status
+    if (typeof window !== "undefined") {
+      const cached = window.localStorage.getItem(`qerin_pass_claimed_${accountId}`);
+      if (cached === "true") setPassClaimed(true);
+    }
+
+    async function checkAccountPass() {
+      if (!accountId) return;
+      try {
+        const info = await fetchAccountInfo(accountId);
+        if (!cancelled && info.passClaimed) {
+          setPassClaimed(true);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
+          }
+        }
+      } catch {}
+    }
+    checkAccountPass();
+
+    return () => {
+      cancelled = true;
+    };
   }, [accountId]);
 
   useEffect(() => {
@@ -146,12 +172,10 @@ export function TopupModal({
   };
 
   const handleWalletDeposit = async (amountUsd: number) => {
-    // If wallet has 0 token balance, gracefully guide to instant activation
     if (walletDiag && Number(walletDiag.tokenBalance) < amountUsd) {
       setStep({
         kind: "error",
-        message: `Your wallet holds ${walletDiag.tokenBalance} ${activeMeta.tokenSymbol} on ${activeMeta.name}. You can activate this tier via 1-Click Instant Fuel below:`,
-        retryTier: amountUsd,
+        message: `Insufficient ${activeMeta.tokenSymbol} balance: Your wallet holds ${walletDiag.tokenBalance} ${activeMeta.tokenSymbol} on ${activeMeta.name} (required: $${amountUsd}.00). Please transfer ${activeMeta.tokenSymbol} to your address or switch networks above.`,
       });
       return;
     }
@@ -164,7 +188,6 @@ export function TopupModal({
       setStep({
         kind: "error",
         message: err instanceof Error ? err.message : "Could not initialize settlement transaction",
-        retryTier: amountUsd,
       });
       return;
     }
@@ -173,45 +196,39 @@ export function TopupModal({
   };
 
   const handleClaimDemoFuel = async () => {
+    if (passClaimed) {
+      setStep({
+        kind: "error",
+        message: "Ecosystem Review Pass has already been claimed for this account. Pass is strictly one-time per individual user.",
+      });
+      return;
+    }
+
     setStep({ kind: "claiming" });
     try {
       const balance = await claimDemoFuel(accountId);
+      setPassClaimed(true);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
+      }
       setStep({
         kind: "success",
         balance,
         message: "Ecosystem Review Pass activated with $1.50 Research Fuel.",
       });
       onCredited(balance);
-    } catch {
-      // Guaranteed fallback: never leave user stranded
-      const fallback = 1.5;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not activate review pass";
+      if (msg.toLowerCase().includes("already been claimed")) {
+        setPassClaimed(true);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
+        }
+      }
       setStep({
-        kind: "success",
-        balance: fallback,
-        message: "Ecosystem Review Pass activated with $1.50 Research Fuel.",
+        kind: "error",
+        message: msg,
       });
-      onCredited(fallback);
-    }
-  };
-
-  const handleActivateInstantFuel = async (amountUsd: number) => {
-    setStep({ kind: "claiming" });
-    try {
-      const balance = await claimVoucherFuel(accountId, amountUsd);
-      setStep({
-        kind: "success",
-        balance,
-        message: `$${amountUsd}.00 Research Fuel activated successfully.`,
-      });
-      onCredited(balance);
-    } catch {
-      // Fallback
-      setStep({
-        kind: "success",
-        balance: amountUsd,
-        message: `$${amountUsd}.00 Research Fuel activated successfully.`,
-      });
-      onCredited(amountUsd);
     }
   };
 
@@ -282,7 +299,7 @@ export function TopupModal({
             </div>
             <div style={{ marginTop: 6, fontSize: 13, color: "#9CA3AF", lineHeight: 1.45 }}>
               {reason ??
-                "Fund your autonomous treasury to pay Web3 data sources (Messari, Dune, CoinGecko, BOT Chain) and mint verifiable on-chain receipts."}
+                "Fund your autonomous treasury to pay decentralized data sources (Autonomous Web Research, Protocol Intelligence, Consensus RPC, BOT Chain Mainnet) and mint verifiable on-chain receipts."}
             </div>
           </div>
           {canDismiss && (
@@ -402,41 +419,58 @@ export function TopupModal({
               style={{
                 marginTop: 16,
                 padding: "14px 16px",
-                background: "linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(13, 148, 136, 0.08) 100%)",
-                border: "1px solid rgba(20, 184, 166, 0.4)",
+                background: passClaimed
+                  ? "rgba(255, 255, 255, 0.03)"
+                  : "linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(13, 148, 136, 0.08) 100%)",
+                border: passClaimed
+                  ? "1px solid rgba(255, 255, 255, 0.1)"
+                  : "1px solid rgba(20, 184, 166, 0.4)",
                 borderRadius: 12,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                opacity: passClaimed ? 0.75 : 1,
               }}
             >
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 14, color: "#2DD4BF" }}>
-                  <span>⚡</span> Ecosystem Review Pass (Free)
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: passClaimed ? "#9CA3AF" : "#2DD4BF",
+                  }}
+                >
+                  <span>{passClaimed ? "✓" : "⚡"}</span> Ecosystem Review Pass {passClaimed ? "(Claimed)" : "(Free)"}
                 </div>
-                <div style={{ marginTop: 2, fontSize: 12, color: "#99F6E4" }}>
-                  1-Click instant test fuel (+$1.50) — test queries without sending gas
+                <div style={{ marginTop: 2, fontSize: 12, color: passClaimed ? "#6B7280" : "#99F6E4" }}>
+                  {passClaimed
+                    ? "One-time ecosystem review pass has already been activated for this account (+ $1.50 credited)."
+                    : "1-Click instant test fuel (+$1.50) — one-time pass per account for testing."}
                 </div>
               </div>
               <button
                 onClick={handleClaimDemoFuel}
+                disabled={passClaimed}
                 style={{
-                  background: "#0D9488",
-                  border: "none",
-                  color: "#FFFFFF",
+                  background: passClaimed ? "rgba(255, 255, 255, 0.06)" : "#0D9488",
+                  border: passClaimed ? "1px solid rgba(255, 255, 255, 0.12)" : "none",
+                  color: passClaimed ? "#9CA3AF" : "#FFFFFF",
                   fontWeight: 600,
                   fontSize: 13,
                   padding: "8px 16px",
                   borderRadius: 8,
-                  cursor: "pointer",
-                  boxShadow: "0 0 12px rgba(20, 184, 166, 0.4)",
+                  cursor: passClaimed ? "not-allowed" : "pointer",
+                  boxShadow: passClaimed ? "none" : "0 0 12px rgba(20, 184, 166, 0.4)",
                 }}
               >
-                Claim Pass
+                {passClaimed ? "✓ Claimed" : "Claim Pass"}
               </button>
             </div>
 
-            {/* Error banner with Instant Remedy Action */}
+            {/* Error banner */}
             {step.kind === "error" && (
               <div
                 style={{
@@ -453,28 +487,10 @@ export function TopupModal({
                 }}
               >
                 <div>{step.message}</div>
-                {step.retryTier && (
-                  <button
-                    onClick={() => handleActivateInstantFuel(step.retryTier!)}
-                    style={{
-                      alignSelf: "flex-start",
-                      background: "#EA580C",
-                      border: "none",
-                      color: "#FFFFFF",
-                      padding: "6px 12px",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ⚡ Activate ${step.retryTier}.00 Instant Fuel Instead
-                  </button>
-                )}
               </div>
             )}
 
-            {/* Tiers List with Dual Options (Instant Fuel or Wallet Deposit) */}
+            {/* Tiers List with Web3 Wallet Deposit */}
             <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
               {TIERS.map((tier) => (
                 <div
@@ -519,51 +535,30 @@ export function TopupModal({
                     </div>
                   </div>
 
-                  {/* Action Buttons: Instant Test Voucher or Web3 Wallet */}
-                  <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                    <button
-                      onClick={() => handleActivateInstantFuel(tier.amountUsd)}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        background: "rgba(255, 255, 255, 0.08)",
-                        border: "1px solid rgba(255, 255, 255, 0.15)",
-                        borderRadius: 8,
-                        color: "#E5E7EB",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <span>⚡</span>
-                      <span>Instant Fuel Voucher</span>
-                    </button>
+                  {/* Action Button: Web3 Wallet */}
+                  <div style={{ marginTop: 12 }}>
                     <button
                       onClick={() => handleWalletDeposit(tier.amountUsd)}
                       style={{
-                        flex: 1,
-                        padding: "8px 12px",
+                        width: "100%",
+                        padding: "10px 14px",
                         background: "#EA580C",
                         border: "none",
                         borderRadius: 8,
                         color: "#FFFFFF",
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 600,
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 6,
-                        boxShadow: "0 0 10px rgba(234, 88, 12, 0.3)",
+                        gap: 8,
+                        boxShadow: "0 0 12px rgba(234, 88, 12, 0.35)",
+                        transition: "all 0.15s ease",
                       }}
                     >
                       <span>💳</span>
-                      <span>Send with Wallet</span>
+                      <span>Send with Wallet (${tier.amountUsd}.00 {activeMeta.tokenSymbol})</span>
                     </button>
                   </div>
                 </div>
