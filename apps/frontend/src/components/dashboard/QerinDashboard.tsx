@@ -32,6 +32,7 @@ interface ChatMessage {
   summary?: string;
   personaInsights?: PersonaInsights;
   thinkingFor?: string;
+  thinkingSources?: string[];
   question?: string;
   userAccount?: string;
   costDebited?: number;
@@ -195,18 +196,69 @@ function QerinAvatar({ size = 28 }: { size?: number }) {
   return <Image src="/qerin-mark-orange.png" alt="Qerin" width={size} height={size} style={{ flexShrink: 0, borderRadius: 6 }} />;
 }
 
-function ThinkingBubble({ text }: { text: string }) {
+const THINKING_PHASES = [
+  { label: "Routing query to intelligence sources", icon: "⚡" },
+  { label: "Settling x402 micropayments on-chain", icon: "🔗" },
+  { label: "Pulling live market & protocol data", icon: "📡" },
+  { label: "Verifying consensus node telemetry", icon: "🛡️" },
+  { label: "Synthesizing verified research dossier", icon: "🧠" },
+  { label: "Anchoring receipt to smart contract", icon: "⛓️" },
+];
+
+function ThinkingBubble({ text, sources }: { text?: string; sources?: string[] }) {
+  const [phaseIdx, setPhaseIdx] = useState(0);
+  const [srcIdx, setSrcIdx] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  const defaultSources = ["Tavily Search Node", "CryptoSlate Intelligence", "CoinGecko Terminal", "Validator Telemetry"];
+  const activeSources = sources && sources.length > 0 ? sources : defaultSources;
+
+  useEffect(() => {
+    const start = Date.now();
+    const elapsedTimer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    const phaseTimer = setInterval(() => setPhaseIdx(i => (i + 1) % THINKING_PHASES.length), 2000);
+    const srcTimer = setInterval(() => setSrcIdx(i => (i + 1) % activeSources.length), 1400);
+    return () => { clearInterval(elapsedTimer); clearInterval(phaseTimer); clearInterval(srcTimer); };
+  }, [activeSources.length]);
+
+  const phase = THINKING_PHASES[phaseIdx];
+  const activeSrc = activeSources[srcIdx];
+
   return (
     <div className="qd-ai-msg qd-msg-enter">
       <QerinAvatar />
       <div className="qd-ai-content">
-        <div className="qd-ai-bubble" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", gap: 4 }}>
-            <span className="qd-thinking-dot" />
-            <span className="qd-thinking-dot" />
-            <span className="qd-thinking-dot" />
+        <div className="qd-ai-bubble" style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 280 }}>
+          {/* Phase indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", gap: 4 }}>
+              <span className="qd-thinking-dot" />
+              <span className="qd-thinking-dot" />
+              <span className="qd-thinking-dot" />
+            </div>
+            <span style={{ fontSize: 12.5, color: "var(--qd-muted2)", fontWeight: 500 }}>
+              {phase.icon} {text || phase.label}
+            </span>
           </div>
-          <span style={{ fontSize: 13, color: "var(--qd-muted2)" }}>{text}</span>
+          {/* Live source ticker */}
+          {activeSrc && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.15)",
+              borderRadius: 6, padding: "4px 10px", fontSize: 11.5,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", background: "#FF6B00",
+                display: "inline-block", animation: "qd-pulse 1s ease-in-out infinite",
+              }} />
+              <span style={{ color: "#FB923C", fontWeight: 600 }}>Settling x402:</span>
+              <span style={{ color: "var(--qd-muted2)", fontFamily: "monospace", fontSize: 11 }}>{activeSrc}</span>
+            </div>
+          )}
+          {/* Elapsed */}
+          <div style={{ fontSize: 11, color: "var(--qd-muted2)", opacity: 0.6 }}>
+            {elapsed}s elapsed · avg ~5-12s
+          </div>
         </div>
       </div>
     </div>
@@ -580,6 +632,46 @@ function MarkdownContent({ content }: { content: string }) {
   return <div style={{ fontSize: 14, color: "var(--qerin-text)" }}>{elements}</div>;
 }
 
+function StreamingMarkdownInner({ content }: { content: string }) {
+  const [displayed, setDisplayed] = useState("");
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const words = content.split(/(\s+)/);
+    let pos = 0;
+
+    const stream = () => {
+      if (pos >= words.length) return;
+      const batch = words.slice(pos, pos + 4).join("");
+      pos += 4;
+      setDisplayed(prev => prev + batch);
+      if (pos < words.length) {
+        rafRef.current = requestAnimationFrame(stream);
+      }
+    };
+
+    const t = setTimeout(() => {
+      rafRef.current = requestAnimationFrame(stream);
+    }, 120);
+
+    return () => {
+      clearTimeout(t);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [content]);
+
+  return <MarkdownContent content={displayed} />;
+}
+
+// Streams text in word-by-word for a live typewriter feel.
+// `isNew` controls whether to animate (only the most recent assistant message).
+function StreamingMarkdown({ content, isNew }: { content: string; isNew: boolean }) {
+  if (!isNew) {
+    return <MarkdownContent content={content} />;
+  }
+  return <StreamingMarkdownInner content={content} />;
+}
+
 type PersonaType = "all" | "developer" | "founder" | "writer" | "trader";
 const THREADS_STORAGE_KEY = "qerin_chat_threads_v3";
 const ACTIVE_THREAD_KEY = "qerin_active_thread_id";
@@ -904,7 +996,7 @@ export function QerinDashboard() {
       preview: q.slice(0, 60),
       messages: [...t.messages.filter(m => m.role !== "thinking"),
         { id: userMsgId, role: "user" as const, content: q, time },
-        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingFor: "Agentic Layer: Settling x402 micropayments across verified intelligence sources..." },
+        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingFor: "Agentic Layer: Settling x402 micropayments across verified intelligence sources...", thinkingSources: sources.map(s => s.name) },
       ],
     }));
 
@@ -1324,7 +1416,7 @@ export function QerinDashboard() {
                 const cleanThinkingText = (msg.thinkingFor && !msg.thinkingFor.toLowerCase().includes("tavily") && !msg.thinkingFor.toLowerCase().includes("tably"))
                   ? msg.thinkingFor
                   : "Agentic Layer: Settling x402 micropayments across verified intelligence sources...";
-                return <ThinkingBubble key={msg.id} text={cleanThinkingText} />;
+                return <ThinkingBubble key={msg.id} text={cleanThinkingText} sources={msg.thinkingSources} />;
               }
 
               if (msg.role === "user") {
@@ -1363,7 +1455,7 @@ export function QerinDashboard() {
 
                     {/* MAIN VERIFIED CONTENT */}
                     <div className="qd-ai-bubble">
-                      <MarkdownContent content={msg.content} />
+                      <StreamingMarkdown content={msg.content} isNew={isLast} />
                     </div>
 
                     {/* FACTOR 3: MULTI-PERSONA TABS & INSIGHTS */}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LogoLockup } from "@/components/LogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -32,9 +33,9 @@ export function Nav() {
           gap: 16,
         }}
       >
-        <a href="/" style={{ textDecoration: "none" }}>
+        <Link href="/" style={{ textDecoration: "none" }}>
           <LogoLockup size={22} />
-        </a>
+        </Link>
 
         <nav className="qerin-nav-links" aria-label="Section">
           {links.map((link) => (

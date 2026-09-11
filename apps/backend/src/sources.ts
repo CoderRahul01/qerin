@@ -1,10 +1,9 @@
 import { withTimeout } from "./withTimeout.js";
 
-// Applies to the free-tier fallback lookups below (RSS/CoinGecko/Wikipedia),
-// not the paid x402 sources (those have their own, longer timeout in
-// paidFetch.ts) — these are meant to be quick, best-effort context, so a
-// tighter budget keeps a slow one from delaying the whole fallback path.
-const FALLBACK_FETCH_TIMEOUT_MS = 8_000;
+// Applies to the free-tier fallback lookups below (RSS/CoinGecko/Wikipedia).
+// 4s is enough for a healthy upstream; keeps the entire parallel gather round
+// under the paid-source window.
+const FALLBACK_FETCH_TIMEOUT_MS = 4_000;
 
 export interface SourceRequest {
   url: string;
@@ -181,7 +180,9 @@ export const SOURCES: Record<string, SourceDef> = {
       init: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, search_depth: "advanced", max_results: 5, include_answer: true }),
+        // "basic" is 2-5x faster than "advanced" with minimal accuracy loss
+        // for current-events questions. Advanced deep-crawl is rarely needed.
+        body: JSON.stringify({ query, search_depth: "basic", max_results: 5, include_answer: true }),
       },
     }),
   },

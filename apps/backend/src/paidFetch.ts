@@ -4,13 +4,12 @@ import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { withTimeout } from "./withTimeout.js";
 
-// A single source (its own server, or the x402 facilitator settling
-// payment) hanging with no response used to hang the entire /v1/answer
-// request indefinitely — gatherSources() awaits every source via
-// Promise.allSettled, which waits for every promise to *settle*, not just
-// the fast ones. One dead source meant no response ever reached the user,
-// with no error and no timeout screen — just an infinite "Paying..." state.
-const SOURCE_TIMEOUT_MS = 5_000;
+// Per-source timeout. Paid x402 sources that require on-chain payment
+// negotiation have their own upstream latency; 3s is enough for a healthy
+// source, and fast enough to fall through to free sources without a long stall.
+// (Previously 5s — that 2s saved per failing source adds up when 3-4 sources
+// are selected and all fail.)
+const SOURCE_TIMEOUT_MS = 3_000;
 
 export interface PaidResult {
   content: unknown;

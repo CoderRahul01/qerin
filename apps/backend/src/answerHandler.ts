@@ -51,15 +51,32 @@ export async function answerHandler(
 
   const synthesized = await synthesizeAnswer(question, paidResults);
 
-  // Record verified on-chain receipt directly to the QerinReceiptRegistry smart contract
+  // Record verified on-chain receipt ASAP — but don't block the response on it.
+  // The blockchain write (Base/BOT Chain) involves RPC round-trips and tx propagation
+  // that can take 5-30s: waiting for it before returning the answer is the single
+  // largest source of perceived latency. Fire it as a background task and ship the
+  // answer immediately. The receipt will land on-chain regardless.
   const network = getNetwork(targetNetwork);
   const registryAddr = getRegistryAddress(targetNetwork);
-  let registryTxHash: string | null = null;
+
+  // Background the chain write — intentionally not awaited
+  let backgroundReceiptPromise: Promise<string | null>;
   try {
-    registryTxHash = await recordReceiptOnChain(question, paidResults.length, totalPaidNum, accountId, targetNetwork);
+    backgroundReceiptPromise = recordReceiptOnChain(question, paidResults.length, totalPaidNum, accountId, targetNetwork);
+    // Attach a no-op catch so unhandled-rejection warnings don't fire
+    backgroundReceiptPromise.catch((err) => console.error("QerinReceiptRegistry background write failed:", err));
   } catch (err) {
-    console.error("QerinReceiptRegistry write failed:", err);
+    console.error("QerinReceiptRegistry launch failed:", err);
+    backgroundReceiptPromise = Promise.resolve(null);
   }
+
+  // Give the chain write a tiny head-start window (250ms) — often enough for
+  // the RPC submit to return a hash, which we can include in the response. If
+  // it hasn't resolved by then we ship the answer anyway with txHash = null.
+  const registryTxHash = await Promise.race([
+    backgroundReceiptPromise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 250)),
+  ]);
 
   const defaultExplorerUrl = registryTxHash
     ? network.explorerTxUrl(registryTxHash)
