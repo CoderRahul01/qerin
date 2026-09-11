@@ -151,27 +151,60 @@ export async function creditBalance(
 
 /**
  * Records a completed top-up and credits the balance.
- * Idempotent by design — keyed on txHash.
+ * Idempotent by design — keyed GLOBALLY on (network, txHash), not per-account.
+ *
+ * A per-account key alone is not enough: the signed message that authorizes
+ * a deposit binds accountId + txHash, and any client can mint a fresh
+ * accountId for free (see normalizeAccountId — falls back to a random UUID
+ * when it isn't a wallet address). Without a global lock, the real signer of
+ * one on-chain transfer could re-sign the same txHash against many different
+ * accountIds and get the same payment credited over and over. The
+ * `usedDeposits/{network}:{txHash}` doc is the single source of truth for
+ * "has this transaction already been spent," checked in the same
+ * transaction as the credit.
  */
 export async function recordDeposit(
   accountId: string,
   txHash: string,
-  amountUsd: number
-): Promise<{ credited: boolean; balance: number; accountFound: boolean }> {
+  amountUsd: number,
+  networkKey: string
+): Promise<{ credited: boolean; balance: number; accountFound: boolean; reason?: string }> {
   const db = getDb();
   const id = normalizeAccountId(accountId);
   const accountRef = db.collection("accounts").doc(id);
   const depositRef = accountRef.collection("deposits").doc(txHash);
+  const globalTxRef = db.collection("usedDeposits").doc(`${networkKey}:${txHash.toLowerCase()}`);
 
   return db.runTransaction(async (tx) => {
-    const [accountDoc, depositDoc] = await Promise.all([
+    const [accountDoc, depositDoc, globalTxDoc] = await Promise.all([
       tx.get(accountRef),
       tx.get(depositRef),
+      tx.get(globalTxRef),
     ]);
+
+    if (globalTxDoc.exists) {
+      const usedByAccountId = globalTxDoc.data()?.accountId;
+      if (usedByAccountId !== id) {
+        // Same real transaction, different accountId — replay attempt.
+        return {
+          credited: false,
+          balance: accountDoc.exists ? Number(accountDoc.data()!.balance ?? 0) : 0,
+          accountFound: accountDoc.exists,
+          reason: "This transaction has already been credited to a different account",
+        };
+      }
+      // Same account retrying — idempotent no-op, matches prior behavior.
+      return {
+        credited: false,
+        balance: accountDoc.exists ? Number(accountDoc.data()!.balance ?? 0) : 0,
+        accountFound: accountDoc.exists,
+      };
+    }
 
     if (!accountDoc.exists) {
       tx.set(accountRef, { balance: amountUsd, createdAt: FieldValue.serverTimestamp() });
       tx.set(depositRef, { amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
+      tx.set(globalTxRef, { accountId: id, amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
       return { credited: true, balance: amountUsd, accountFound: true };
     }
 
@@ -187,6 +220,7 @@ export async function recordDeposit(
     const next = current + amountUsd;
     tx.update(accountRef, { balance: next });
     tx.set(depositRef, { amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
+    tx.set(globalTxRef, { accountId: id, amount: amountUsd, createdAt: FieldValue.serverTimestamp() });
     return { credited: true, balance: next, accountFound: true };
   });
 }

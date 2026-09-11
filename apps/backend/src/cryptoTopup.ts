@@ -46,6 +46,33 @@ export async function fetchLiveBotPrice(): Promise<number> {
   return BOT_PRICE_FALLBACK;
 }
 
+// ETH price cache: same pattern as BOT — live via Coinbase's public spot
+// price endpoint (no API key required), refreshed every 5 minutes.
+let _ethPriceCache: { price: number; ts: number } | null = null;
+const ETH_PRICE_FALLBACK = 2500;
+
+export async function fetchLiveEthPrice(): Promise<number> {
+  const now = Date.now();
+  if (_ethPriceCache && now - _ethPriceCache.ts < BOT_PRICE_TTL_MS) {
+    return _ethPriceCache.price;
+  }
+  try {
+    const res = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot", {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = (await res.json()) as { data?: { amount?: string } };
+    const price = body?.data?.amount ? parseFloat(body.data.amount) : 0;
+    if (price > 0) {
+      _ethPriceCache = { price, ts: now };
+      return price;
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return ETH_PRICE_FALLBACK;
+}
+
 interface RpcLog {
   address: string;
   topics: string[];
@@ -160,9 +187,8 @@ export async function verifyAndCreditCryptoDeposit(
       const botPrice = await fetchLiveBotPrice();
       transferredUsd = nativeAmount * botPrice;
     } else {
-      // Base: use a fixed ETH price or fetch — for simplicity use $2500 fallback
-      // (ETH-native deposits on Base are not the primary flow but we support them)
-      transferredUsd = nativeAmount * 2500;
+      const ethPrice = await fetchLiveEthPrice();
+      transferredUsd = nativeAmount * ethPrice;
     }
   }
 
@@ -193,9 +219,20 @@ export async function verifyAndCreditCryptoDeposit(
   }
 
   // Credit exactly what was actually sent on-chain — never trust the client's claimed amount.
-  const { balance, accountFound } = await recordDeposit(accountId, txHash, transferredUsd);
+  const { balance, accountFound, credited, reason } = await recordDeposit(
+    accountId,
+    txHash,
+    transferredUsd,
+    network.chainId.toString()
+  );
+  if (reason) {
+    return { verified: false, balance: 0, reason };
+  }
   if (!accountFound) {
     return { verified: false, balance: 0, reason: "Unknown account" };
   }
+  // credited=false with no reason means this exact account already claimed
+  // this exact tx before (idempotent retry) — treat as a successful confirm.
+  void credited;
   return { verified: true, balance };
 }
