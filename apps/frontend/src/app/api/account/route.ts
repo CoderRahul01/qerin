@@ -1,3 +1,5 @@
+import { getClientIp } from "@/lib/clientIp";
+
 export async function POST(req: Request) {
   const backendUrl = process.env.QERIN_BACKEND_URL;
   if (!backendUrl) {
@@ -19,6 +21,7 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "application/json",
       "X-Qerin-Internal-Secret": internalSecret,
+      "X-Qerin-Client-Ip": getClientIp(req),
     },
     body: JSON.stringify(body),
   });
