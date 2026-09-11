@@ -220,34 +220,6 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
   }
 });
 
-// Fuel Voucher: restricted to authorized promo code
-app.post("/v1/account/topup/voucher", async (c) => {
-  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
-
-  const accountId = c.req.header("x-qerin-account-id");
-  if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
-
-  const body = await c.req.json().catch(() => ({}));
-  const code = typeof body?.code === "string" ? body.code.trim().toUpperCase() : "";
-
-  if (code !== "QERIN-ALPHA-PASS") {
-    return c.json({ error: "Invalid voucher code. Please deposit via your Web3 wallet." }, 403);
-  }
-
-  const amountUsd = typeof body?.amountUsd === "number" && body.amountUsd > 0 && body.amountUsd <= 5 ? body.amountUsd : 1.00;
-
-  try {
-    await getOrCreateAccount(accountId);
-    const newBalance = await creditBalance(accountId, amountUsd);
-    return c.json({ balance: newBalance, credited: amountUsd });
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Internal error" }, 500);
-  }
-});
-
-
-
 // Free-app path: gated by the internal secret (only Qerin's own frontend
 // can reach it) AND a prepaid balance — the consumer paywall. Debits
 // ANSWER_PRICE_USD before running the request, refunds it if the request
