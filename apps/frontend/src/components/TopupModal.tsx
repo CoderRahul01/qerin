@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import Script from "next/script";
 import {
   sendCryptoDeposit,
   signTopupConfirmation,
@@ -19,6 +20,10 @@ const TIERS = [
   { amountUsd: 5,  title: "Intelligence Pack",   desc: "~250 Queries · Multi-Source", badge: "RECOMMENDED" },
   { amountUsd: 20, title: "Institutional Vault", desc: "~1,000 Queries · Priority",  badge: null },
 ];
+
+// Public sitekey — pairs with the secret held only by the deployed
+// siteverify Worker (see apps/frontend/src/app/api/account/topup/demo-claim/route.ts).
+const TURNSTILE_SITEKEY = "0x4AAAAAAEwCEYi80lvHdDWk";
 
 const NOT_MINED_REASON = "not found on-chain yet";
 const CONFIRM_RETRY_INTERVAL_MS = 3000;
@@ -82,8 +87,41 @@ export function TopupModal({
   const [paymentMethod, setPaymentMethod] = useState<"token" | "native">(
     initialNetwork === "botchain" ? "native" : "token"
   );
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
 
   const activeMeta = TOPUP_NETWORKS[network];
+
+  // Render the Turnstile widget imperatively once the script is loaded and
+  // the pass hasn't been claimed — bot-gates the free $1.50 claim so it
+  // can't be farmed by scripting requests directly at the API route.
+  useEffect(() => {
+    if (!turnstileReady || passClaimed || !turnstileContainerRef.current) return;
+    const w = window as unknown as {
+      turnstile?: {
+        render: (el: Element, opts: Record<string, unknown>) => string;
+        remove: (id: string) => void;
+        reset: (id: string) => void;
+      };
+    };
+    if (!w.turnstile) return;
+    const id = w.turnstile.render(turnstileContainerRef.current, {
+      sitekey: TURNSTILE_SITEKEY,
+      action: "turnstile-spin-v1",
+      callback: (token: string) => setTurnstileToken(token),
+      "expired-callback": () => setTurnstileToken(""),
+      "error-callback": () => setTurnstileToken(""),
+    });
+    turnstileWidgetIdRef.current = id;
+    return () => {
+      try {
+        w.turnstile?.remove(id);
+      } catch {}
+      turnstileWidgetIdRef.current = null;
+    };
+  }, [turnstileReady, passClaimed]);
 
   // Detect wallet after mount if injected asynchronously
   useEffect(() => {
@@ -223,6 +261,16 @@ export function TopupModal({
     await runConfirm(txHash, amountUsd, network);
   };
 
+  const resetTurnstile = () => {
+    const w = window as unknown as { turnstile?: { reset: (id: string) => void } };
+    if (turnstileWidgetIdRef.current && w.turnstile) {
+      try {
+        w.turnstile.reset(turnstileWidgetIdRef.current);
+      } catch {}
+    }
+    setTurnstileToken("");
+  };
+
   const handleClaimDemoFuel = async () => {
     if (passClaimed) {
       setStep({
@@ -231,10 +279,14 @@ export function TopupModal({
       });
       return;
     }
+    if (!turnstileToken) {
+      setStep({ kind: "error", message: "Complete the verification challenge above to claim the pass." });
+      return;
+    }
 
     setStep({ kind: "claiming" });
     try {
-      const balance = await claimDemoFuel(accountId);
+      const balance = await claimDemoFuel(accountId, turnstileToken);
       setPassClaimed(true);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
@@ -249,6 +301,7 @@ export function TopupModal({
           window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
         }
       }
+      resetTurnstile();
       setStep({ kind: "error", message: msg });
     }
   };
@@ -268,6 +321,12 @@ export function TopupModal({
   }, {});
 
   return (
+    <>
+    <Script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+      strategy="afterInteractive"
+      onLoad={() => setTurnstileReady(true)}
+    />
     <div
       style={{
         position: "fixed",
@@ -583,20 +642,23 @@ export function TopupModal({
                 <div style={{ marginTop: 2, fontSize: 11.5, color: passClaimed ? "#4B5563" : "#99F6E4" }}>
                   {passClaimed ? "Already activated for this account." : "One-time pass — test autonomous research for free."}
                 </div>
+                {!passClaimed && (
+                  <div ref={turnstileContainerRef} style={{ marginTop: 8 }} />
+                )}
               </div>
               <button
                 onClick={handleClaimDemoFuel}
-                disabled={passClaimed || busy}
+                disabled={passClaimed || busy || !turnstileToken}
                 style={{
-                  background: passClaimed ? "rgba(255,255,255,0.05)" : "#0D9488",
-                  border: passClaimed ? "1px solid rgba(255,255,255,0.1)" : "none",
-                  color: passClaimed ? "#6B7280" : "#fff",
+                  background: passClaimed || !turnstileToken ? "rgba(255,255,255,0.05)" : "#0D9488",
+                  border: passClaimed || !turnstileToken ? "1px solid rgba(255,255,255,0.1)" : "none",
+                  color: passClaimed || !turnstileToken ? "#6B7280" : "#fff",
                   fontWeight: 700,
                   fontSize: 12,
                   padding: "7px 14px",
                   borderRadius: 7,
-                  cursor: passClaimed ? "default" : "pointer",
-                  boxShadow: passClaimed ? "none" : "0 0 12px rgba(20,184,166,0.35)",
+                  cursor: passClaimed || !turnstileToken ? "default" : "pointer",
+                  boxShadow: passClaimed || !turnstileToken ? "none" : "0 0 12px rgba(20,184,166,0.35)",
                   flexShrink: 0,
                 }}
               >
@@ -861,5 +923,6 @@ export function TopupModal({
         }
       `}</style>
     </div>
+    </>
   );
 }

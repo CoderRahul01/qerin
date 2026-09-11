@@ -210,7 +210,7 @@ export async function confirmCryptoTopup(
   return json.balance as number;
 }
 
-export async function claimDemoFuel(accountId: string): Promise<number> {
+export async function claimDemoFuel(accountId: string, turnstileToken: string): Promise<number> {
   let targetId = accountId;
   if (!targetId || targetId.startsWith("local-")) {
     targetId = await getOrCreateAccountId();
@@ -219,6 +219,7 @@ export async function claimDemoFuel(accountId: string): Promise<number> {
   const res = await fetch("/api/account/topup/demo-claim", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": targetId },
+    body: JSON.stringify({ turnstileToken }),
   });
   const json = await res.json();
 
