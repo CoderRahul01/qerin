@@ -30,6 +30,19 @@ export interface SourceCitation {
   citation: string;
 }
 
+export interface ReceiptData {
+  paid: string;
+  to: string;
+  via: string;
+  txId: string;
+  basescanUrl: string;
+  success: boolean;
+  sourceCitations?: SourceCitation[];
+  registryTxHash?: string;
+  registryContract?: string;
+  chainId?: number;
+}
+
 // Mirrors ProgressEvent in apps/backend/src/orchestrator.ts — real pipeline
 // events streamed as SSE from /v1/answer, not decorative client-side guesses.
 export type AnswerProgressEvent =

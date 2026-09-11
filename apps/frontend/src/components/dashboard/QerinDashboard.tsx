@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoLockup } from "@/components/LogoMark";
 import { TopupModal } from "@/components/TopupModal";
 import { UserTransparencyModal } from "@/components/UserTransparencyModal";
+import { ProofCardModal } from "@/components/ProofCardModal";
 import { keccak256, toBytes } from "viem";
 import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
@@ -811,6 +812,8 @@ export function QerinDashboard() {
   const [balance, setBalance] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
   const [showTransparencyModal, setShowTransparencyModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [activeProofData, setActiveProofData] = useState<{ topic?: string; receipt?: ReceiptData; sourceCitations?: SourceCitation[] }>({});
   const [topupReason, setTopupReason] = useState<string | null>(null);
   const [activePersona, setActivePersona] = useState<Record<string, PersonaType>>({});
   const [selectedNetwork, setSelectedNetwork] = useState<"base" | "botchain">("base");
@@ -1464,6 +1467,44 @@ export function QerinDashboard() {
               >
                 Overview
               </Link>
+              <Link
+                href="/developers"
+                title="Developer & MCP Hub"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  border: "1px solid var(--qd-border)",
+                  background: "var(--qd-surface)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "var(--qd-muted2)",
+                  textDecoration: "none",
+                }}
+              >
+                Developers
+              </Link>
+              <Link
+                href="/rewards"
+                title="Rewards & Referral Program"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  border: "1px solid var(--qd-border)",
+                  background: "var(--qd-surface)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "var(--qd-muted2)",
+                  textDecoration: "none",
+                }}
+              >
+                Rewards
+              </Link>
               {/* Network Pill */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--qd-surface)", border: "1px solid var(--qd-border)", borderRadius: 8, padding: "2px 4px" }}>
                 <button
@@ -1675,6 +1716,26 @@ export function QerinDashboard() {
 
                         <button
                           className="qd-export-btn"
+                          onClick={() => {
+                            setActiveProofData({
+                              topic: msg.topic || activeThread.title,
+                              receipt: msg.receipt,
+                              sourceCitations: msg.sourceCitations,
+                            });
+                            setShowProofModal(true);
+                          }}
+                          title="View and share cryptographic on-chain audit card"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                          </svg>
+                          Share Proof Card
+                        </button>
+
+                        <button
+                          className="qd-export-btn"
                           onClick={() => handleCopyMarkdown(msg.id, msg)}
                           title="Copy full dossier in Markdown"
                         >
@@ -1761,6 +1822,14 @@ export function QerinDashboard() {
           setShowTopup(true);
         }}
         activeNetwork={selectedNetwork}
+      />
+
+      <ProofCardModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        topic={activeProofData.topic}
+        receipt={activeProofData.receipt}
+        sourceCitations={activeProofData.sourceCitations}
       />
 
       <style>{`@media (max-width: 767px) { #qd-mobile-menu { display: flex !important; } }`}</style>
