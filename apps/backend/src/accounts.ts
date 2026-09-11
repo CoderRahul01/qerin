@@ -224,3 +224,50 @@ export async function recordDeposit(
     return { credited: true, balance: next, accountFound: true };
   });
 }
+
+/**
+ * Free-tier optimized rewards and tier tracker.
+ * Operates directly on the existing account document without creating secondary collections.
+ */
+export async function getRewardsSummary(accountId: string): Promise<{
+  accountId: string;
+  points: number;
+  referralCount: number;
+  tier: string;
+}> {
+  const db = getDb();
+  const id = normalizeAccountId(accountId);
+  const ref = db.collection("accounts").doc(id);
+  const doc = await ref.get();
+  const data = doc.exists ? doc.data()! : {};
+  const points = Number(data.vipPoints ?? 120);
+  const referralCount = Number(data.referralCount ?? 0);
+
+  let tier = "Protocol Explorer";
+  if (points >= 5000) tier = "Council Partner";
+  else if (points >= 1000) tier = "Autonomous Operator";
+  else if (points >= 250) tier = "Verified Researcher";
+
+  return { accountId: id, points, referralCount, tier };
+}
+
+export async function recordRewardPoints(accountId: string, additionalPoints = 10): Promise<number> {
+  const db = getDb();
+  const id = normalizeAccountId(accountId);
+  const ref = db.collection("accounts").doc(id);
+  const doc = await ref.get();
+  const current = doc.exists ? Number(doc.data()?.vipPoints ?? 120) : 120;
+  const updated = current + additionalPoints;
+
+  if (doc.exists) {
+    await ref.update({ vipPoints: updated });
+  } else {
+    await ref.set({
+      balance: 0,
+      vipPoints: updated,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  return updated;
+}
+

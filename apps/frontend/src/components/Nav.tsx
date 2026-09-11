@@ -3,10 +3,9 @@ import { LogoLockup } from "@/components/LogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
-  { href: "/app", label: "App" },
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#features", label: "Features" },
-  { href: "#proof", label: "Proof" },
+  { href: "/app", label: "Terminal" },
+  { href: "/developers", label: "Developers & MCP" },
+  { href: "/rewards", label: "Rewards & Points" },
   { href: "https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub", label: "Dune Analytics ↗" },
 ];
 

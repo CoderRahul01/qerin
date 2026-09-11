@@ -1,0 +1,32 @@
+{
+  "name": "@qerin/mcp",
+  "version": "1.0.0",
+  "description": "Official Model Context Protocol (MCP) server for Qerin autonomous verifiable research and on-chain intelligence",
+  "main": "dist/index.js",
+  "bin": {
+    "qerin-mcp": "./dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "qerin",
+    "ai-agent",
+    "web3",
+    "verifiable-compute",
+    "blockchain-intelligence"
+  ],
+  "author": "Qerin Protocol",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

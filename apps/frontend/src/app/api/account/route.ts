@@ -1,31 +1,41 @@
 import { getClientIp } from "@/lib/clientIp";
+import { fetchBackend, getInternalSecret } from "@/lib/backendClient";
+
+interface AccountBody {
+  walletAddress?: string;
+}
 
 export async function POST(req: Request) {
-  const backendUrl = process.env.QERIN_BACKEND_URL;
-  if (!backendUrl) {
-    return Response.json({ error: "QERIN_BACKEND_URL is not configured" }, { status: 500 });
-  }
+  const internalSecret = getInternalSecret();
 
-  const internalSecret = process.env.QERIN_INTERNAL_SECRET;
-  if (!internalSecret) {
-    return Response.json({ error: "QERIN_INTERNAL_SECRET is not configured" }, { status: 500 });
-  }
-
-  let body = {};
+  let body: AccountBody = {};
   try {
-    body = await req.json();
+    body = (await req.json()) as AccountBody;
   } catch {}
 
-  const res = await fetch(`${backendUrl}/v1/account`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Qerin-Internal-Secret": internalSecret,
-      "X-Qerin-Client-Ip": getClientIp(req),
-    },
-    body: JSON.stringify(body),
-  });
+  try {
+    const res = await fetchBackend("/v1/account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Qerin-Internal-Secret": internalSecret,
+        "X-Qerin-Client-Ip": getClientIp(req),
+      },
+      body: JSON.stringify(body),
+    });
 
-  const data = await res.json();
-  return Response.json(data, { status: res.status });
+    const data = await res.json();
+    return Response.json(data, { status: res.status });
+  } catch {
+    // Fallback: Return client-compatible account object if backend is offline
+    const walletAddress = body.walletAddress;
+    return Response.json(
+      {
+        accountId: walletAddress || crypto.randomUUID(),
+        balance: 0,
+        offline: true,
+      },
+      { status: 200 }
+    );
+  }
 }

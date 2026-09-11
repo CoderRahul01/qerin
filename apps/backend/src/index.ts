@@ -11,7 +11,7 @@ import { issueApiKey } from "./apiKeys.js";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
-import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance, claimEcosystemPass } from "./accounts.js";
+import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance, claimEcosystemPass, getRewardsSummary } from "./accounts.js";
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
@@ -94,6 +94,20 @@ app.post("/v1/keys", async (c) => {
       prefix,
       message: "Store this key now — it will not be shown again.",
     });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal error" }, 500);
+  }
+});
+
+// Free-tier rewards summary endpoint — reads existing account doc directly
+app.get("/v1/rewards/:accountId", async (c) => {
+  const accountId = c.req.param("accountId");
+  if (!accountId) return c.json({ error: "accountId required" }, 400);
+
+  try {
+    const summary = await getRewardsSummary(accountId);
+    return c.json(summary);
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
