@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { isAddress } from "viem";
 import { cors } from "hono/cors";
 import { x402ResourceServer, type RoutesConfig } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
@@ -191,6 +192,17 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
 
   const accountId = c.req.header("x-qerin-account-id");
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+
+  // Gate the free pass to a real connected wallet address. accountId is
+  // otherwise a client-minted random UUID (see normalizeAccountId) that
+  // costs nothing to regenerate — without this check, clearing localStorage
+  // or opening an incognito window would re-unlock the $1.50 pass forever,
+  // breaking "strictly one-time per individual user."
+  if (!isAddress(accountId.trim())) {
+    return c.json({
+      error: "Connect your wallet to claim the Ecosystem Review Pass.",
+    }, 400);
+  }
 
   try {
     const result = await claimEcosystemPass(accountId, 1.50);
