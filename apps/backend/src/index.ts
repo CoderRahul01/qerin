@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { isAddress } from "viem";
 import { cors } from "hono/cors";
+import { streamSSE } from "hono/streaming";
 import { x402ResourceServer, type RoutesConfig } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
 import { paymentMiddleware } from "@x402/hono";
@@ -292,18 +293,39 @@ app.post("/v1/answer", async (c) => {
     );
   }
 
-  // Debit succeeded — from here on, any failure must refund it.
-  try {
-    const result = await answerHandler(question, accountId, typeof network === "string" ? network : undefined);
-    if (result.status !== 200) {
-      await creditBalance(accountId, ANSWER_PRICE_USD);
+  // Debit succeeded — from here on, any failure must refund it. Streamed as
+  // SSE so the client can render real pipeline progress (which sources
+  // actually settled, when synthesis actually started) instead of a
+  // decorative loop — every event below fires exactly when the thing it
+  // describes happens. The refund/response-shape contract is unchanged from
+  // the old plain-JSON version: a non-200 result (or a thrown error) always
+  // refunds before anything is sent back, only now as a terminal SSE event
+  // instead of an HTTP status+body.
+  return streamSSE(c, async (stream) => {
+    try {
+      const result = await answerHandler(
+        question,
+        accountId,
+        typeof network === "string" ? network : undefined,
+        (event) => {
+          stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
+        }
+      );
+      if (result.status !== 200) {
+        await creditBalance(accountId, ANSWER_PRICE_USD);
+        await stream.writeSSE({ event: "error", data: JSON.stringify(result.body) });
+        return;
+      }
+      await stream.writeSSE({
+        event: "done",
+        data: JSON.stringify({ ...result.body, balance: balanceAfterDebit }),
+      });
+    } catch (err) {
+      console.error(err);
+      await creditBalance(accountId, ANSWER_PRICE_USD).catch(() => {});
+      await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "Internal error" }) }).catch(() => {});
     }
-    return c.json(result.status === 200 ? { ...result.body, balance: balanceAfterDebit } : result.body, result.status);
-  } catch (err) {
-    console.error(err);
-    await creditBalance(accountId, ANSWER_PRICE_USD).catch(() => {});
-    return c.json({ error: "Internal error" }, 500);
-  }
+  });
 });
 
 // Public marketing signup — no internal-secret gate (reachable directly from

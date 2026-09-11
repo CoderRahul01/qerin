@@ -1,4 +1,9 @@
-export const maxDuration = 60;
+// Bumped from 60s alongside the SSE conversion below — the backend's own
+// documented worst case is a full LLM fallback cascade (up to 4 providers,
+// ~20s each) plus source gathering, which can comfortably exceed 60s. With
+// real progress events now streaming to the client the whole time, a longer
+// wait is no longer a silent hang — the user sees exactly what's happening.
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -24,13 +29,21 @@ export async function POST(req: Request) {
   // /v1/paid/answer directly with an x402 payment attached; see
   // DeveloperScreen.tsx.
   //
+  // The backend now streams real pipeline progress as Server-Sent Events
+  // once the balance debit succeeds (see streamSSE in index.ts) — this
+  // route passes that stream straight through unbuffered. The early-exit
+  // failures (bad secret, missing header, invalid question, insufficient
+  // balance) still come back as a single plain JSON response with a non-200
+  // status, exactly as before; we tell the two apart by content-type.
+  //
   // This used to have no try/catch and no timeout at all: if the backend
   // hung (a stuck paid source with no timeout of its own) or the network
   // call itself failed, this route threw an unhandled exception and Next.js
   // turned it into a bare 500 with no JSON body — which the frontend's own
   // `res.json()` call then failed to parse, so the "Paying..." screen never
-  // resolved to either a result or a visible error. A 30s cap here, plus
-  // explicit error handling, guarantees the client always gets back JSON.
+  // resolved to either a result or a visible error. Explicit error handling
+  // guarantees the client always gets back something readable — JSON for an
+  // early failure, or an `error` SSE event for a mid-stream one.
   try {
     const res = await fetch(`${backendUrl}/v1/answer`, {
       method: "POST",
@@ -40,13 +53,20 @@ export async function POST(req: Request) {
         "X-Qerin-Account-Id": accountId,
       },
       body: JSON.stringify(body),
-      // Generous on purpose: the backend's own worst case is a full LLM
-      // fallback cascade (up to 4 providers, ~20s each if every one stalls)
-      // plus source gathering — genuinely rare, but this should only fire
-      // for an actual multi-provider outage, not ordinary slow-but-working
-      // latency.
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(110_000),
     });
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("text/event-stream") && res.body) {
+      return new Response(res.body, {
+        status: res.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
 
     const data = await res.json().catch(() => null);
     if (data === null) {

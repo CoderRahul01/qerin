@@ -10,8 +10,7 @@ import { UserTransparencyModal } from "@/components/UserTransparencyModal";
 import { keccak256, toBytes } from "viem";
 import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
-import { selectSourcesForDisplay } from "@/lib/selectSources";
-import type { AnswerData, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
+import type { AnswerData, AnswerProgressEvent, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
 import { downloadDossierPdf, generateDossierMarkdown } from "@/lib/dossierExport";
 
 interface EthereumProvider {
@@ -31,8 +30,7 @@ interface ChatMessage {
   topic?: string;
   summary?: string;
   personaInsights?: PersonaInsights;
-  thinkingFor?: string;
-  thinkingSources?: string[];
+  thinkingEvents?: AnswerProgressEvent[];
   question?: string;
   userAccount?: string;
   costDebited?: number;
@@ -196,33 +194,39 @@ function QerinAvatar({ size = 28 }: { size?: number }) {
   return <Image src="/qerin-mark-orange.png" alt="Qerin" width={size} height={size} style={{ flexShrink: 0, borderRadius: 6 }} />;
 }
 
-const THINKING_PHASES = [
-  { label: "Routing query to intelligence sources", icon: "⚡" },
-  { label: "Settling x402 micropayments on-chain", icon: "🔗" },
-  { label: "Pulling live market & protocol data", icon: "📡" },
-  { label: "Verifying consensus node telemetry", icon: "🛡️" },
-  { label: "Synthesizing verified research dossier", icon: "🧠" },
-  { label: "Anchoring receipt to smart contract", icon: "⛓️" },
-];
-
-function ThinkingBubble({ text, sources }: { text?: string; sources?: string[] }) {
-  const [phaseIdx, setPhaseIdx] = useState(0);
-  const [srcIdx, setSrcIdx] = useState(0);
+// Driven entirely by real ProgressEvents streamed from the backend
+// (apps/backend/src/orchestrator.ts) — every row here reflects a payment
+// the agent actually attempted, not a decorative guess.
+function ThinkingBubble({ events }: { events?: AnswerProgressEvent[] }) {
   const [elapsed, setElapsed] = useState(0);
-
-  const defaultSources = ["Tavily Search Node", "CryptoSlate Intelligence", "CoinGecko Terminal", "Validator Telemetry"];
-  const activeSources = sources && sources.length > 0 ? sources : defaultSources;
 
   useEffect(() => {
     const start = Date.now();
     const elapsedTimer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
-    const phaseTimer = setInterval(() => setPhaseIdx(i => (i + 1) % THINKING_PHASES.length), 2000);
-    const srcTimer = setInterval(() => setSrcIdx(i => (i + 1) % activeSources.length), 1400);
-    return () => { clearInterval(elapsedTimer); clearInterval(phaseTimer); clearInterval(srcTimer); };
-  }, [activeSources.length]);
+    return () => clearInterval(elapsedTimer);
+  }, []);
 
-  const phase = THINKING_PHASES[phaseIdx];
-  const activeSrc = activeSources[srcIdx];
+  const selected = useMemo(() => {
+    const evt = events?.find((e): e is Extract<AnswerProgressEvent, { type: "sources_selected" }> => e.type === "sources_selected");
+    return evt?.sources ?? [];
+  }, [events]);
+
+  const settled = useMemo(() => {
+    const map = new Map<string, { success: boolean; amountPaid?: string }>();
+    for (const e of events ?? []) {
+      if (e.type === "source_settled") map.set(e.name, { success: e.success, amountPaid: e.amountPaid });
+    }
+    return map;
+  }, [events]);
+
+  const isSynthesizing = (events ?? []).some((e) => e.type === "synthesizing");
+
+  const phaseLabel = isSynthesizing
+    ? "Synthesizing verified research dossier"
+    : selected.length > 0
+      ? `Settling payments across ${selected.length} verified sources`
+      : "Routing query to intelligence sources";
+  const phaseIcon = isSynthesizing ? "🧠" : selected.length > 0 ? "🔗" : "⚡";
 
   return (
     <div className="qd-ai-msg qd-msg-enter">
@@ -237,27 +241,38 @@ function ThinkingBubble({ text, sources }: { text?: string; sources?: string[] }
               <span className="qd-thinking-dot" />
             </div>
             <span style={{ fontSize: 12.5, color: "var(--qd-muted2)", fontWeight: 500 }}>
-              {phase.icon} {text || phase.label}
+              {phaseIcon} {phaseLabel}
             </span>
           </div>
-          {/* Live source ticker */}
-          {activeSrc && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(255,107,0,0.06)", border: "1px solid rgba(255,107,0,0.15)",
-              borderRadius: 6, padding: "4px 10px", fontSize: 11.5,
-            }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%", background: "#FF6B00",
-                display: "inline-block", animation: "qd-pulse 1s ease-in-out infinite",
-              }} />
-              <span style={{ color: "#FB923C", fontWeight: 600 }}>Settling x402:</span>
-              <span style={{ color: "var(--qd-muted2)", fontFamily: "monospace", fontSize: 11 }}>{activeSrc}</span>
+          {/* Real per-source settlement status — pending, paid, or unavailable */}
+          {selected.length > 0 && !isSynthesizing && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {selected.map((src) => {
+                const state = settled.get(src.name);
+                const dotColor = !state ? "#FF6B00" : state.success ? "#22C55E" : "#6B7280";
+                return (
+                  <div key={src.name} style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    background: "rgba(255,107,0,0.05)", border: "1px solid rgba(255,107,0,0.12)",
+                    borderRadius: 6, padding: "4px 10px", fontSize: 11.5,
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%", background: dotColor,
+                      display: "inline-block", flexShrink: 0,
+                      animation: !state ? "qd-pulse 1s ease-in-out infinite" : undefined,
+                    }} />
+                    <span style={{ color: "var(--qd-muted2)", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{src.name}</span>
+                    <span style={{ color: state?.success ? "#22C55E" : "var(--qd-muted2)", fontSize: 10.5, fontWeight: 600 }}>
+                      {!state ? "…" : state.success ? `paid $${state.amountPaid ?? src.priceUsd}` : "unavailable · not charged"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
           {/* Elapsed */}
           <div style={{ fontSize: 11, color: "var(--qd-muted2)", opacity: 0.6 }}>
-            {elapsed}s elapsed · avg ~5-12s
+            {elapsed}s elapsed
           </div>
         </div>
       </div>
@@ -998,7 +1013,6 @@ export function QerinDashboard() {
     const userMsgId = "u-" + makeId();
     const thinkingId = "th-" + makeId();
     const time = nowTime();
-    const sources = selectSourcesForDisplay(q);
 
     updateThread(threadId, t => ({
       ...t,
@@ -1006,12 +1020,21 @@ export function QerinDashboard() {
       preview: q.slice(0, 60),
       messages: [...t.messages.filter(m => m.role !== "thinking"),
         { id: userMsgId, role: "user" as const, content: q, time },
-        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingFor: "Agentic Layer: Settling x402 micropayments across verified intelligence sources...", thinkingSources: sources.map(s => s.name) },
+        { id: thinkingId, role: "thinking" as const, content: "", time, thinkingEvents: [] },
       ],
     }));
 
+    const handleProgress = (event: AnswerProgressEvent) => {
+      updateThread(threadId, t => ({
+        ...t,
+        messages: t.messages.map(m =>
+          m.id === thinkingId ? { ...m, thinkingEvents: [...(m.thinkingEvents ?? []), event] } : m
+        ),
+      }));
+    };
+
     try {
-      const result = await ask(q, accountId ?? "local", selectedNetwork === "botchain" ? "botchain" : "mainnet");
+      const result = await ask(q, accountId ?? "local", selectedNetwork === "botchain" ? "botchain" : "mainnet", handleProgress);
       const answerMsgId = "a-" + makeId();
       const answerTime = nowTime();
 
@@ -1423,10 +1446,7 @@ export function QerinDashboard() {
 
               if (msg.role === "thinking") {
                 if (!isSubmitting) return null;
-                const cleanThinkingText = (msg.thinkingFor && !msg.thinkingFor.toLowerCase().includes("tavily") && !msg.thinkingFor.toLowerCase().includes("tably"))
-                  ? msg.thinkingFor
-                  : "Agentic Layer: Settling x402 micropayments across verified intelligence sources...";
-                return <ThinkingBubble key={msg.id} text={cleanThinkingText} sources={msg.thinkingSources} />;
+                return <ThinkingBubble key={msg.id} events={msg.thinkingEvents} />;
               }
 
               if (msg.role === "user") {

@@ -30,6 +30,13 @@ export interface SourceCitation {
   citation: string;
 }
 
+// Mirrors ProgressEvent in apps/backend/src/orchestrator.ts — real pipeline
+// events streamed as SSE from /v1/answer, not decorative client-side guesses.
+export type AnswerProgressEvent =
+  | { type: "sources_selected"; sources: { name: string; priceUsd: string }[] }
+  | { type: "source_settled"; name: string; success: boolean; amountPaid?: string }
+  | { type: "synthesizing" };
+
 export interface AnswerData {
   question: string;
   topic?: string;
