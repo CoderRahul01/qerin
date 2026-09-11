@@ -337,7 +337,7 @@ function ReceiptCard({
   const contractAddress = receipt.registryContract || defaultAddress;
 
   return (
-    <div className="qd-receipt-card" style={{ marginTop: 14, padding: "16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "rgba(255,255,255,0.02)" }}>
+    <div className="qd-receipt-card" style={{ marginTop: 14, padding: "16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "var(--qd-receipt-bg)" }}>
       {/* Top status bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -357,7 +357,7 @@ function ReceiptCard({
       </div>
 
       {/* INDIVIDUAL USER SETTLEMENT LEDGER */}
-      <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
+      <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--qerin-surface)", border: "1px solid var(--qd-receipt-border)", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--qerin-text)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
@@ -393,37 +393,37 @@ function ReceiptCard({
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
-          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
-            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Query Cost (Your Fuel)</div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#f87171", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+          <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Query Cost (Your Fuel)</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
               -${costDebited.toFixed(3)} Fuel
             </div>
           </div>
 
-          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
-            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Your Remaining Balance</div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+          <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Your Remaining Balance</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
               {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "$2.80 Fuel"}
             </div>
           </div>
 
-          <div style={{ padding: "6px 8px", borderRadius: 6, background: "rgba(0,0,0,0.2)" }}>
-            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)" }}>Agent Paid to Sources</div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+          <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Agent Paid to Sources</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
               {receipt.paid}
             </div>
           </div>
         </div>
 
         {/* Cryptographic Question Hash Proof Tag */}
-        <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+        <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid var(--qd-receipt-border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 10, color: "var(--qd-muted2)" }}>Query Hash Digest:</span>
-            <span style={{ fontSize: 10.5, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "#38bdf8" }}>
+            <span style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500 }}>Query Hash Digest:</span>
+            <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
               {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
             </span>
           </div>
-          <span style={{ fontSize: 10, color: "var(--qd-receipt-success)", fontWeight: 600 }}>
+          <span style={{ fontSize: 10.5, color: "var(--qd-receipt-success)", fontWeight: 600 }}>
             ✓ Etched into smart contract
           </span>
         </div>
@@ -440,11 +440,11 @@ function ReceiptCard({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {itemizedSources.map((src, i) => (
-            <div key={i} style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 4 }}>
+            <div key={i} style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qerin-surface)", border: "1px solid var(--qd-receipt-border)", display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--qerin-text)" }}>{src.name}</span>
-                  <span style={{ fontSize: 9.5, padding: "1px 5px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: "var(--qd-muted2)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)", color: "var(--qd-muted2)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
                     {src.protocol}
                   </span>
                 </div>
@@ -489,47 +489,57 @@ function ReceiptCard({
         </button>
 
         {showAudit && (
-          <div style={{ marginTop: 10, padding: "10px", borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 11.5, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{
+            marginTop: 10,
+            padding: "12px 14px",
+            borderRadius: 8,
+            background: "var(--qd-input-bg)",
+            border: "1px solid var(--qd-receipt-border)",
+            fontSize: 11.5,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Registry Contract</span>
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Registry Contract</span>
               <a
                 href={isBotChain ? `https://scan.botchain.ai/address/${contractAddress}` : `https://basescan.org/address/${contractAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}
+                style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none", fontWeight: 600 }}
               >
                 {shortAddr(contractAddress)} ↗
               </a>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Autonomous Agent Payer</span>
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Autonomous Agent Payer</span>
               <a
                 href={isBotChain ? `https://scan.botchain.ai/address/${agentWallet}` : `https://basescan.org/address/${agentWallet}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}
+                style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none", fontWeight: 600 }}
               >
                 {shortAddr(agentWallet)} ↗
               </a>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Your Client Identity</span>
-              <span style={{ color: "#38bdf8", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-                {userAccount ? shortAddr(userAccount) : "0x1577...2b7e (You)"}
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Your Client Identity</span>
+              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontWeight: 600 }}>
+                {userAccount ? shortAddr(userAccount) : "0x1577...2b7e"} <span style={{ color: "var(--qd-receipt-success)", fontSize: 10 }}>(Verified)</span>
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Query Hash (questionHash)</span>
-              <span style={{ color: "#38bdf8", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5 }}>
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Query Hash (questionHash)</span>
+              <span style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, fontWeight: 600 }}>
                 {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>On-Chain Receipt Tx</span>
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>On-Chain Receipt Tx</span>
               <a
                 href={explorerUrl}
                 target="_blank"
@@ -541,13 +551,13 @@ function ReceiptCard({
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--qd-muted2)" }}>Smart Contract Method</span>
-              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5 }}>
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Smart Contract Method</span>
+              <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5, fontWeight: 500, background: "var(--qerin-surface)", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--qd-receipt-border)" }}>
                 recordReceipt(bytes32,uint256,uint256,string)
               </span>
             </div>
 
-            <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px dashed rgba(255,255,255,0.08)", fontSize: 11, color: "var(--qd-muted2)" }}>
+            <div style={{ marginTop: 4, paddingTop: 8, borderTop: "1px dashed var(--qd-receipt-border)", fontSize: 11, color: "var(--qd-muted2)" }}>
               ✓ Micropayment settled autonomously on your behalf. Publicly verifiable on {explorerName}.
             </div>
           </div>
