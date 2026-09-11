@@ -6,6 +6,7 @@ import {
   formatEther,
   parseEther,
 } from "viem";
+import { getProvider, type EthereumProvider } from "./account";
 
 export type TopupNetwork = "base" | "botchain";
 
@@ -53,23 +54,46 @@ export const TOPUP_NETWORKS: Record<TopupNetwork, NetworkMeta> = {
 };
 
 const PENDING_KEY_PREFIX = "qerin_pending_topup_";
+const WBOT_ADDRESS = "0xD5452816194a3784dBa983426cCe7c122F4abd30";
+const BOT_PRICE_FALLBACK = 12.20;
 
-interface EthereumProvider {
-  request: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;
-}
+// ── Live BOT Price ────────────────────────────────────────────────────────────
 
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
+let _botPriceCache: { price: number; ts: number } | null = null;
+const BOT_PRICE_TTL_MS = 5 * 60 * 1000;
+
+export async function fetchBotPrice(): Promise<number> {
+  const now = Date.now();
+  if (_botPriceCache && now - _botPriceCache.ts < BOT_PRICE_TTL_MS) {
+    return _botPriceCache.price;
   }
+  try {
+    const res = await fetch(
+      `https://dex-wallet.botchain.ai/api/graph/price?token=${WBOT_ADDRESS}`,
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = (await res.json()) as { success: boolean; data?: { price?: string } };
+    const priceStr = body?.data?.price;
+    const price = priceStr ? parseFloat(priceStr) : 0;
+    if (price > 0) {
+      _botPriceCache = { price, ts: now };
+      return price;
+    }
+  } catch {}
+  return BOT_PRICE_FALLBACK;
 }
 
-export function getProvider(): EthereumProvider {
-  if (typeof window === "undefined" || !window.ethereum) {
-    throw new Error("No wallet found — please install MetaMask, Rabby, Coinbase Wallet, or open in a Web3 browser.");
-  }
-  return window.ethereum;
+/**
+ * For BOT Chain native BOT payment: calculate how much BOT is needed
+ * for the given USD amount, using live price.
+ */
+export async function usdToBotAmount(amountUsd: number): Promise<number> {
+  const price = await fetchBotPrice();
+  return amountUsd / price;
 }
+
+// ── Wallet Utilities ─────────────────────────────────────────────────────────
 
 export async function ensureNetwork(provider: EthereumProvider, network: TopupNetwork): Promise<void> {
   const meta = TOPUP_NETWORKS[network];
@@ -124,12 +148,13 @@ const ERC20_BALANCE_ABI = [
   },
 ] as const;
 
-// --- Pending-payment recovery record --------------------------------------
+// ── Pending Payment Recovery ──────────────────────────────────────────────────
 
 export interface PendingTopup {
   txHash: string;
   amountUsd: number;
   network?: TopupNetwork;
+  paymentMethod?: "token" | "native";
   sentAt: number;
 }
 
@@ -156,7 +181,7 @@ export function clearPendingTopup(accountId: string): void {
   window.localStorage.removeItem(pendingKey(accountId));
 }
 
-// --- Wallet Diagnostics & Watch Asset ------------------------------------
+// ── Wallet Diagnostics ────────────────────────────────────────────────────────
 
 export async function registerAssetInWallet(network: TopupNetwork = "base"): Promise<boolean> {
   const provider = getProvider();
@@ -186,6 +211,7 @@ export interface WalletBalanceReport {
   tokenBalance: string;
   nativeNumeric: number;
   tokenNumeric: number;
+  botPrice?: number;
 }
 
 export async function checkWalletBalances(network: TopupNetwork = "base"): Promise<WalletBalanceReport> {
@@ -226,22 +252,29 @@ export async function checkWalletBalances(network: TopupNetwork = "base"): Promi
     tokenBalance = tokenNumeric.toFixed(2);
   } catch {}
 
+  // Fetch live BOT price for BOT Chain network
+  let botPrice: number | undefined;
+  if (network === "botchain") {
+    botPrice = await fetchBotPrice().catch(() => BOT_PRICE_FALLBACK);
+  }
+
   return {
     account,
     nativeBalance,
     tokenBalance,
     nativeNumeric,
     tokenNumeric,
+    botPrice,
   };
 }
 
-// --- Wallet flow ------------------------------------------------------------
+// ── Deposit Flow ──────────────────────────────────────────────────────────────
 
 export async function sendCryptoDeposit(
   accountId: string,
   amountUsd: number,
   network: TopupNetwork = "base",
-  paymentMethod: "token" | "native" = "token"
+  paymentMethod: "token" | "native" = network === "botchain" ? "native" : "token"
 ): Promise<string> {
   const provider = getProvider();
   const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
@@ -251,24 +284,48 @@ export async function sendCryptoDeposit(
   await ensureNetwork(provider, network);
   const meta = TOPUP_NETWORKS[network];
 
-  // Fetch destination settlement address
+  // Fetch destination settlement address + network info
   const infoRes = await fetch(`/api/network-info?network=${network}`);
   const info = await infoRes.json().catch(() => ({}));
   const payTo = (info.payTo || "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2") as `0x${string}`;
 
-  // Pre-flight balance diagnostics: avoid firing a doomed transaction that causes
-  // MetaMask to display "1 Unknown" / "This transaction is likely to fail"
-  const diag = await checkWalletBalances(network).catch(() => null);
+  // Pre-flight balance diagnostics
+  let diag: WalletBalanceReport | null = null;
+  try {
+    diag = await checkWalletBalances(network);
+  } catch {}
+
   if (diag) {
-    if (paymentMethod === "token") {
+    if (paymentMethod === "native") {
+      // For native BOT payment: check BOT balance is sufficient
+      if (network === "botchain") {
+        const botPrice = diag.botPrice ?? BOT_PRICE_FALLBACK;
+        const botNeeded = amountUsd / botPrice;
+        // Add 10% buffer for gas
+        const botRequired = botNeeded * 1.10;
+        if (diag.nativeNumeric < botRequired) {
+          throw new Error(
+            `Insufficient BOT balance: Your wallet holds ${diag.nativeBalance} BOT on ${meta.name}. You need ~${botNeeded.toFixed(4)} BOT (+ gas) for this payment.`
+          );
+        }
+      } else {
+        // ETH native on Base
+        if (diag.nativeNumeric <= 0.0001) {
+          throw new Error(
+            `Insufficient ETH balance on ${meta.name}. Your wallet holds ${diag.nativeBalance} ETH.`
+          );
+        }
+      }
+    } else {
+      // ERC-20 token payment
       if (diag.nativeNumeric <= 0.00005) {
         throw new Error(
-          `Insufficient gas on ${meta.name}. Your wallet holds ${diag.nativeBalance} ${meta.currency}. A small amount of ${meta.currency} is required to pay network fees. You can also claim the Instant Ecosystem Review Pass below.`
+          `Insufficient gas on ${meta.name}. Your wallet holds ${diag.nativeBalance} ${meta.currency}. A small amount of ${meta.currency} is needed for gas fees.`
         );
       }
       if (diag.tokenNumeric < amountUsd) {
         throw new Error(
-          `Insufficient ${meta.tokenSymbol} balance: Your wallet holds ${diag.tokenBalance} ${meta.tokenSymbol} on ${meta.name} (required: $${amountUsd}.00). Fund your address or activate the Instant Ecosystem Review Pass below.`
+          `Insufficient ${meta.tokenSymbol} balance: Your wallet holds ${diag.tokenBalance} ${meta.tokenSymbol} on ${meta.name} (required: $${amountUsd}.00). You can switch to Native BOT payment above.`
         );
       }
     }
@@ -276,7 +333,23 @@ export async function sendCryptoDeposit(
 
   let txHash: string;
 
-  if (paymentMethod === "token") {
+  if (paymentMethod === "native") {
+    let weiAmount: bigint;
+    if (network === "botchain") {
+      const botPrice = diag?.botPrice ?? info.botPrice ?? BOT_PRICE_FALLBACK;
+      const botAmount = amountUsd / botPrice;
+      weiAmount = parseEther(botAmount.toFixed(8));
+    } else {
+      // Base: ETH at ~$2500 fallback
+      weiAmount = parseEther((amountUsd / 2500).toFixed(8));
+    }
+
+    txHash = (await provider.request({
+      method: "eth_sendTransaction",
+      params: [{ from, to: payTo, value: `0x${weiAmount.toString(16)}`, data: "0x" }],
+    })) as string;
+  } else {
+    // ERC-20 token payment
     const tokenContract = (info.usdc || info.usdt || meta.tokenAddress) as `0x${string}`;
     const amountAtomic = parseUnits(amountUsd.toString(), meta.tokenDecimals);
     const data = encodeFunctionData({
@@ -289,23 +362,13 @@ export async function sendCryptoDeposit(
       method: "eth_sendTransaction",
       params: [{ from, to: tokenContract, value: "0x0", data }],
     })) as string;
-  } else {
-    // Native coin payment (ETH or BOT)
-    const weiAmount = network === "base"
-      ? parseEther((amountUsd / 2500).toFixed(6))
-      : parseEther((amountUsd * 10).toString());
-
-    txHash = (await provider.request({
-      method: "eth_sendTransaction",
-      params: [{ from, to: payTo, value: `0x${weiAmount.toString(16)}`, data: "0x" }],
-    })) as string;
   }
 
-  savePendingTopup(accountId, { txHash, amountUsd, network, sentAt: Date.now() });
+  savePendingTopup(accountId, { txHash, amountUsd, network, paymentMethod, sentAt: Date.now() });
   return txHash;
 }
 
-// Backward compatibility alias for legacy callers
+// Backward compatibility alias
 export async function sendUsdcTransfer(accountId: string, amountUsd: number): Promise<string> {
   return sendCryptoDeposit(accountId, amountUsd, "base", "token");
 }
