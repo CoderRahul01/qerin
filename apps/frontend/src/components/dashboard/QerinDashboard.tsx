@@ -1274,6 +1274,17 @@ export function QerinDashboard() {
             </div>
           </div>
 
+          {/* Balance gets its own full-width row — cramming it into the user
+              bar alongside the wallet identity text left too little room and
+              made both overlap illegibly on narrower sidebars. */}
+          {balance !== null && (
+            <div
+              onClick={() => { setTopupReason(null); setShowTopup(true); }}
+              style={{ padding: "10px 12px", borderTop: "1px solid var(--qd-sidebar-border)", cursor: "pointer" }}
+            >
+              <FuelMeter balance={balance} usedTotal={totalUsed} compact />
+            </div>
+          )}
           <div className="qd-user-bar" onClick={() => { setTopupReason(null); setShowTopup(true); }}>
             <div style={{ position: "relative" }}>
               <Avatar letter={connectedWallet ? "W" : "U"} size={30} />
@@ -1300,7 +1311,7 @@ export function QerinDashboard() {
                 {truncatedAddr}
               </div>
             </div>
-            {!connectedWallet ? (
+            {!connectedWallet && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1324,10 +1335,6 @@ export function QerinDashboard() {
               >
                 Connect
               </button>
-            ) : (
-              <div style={{ flexShrink: 0 }}>
-                <FuelMeter balance={balance} usedTotal={totalUsed} />
-              </div>
             )}
             <button
               type="button"
