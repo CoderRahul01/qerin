@@ -1,4 +1,4 @@
-import type { AnswerData, PersonaInsights, ReceiptItem } from "./types";
+import type { PersonaInsights, ReceiptItem } from "./types";
 
 export interface DossierOptions {
   question: string;

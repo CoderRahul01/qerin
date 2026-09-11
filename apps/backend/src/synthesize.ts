@@ -1,15 +1,18 @@
 import OpenAI from "openai";
 import type { PaidResult } from "./paidFetch.js";
 
-// OpenRouter: Access to top open-weight models (DeepSeek V3, Llama 3.3 70B, Qwen 2.5 72B)
-// with automatic failover and high-throughput reasoning.
+// OpenRouter: Open-weight models ordered by typical response speed.
+// DeepSeek V3 is fastest (1-3s) and high quality; Qwen is a solid second;
+// Llama 70B is the most reliable fallback but slower.
 const OPENROUTER_MODELS = [
-  "meta-llama/llama-3.3-70b-instruct",
-  "qwen/qwen-2.5-72b-instruct",
   "deepseek/deepseek-chat",
+  "qwen/qwen-2.5-72b-instruct",
+  "meta-llama/llama-3.3-70b-instruct",
 ];
 
-const LLM_TIMEOUT_MS = 12_000;
+// Per-model attempt budget. 8s is enough for DeepSeek (usually 1-3s) and
+// Qwen (usually 2-5s). Llama can occasionally hit 7-8s on warm replicas.
+const LLM_TIMEOUT_MS = 8_000;
 
 export interface PersonaInsights {
   developer: string;
@@ -182,8 +185,8 @@ Return ONLY the raw JSON object without additional surrounding text.`;
       try {
         const completion = await openRouterClient.chat.completions.create({
           model,
-          max_tokens: 1800,
-          temperature: 0.25,
+          max_tokens: 1200,
+          temperature: 0.2,
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
         });
@@ -209,8 +212,8 @@ Return ONLY the raw JSON object without additional surrounding text.`;
       const model = process.env.QERIN_LLM_MODEL || "meta/llama-3.3-70b-instruct";
       const completion = await nimClient.chat.completions.create({
         model,
-        max_tokens: 1400,
-        temperature: 0.25,
+        max_tokens: 1000,
+        temperature: 0.2,
         messages: [{ role: "user", content: prompt }],
       });
       const content = completion.choices[0]?.message?.content ?? "";
