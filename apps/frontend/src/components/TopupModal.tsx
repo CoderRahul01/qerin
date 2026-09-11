@@ -1,39 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   sendCryptoDeposit,
   signTopupConfirmation,
-  getPendingTopup,
   clearPendingTopup,
   registerAssetInWallet,
   checkWalletBalances,
+  fetchBotPrice,
   TOPUP_NETWORKS,
-  type PendingTopup,
   type TopupNetwork,
   type WalletBalanceReport,
 } from "@/lib/cryptoTopup";
-import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo } from "@/lib/account";
+import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider } from "@/lib/account";
 
 const TIERS = [
-  {
-    amountUsd: 1,
-    title: "Explorer Fuel",
-    desc: "~50 Autonomous Micropayments",
-    badge: null,
-  },
-  {
-    amountUsd: 5,
-    title: "Intelligence Pack",
-    desc: "~250 Queries • Multi-Source Synthesis",
-    badge: "RECOMMENDED",
-  },
-  {
-    amountUsd: 20,
-    title: "Institutional Vault",
-    desc: "~1,000 Queries • Priority Settlement",
-    badge: null,
-  },
+  { amountUsd: 1,  title: "Explorer Fuel",      desc: "~50 Queries",               badge: null },
+  { amountUsd: 5,  title: "Intelligence Pack",   desc: "~250 Queries · Multi-Source", badge: "RECOMMENDED" },
+  { amountUsd: 20, title: "Institutional Vault", desc: "~1,000 Queries · Priority",  badge: null },
 ];
 
 const NOT_MINED_REASON = "not found on-chain yet";
@@ -43,7 +27,8 @@ const CONFIRM_MAX_ATTEMPTS = 10;
 type Step =
   | { kind: "idle" }
   | { kind: "claiming" }
-  | { kind: "sending"; amountUsd: number; network: TopupNetwork }
+  | { kind: "connecting" }
+  | { kind: "sending"; amountUsd: number; network: TopupNetwork; paymentMethod: "token" | "native" }
   | { kind: "confirming"; txHash: string; amountUsd: number; attempt: number; network: TopupNetwork }
   | { kind: "success"; balance: number; txHash?: string; message?: string }
   | { kind: "stuck"; txHash: string; amountUsd: number; reason: string; network: TopupNetwork }
@@ -64,37 +49,65 @@ function sleep(ms: number): Promise<void> {
 }
 
 export function TopupModal({
-  accountId,
+  accountId: initialAccountId,
   initialNetwork = "base",
   onClose,
   onCredited,
   reason,
+  onAccountCreated,
 }: {
   accountId: string;
   initialNetwork?: "base" | "botchain";
   onClose: () => void;
   onCredited: (balance: number) => void;
   reason?: string | null;
+  onAccountCreated?: (accountId: string, balance: number) => void;
 }) {
+  const [accountId, setAccountId] = useState(initialAccountId);
   const [network, setNetwork] = useState<TopupNetwork>(initialNetwork);
   const [step, setStep] = useState<Step>({ kind: "idle" });
-  const [pending, setPending] = useState<PendingTopup | null>(null);
   const [walletDiag, setWalletDiag] = useState<WalletBalanceReport | null>(null);
   const [watchAssetSuccess, setWatchAssetSuccess] = useState<boolean | null>(null);
-  const [showMetaMaskHelp, setShowMetaMaskHelp] = useState(false);
-  const [passClaimed, setPassClaimed] = useState<boolean>(false);
+  const [passClaimed, setPassClaimed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem(`qerin_pass_claimed_${initialAccountId}`) === "true";
+    }
+    return false;
+  });
+  const [botPrice, setBotPrice] = useState<number>(12.20);
+  const [hasWallet, setHasWallet] = useState<boolean | null>(() => {
+    if (typeof window === "undefined") return null;
+    return getInjectedProvider() !== null;
+  });
+  const [paymentMethod, setPaymentMethod] = useState<"token" | "native">(
+    initialNetwork === "botchain" ? "native" : "token"
+  );
 
   const activeMeta = TOPUP_NETWORKS[network];
 
+  // Detect wallet after mount if injected asynchronously
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasWallet(getInjectedProvider() !== null);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleSelectNetwork = useCallback((net: TopupNetwork) => {
+    setNetwork(net);
+    setPaymentMethod(net === "botchain" ? "native" : "token");
+    setStep({ kind: "idle" });
+  }, []);
+
+  // Fetch live BOT price
+  useEffect(() => {
+    if (network === "botchain") {
+      fetchBotPrice().then(setBotPrice).catch(() => setBotPrice(12.20));
+    }
+  }, [network]);
+
   useEffect(() => {
     let cancelled = false;
-    setPending(getPendingTopup(accountId));
-
-    // Check cached pass claimed status
-    if (typeof window !== "undefined") {
-      const cached = window.localStorage.getItem(`qerin_pass_claimed_${accountId}`);
-      if (cached === "true") setPassClaimed(true);
-    }
 
     async function checkAccountPass() {
       if (!accountId) return;
@@ -110,31 +123,30 @@ export function TopupModal({
     }
     checkAccountPass();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [accountId]);
 
   useEffect(() => {
     let cancelled = false;
     async function inspect() {
-      if (typeof window === "undefined" || !window.ethereum) return;
+      if (!hasWallet) return;
       try {
         const rep = await checkWalletBalances(network);
-        if (!cancelled) setWalletDiag(rep);
+        if (!cancelled) {
+          setWalletDiag(rep);
+          if (rep.botPrice) setBotPrice(rep.botPrice);
+        }
       } catch {
         if (!cancelled) setWalletDiag(null);
       }
     }
     inspect();
-    return () => {
-      cancelled = true;
-    };
-  }, [network]);
+    return () => { cancelled = true; };
+  }, [network, hasWallet]);
 
-  const busy = step.kind === "sending" || step.kind === "confirming" || step.kind === "claiming";
+  const busy = step.kind === "sending" || step.kind === "confirming" || step.kind === "claiming" || step.kind === "connecting";
 
-  const runConfirm = async (txHash: string, amountUsd: number, net: TopupNetwork) => {
+  const runConfirm = useCallback(async (txHash: string, amountUsd: number, net: TopupNetwork) => {
     let signature: string;
     try {
       signature = await signTopupConfirmation(accountId, txHash);
@@ -152,9 +164,8 @@ export function TopupModal({
     for (let attempt = 1; attempt <= CONFIRM_MAX_ATTEMPTS; attempt++) {
       setStep({ kind: "confirming", txHash, amountUsd, attempt, network: net });
       try {
-        const balance = await confirmCryptoTopup(accountId, txHash, signature);
+        const balance = await confirmCryptoTopup(accountId, txHash, signature, net === "botchain" ? "botchain" : "mainnet");
         clearPendingTopup(accountId);
-        setPending(null);
         setStep({ kind: "success", balance, txHash });
         onCredited(balance);
         return;
@@ -169,21 +180,39 @@ export function TopupModal({
         return;
       }
     }
+  }, [accountId, onCredited]);
+
+  const handleConnectWallet = async () => {
+    setStep({ kind: "connecting" });
+    try {
+      const addr = await requestWalletConnection();
+      if (addr) {
+        const id = await getOrCreateAccountId(addr);
+        setAccountId(id);
+        const b = await fetchBalance(id);
+        onAccountCreated?.(id, b);
+        // Re-check wallet diag after connect
+        setHasWallet(true);
+        try {
+          const rep = await checkWalletBalances(network);
+          setWalletDiag(rep);
+          if (rep.botPrice) setBotPrice(rep.botPrice);
+        } catch {}
+      }
+      setStep({ kind: "idle" });
+    } catch (err) {
+      setStep({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Could not connect wallet",
+      });
+    }
   };
 
   const handleWalletDeposit = async (amountUsd: number) => {
-    if (walletDiag && Number(walletDiag.tokenBalance) < amountUsd) {
-      setStep({
-        kind: "error",
-        message: `Insufficient ${activeMeta.tokenSymbol} balance: Your wallet holds ${walletDiag.tokenBalance} ${activeMeta.tokenSymbol} on ${activeMeta.name} (required: $${amountUsd}.00). Please transfer ${activeMeta.tokenSymbol} to your address or switch networks above.`,
-      });
-      return;
-    }
-
-    setStep({ kind: "sending", amountUsd, network });
+    setStep({ kind: "sending", amountUsd, network, paymentMethod });
     let txHash: string;
     try {
-      txHash = await sendCryptoDeposit(accountId, amountUsd, network, "token");
+      txHash = await sendCryptoDeposit(accountId, amountUsd, network, paymentMethod);
     } catch (err) {
       setStep({
         kind: "error",
@@ -191,7 +220,6 @@ export function TopupModal({
       });
       return;
     }
-    setPending({ txHash, amountUsd, network, sentAt: Date.now() });
     await runConfirm(txHash, amountUsd, network);
   };
 
@@ -199,7 +227,7 @@ export function TopupModal({
     if (passClaimed) {
       setStep({
         kind: "error",
-        message: "Ecosystem Review Pass has already been claimed for this account. Pass is strictly one-time per individual user.",
+        message: "Ecosystem Review Pass has already been claimed for this account.",
       });
       return;
     }
@@ -211,11 +239,7 @@ export function TopupModal({
       if (typeof window !== "undefined") {
         window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
       }
-      setStep({
-        kind: "success",
-        balance,
-        message: "Ecosystem Review Pass activated with $1.50 Research Fuel.",
-      });
+      setStep({ kind: "success", balance, message: "Ecosystem Review Pass activated — $1.50 Research Fuel credited." });
       onCredited(balance);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not activate review pass";
@@ -225,10 +249,7 @@ export function TopupModal({
           window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
         }
       }
-      setStep({
-        kind: "error",
-        message: msg,
-      });
+      setStep({ kind: "error", message: msg });
     }
   };
 
@@ -240,13 +261,19 @@ export function TopupModal({
 
   const canDismiss = !busy;
 
+  // Calculate amounts for display
+  const botNeededByTier = TIERS.reduce<Record<number, string>>((acc, t) => {
+    acc[t.amountUsd] = (t.amountUsd / botPrice).toFixed(4);
+    return acc;
+  }, {});
+
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(10, 12, 16, 0.75)",
-        backdropFilter: "blur(10px)",
+        background: "rgba(6, 8, 14, 0.82)",
+        backdropFilter: "blur(12px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -260,59 +287,55 @@ export function TopupModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth: 540,
-          background: "#141721",
-          border: "1px solid rgba(234, 88, 12, 0.3)",
+          maxWidth: 480,
+          background: "linear-gradient(145deg, #111420 0%, #0d1018 100%)",
+          border: "1px solid rgba(234, 88, 12, 0.28)",
           borderRadius: 20,
-          padding: "26px 28px",
+          padding: "22px 24px",
           boxSizing: "border-box",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(234, 88, 12, 0.12)",
+          boxShadow: "0 28px 70px rgba(0,0,0,0.7), 0 0 40px rgba(234,88,12,0.1)",
           color: "#F3F4F6",
           fontFamily: "var(--font-inter), -apple-system, sans-serif",
-          maxHeight: "90vh",
+          maxHeight: "92vh",
           overflowY: "auto",
         }}
       >
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
-                  background: "linear-gradient(135deg, #EA580C 0%, #C2410C 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 0 12px rgba(234, 88, 12, 0.4)",
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 19, letterSpacing: "-0.02em" }}>
-                Agent Settlement Treasury
-              </div>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                background: "linear-gradient(135deg, #EA580C 0%, #C2410C 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 14px rgba(234,88,12,0.45)",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
             </div>
-            <div style={{ marginTop: 6, fontSize: 13, color: "#9CA3AF", lineHeight: 1.45 }}>
-              {reason ??
-                "Fund your autonomous treasury to pay decentralized data sources (Autonomous Web Research, Protocol Intelligence, Consensus RPC, BOT Chain Mainnet) and mint verifiable on-chain receipts."}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>Agent Settlement Treasury</div>
+              {reason && <div style={{ marginTop: 2, fontSize: 12, color: "#9CA3AF" }}>{reason}</div>}
             </div>
           </div>
           {canDismiss && (
             <button
               onClick={onClose}
               style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: 8,
                 color: "#9CA3AF",
                 cursor: "pointer",
-                padding: "6px 10px",
+                padding: "5px 9px",
                 fontSize: 13,
+                lineHeight: 1,
               }}
             >
               ✕
@@ -320,394 +343,435 @@ export function TopupModal({
           )}
         </div>
 
-        {/* Network Selection Pill Bar */}
+        {/* Wallet Not Detected */}
+        {hasWallet === false && step.kind !== "connecting" && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "12px 14px",
+              background: "rgba(251, 146, 60, 0.08)",
+              border: "1px solid rgba(251,146,60,0.3)",
+              borderRadius: 10,
+              fontSize: 12.5,
+              color: "#FCD34D",
+            }}
+          >
+            ⚠ No Web3 wallet detected. Install{" "}
+            <a href="https://metamask.io" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>MetaMask</a>,{" "}
+            <a href="https://www.okx.com/web3" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>OKX Wallet</a>, or{" "}
+            <a href="https://web3.bitget.com" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>Bitget Wallet</a>.
+          </div>
+        )}
+
+        {/* Connect Wallet Prompt (wallet exists but not connected) */}
+        {hasWallet && !walletDiag && step.kind !== "connecting" && (
+          <button
+            onClick={handleConnectWallet}
+            style={{
+              width: "100%",
+              marginBottom: 14,
+              padding: "11px 16px",
+              background: "linear-gradient(135deg, rgba(234,88,12,0.18) 0%, rgba(194,65,12,0.12) 100%)",
+              border: "1px solid rgba(234,88,12,0.45)",
+              borderRadius: 10,
+              color: "#FB923C",
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <span>🔗</span> Connect Wallet to Pay
+          </button>
+        )}
+
+        {/* Connecting state */}
+        {step.kind === "connecting" && (
+          <div style={{ textAlign: "center", padding: "14px 0 18px", fontSize: 13.5, color: "#FB923C", fontWeight: 600 }}>
+            Awaiting wallet approval…
+          </div>
+        )}
+
+        {/* Network Selector */}
         <div
           style={{
-            marginTop: 18,
             display: "flex",
-            background: "#0D0F16",
+            background: "#09090f",
             padding: 4,
-            borderRadius: 12,
-            border: "1px solid rgba(255, 255, 255, 0.06)",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.06)",
             gap: 4,
+            marginBottom: 14,
           }}
         >
           <button
-            onClick={() => setNetwork("base")}
+            onClick={() => handleSelectNetwork("base")}
             style={{
               flex: 1,
-              padding: "8px 12px",
-              borderRadius: 8,
+              padding: "7px 10px",
+              borderRadius: 7,
               border: "none",
-              background: network === "base" ? "rgba(0, 82, 255, 0.2)" : "transparent",
-              color: network === "base" ? "#60A5FA" : "#9CA3AF",
-              fontWeight: network === "base" ? 600 : 500,
-              fontSize: 12.5,
+              background: network === "base" ? "rgba(0,82,255,0.2)" : "transparent",
+              color: network === "base" ? "#60A5FA" : "#6B7280",
+              fontWeight: network === "base" ? 700 : 500,
+              fontSize: 12,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 6,
+              gap: 5,
               transition: "all 0.15s ease",
             }}
           >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0052FF" }} />
-            Base Mainnet (USDC)
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0052FF", display: "inline-block" }} />
+            Base (USDC)
           </button>
           <button
-            onClick={() => setNetwork("botchain")}
+            onClick={() => handleSelectNetwork("botchain")}
             style={{
               flex: 1,
-              padding: "8px 12px",
-              borderRadius: 8,
+              padding: "7px 10px",
+              borderRadius: 7,
               border: "none",
-              background: network === "botchain" ? "rgba(234, 88, 12, 0.2)" : "transparent",
-              color: network === "botchain" ? "#FB923C" : "#9CA3AF",
-              fontWeight: network === "botchain" ? 600 : 500,
-              fontSize: 12.5,
+              background: network === "botchain" ? "rgba(234,88,12,0.2)" : "transparent",
+              color: network === "botchain" ? "#FB923C" : "#6B7280",
+              fontWeight: network === "botchain" ? 700 : 500,
+              fontSize: 12,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 6,
+              gap: 5,
               transition: "all 0.15s ease",
             }}
           >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#EA580C" }} />
-            BOT Chain (USDT/BOT)
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#EA580C", display: "inline-block" }} />
+            BOT Chain
           </button>
         </div>
 
-        {/* Connected Wallet Diagnostics Card */}
+        {/* Connected Wallet Balances */}
         {walletDiag && (
           <div
             style={{
-              marginTop: 14,
-              padding: "10px 14px",
-              background: "rgba(255, 255, 255, 0.03)",
-              borderRadius: 10,
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              marginBottom: 12,
+              padding: "9px 13px",
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 9,
+              border: "1px solid rgba(255,255,255,0.07)",
               fontSize: 12,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 6,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ color: "#9CA3AF" }}>Connected:</span>
-              <span style={{ fontFamily: "monospace", color: "#E5E7EB" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#6B7280" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+              <span style={{ fontFamily: "monospace", color: "#D1D5DB" }}>
                 {walletDiag.account.slice(0, 6)}…{walletDiag.account.slice(-4)}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: Number(walletDiag.tokenBalance) > 0 ? "#34D399" : "#F87171" }}>
-                {walletDiag.tokenBalance} {activeMeta.tokenSymbol}
-              </span>
-              <span style={{ color: "#6B7280" }}>•</span>
-              <span style={{ color: Number(walletDiag.nativeBalance) > 0 ? "#E5E7EB" : "#F87171" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ color: Number(walletDiag.nativeBalance) > 0 ? "#34D399" : "#F87171", fontWeight: 600 }}>
                 {walletDiag.nativeBalance} {activeMeta.currency}
               </span>
+              {network === "base" && (
+                <span style={{ color: Number(walletDiag.tokenBalance) > 0 ? "#60A5FA" : "#F87171" }}>
+                  {walletDiag.tokenBalance} USDC
+                </span>
+              )}
             </div>
+          </div>
+        )}
+
+        {/* Payment Method Selector — BOT Chain only */}
+        {network === "botchain" && (
+          <div
+            style={{
+              marginBottom: 14,
+              display: "flex",
+              background: "#09090f",
+              padding: 3,
+              borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.05)",
+              gap: 3,
+            }}
+          >
+            <button
+              onClick={() => setPaymentMethod("native")}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "none",
+                background: paymentMethod === "native" ? "rgba(234,88,12,0.25)" : "transparent",
+                color: paymentMethod === "native" ? "#FB923C" : "#6B7280",
+                fontWeight: paymentMethod === "native" ? 700 : 500,
+                fontSize: 11.5,
+                cursor: "pointer",
+              }}
+            >
+              ⚡ Pay with BOT
+            </button>
+            <button
+              onClick={() => setPaymentMethod("token")}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "none",
+                background: paymentMethod === "token" ? "rgba(100,116,139,0.2)" : "transparent",
+                color: paymentMethod === "token" ? "#CBD5E1" : "#6B7280",
+                fontWeight: paymentMethod === "token" ? 600 : 500,
+                fontSize: 11.5,
+                cursor: "pointer",
+              }}
+            >
+              💵 Pay with USDT
+            </button>
           </div>
         )}
 
         {/* Main Selection Screen */}
         {(step.kind === "idle" || step.kind === "error") && (
           <>
-            {/* Free Instant Review Pass */}
+            {/* Error Banner */}
+            {step.kind === "error" && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: "11px 13px",
+                  borderRadius: 9,
+                  background: "rgba(239,68,68,0.09)",
+                  border: "1px solid rgba(239,68,68,0.28)",
+                  fontSize: 12.5,
+                  color: "#FCA5A5",
+                }}
+              >
+                {step.message}
+              </div>
+            )}
+
+            {/* Free Ecosystem Pass */}
             <div
               style={{
-                marginTop: 16,
-                padding: "14px 16px",
+                marginBottom: 12,
+                padding: "12px 14px",
                 background: passClaimed
-                  ? "rgba(255, 255, 255, 0.03)"
-                  : "linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(13, 148, 136, 0.08) 100%)",
+                  ? "rgba(255,255,255,0.03)"
+                  : "linear-gradient(135deg, rgba(20,184,166,0.14) 0%, rgba(13,148,136,0.07) 100%)",
                 border: passClaimed
-                  ? "1px solid rgba(255, 255, 255, 0.1)"
-                  : "1px solid rgba(20, 184, 166, 0.4)",
-                borderRadius: 12,
+                  ? "1px solid rgba(255,255,255,0.08)"
+                  : "1px solid rgba(20,184,166,0.38)",
+                borderRadius: 11,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                opacity: passClaimed ? 0.75 : 1,
+                opacity: passClaimed ? 0.7 : 1,
               }}
             >
               <div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: passClaimed ? "#9CA3AF" : "#2DD4BF",
-                  }}
-                >
-                  <span>{passClaimed ? "✓" : "⚡"}</span> Ecosystem Review Pass {passClaimed ? "(Claimed)" : "(Free)"}
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: passClaimed ? "#9CA3AF" : "#2DD4BF", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span>{passClaimed ? "✓" : "⚡"}</span>
+                  Ecosystem Review Pass {passClaimed ? "(Claimed)" : "(Free — $1.50)"}
                 </div>
-                <div style={{ marginTop: 2, fontSize: 12, color: passClaimed ? "#6B7280" : "#99F6E4" }}>
-                  {passClaimed
-                    ? "One-time ecosystem review pass has already been activated for this account (+ $1.50 credited)."
-                    : "1-Click instant test fuel (+$1.50) — one-time pass per account for testing."}
+                <div style={{ marginTop: 2, fontSize: 11.5, color: passClaimed ? "#4B5563" : "#99F6E4" }}>
+                  {passClaimed ? "Already activated for this account." : "One-time pass — test autonomous research for free."}
                 </div>
               </div>
               <button
                 onClick={handleClaimDemoFuel}
-                disabled={passClaimed}
+                disabled={passClaimed || busy}
                 style={{
-                  background: passClaimed ? "rgba(255, 255, 255, 0.06)" : "#0D9488",
-                  border: passClaimed ? "1px solid rgba(255, 255, 255, 0.12)" : "none",
-                  color: passClaimed ? "#9CA3AF" : "#FFFFFF",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  cursor: passClaimed ? "not-allowed" : "pointer",
-                  boxShadow: passClaimed ? "none" : "0 0 12px rgba(20, 184, 166, 0.4)",
+                  background: passClaimed ? "rgba(255,255,255,0.05)" : "#0D9488",
+                  border: passClaimed ? "1px solid rgba(255,255,255,0.1)" : "none",
+                  color: passClaimed ? "#6B7280" : "#fff",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  cursor: passClaimed ? "default" : "pointer",
+                  boxShadow: passClaimed ? "none" : "0 0 12px rgba(20,184,166,0.35)",
+                  flexShrink: 0,
                 }}
               >
-                {passClaimed ? "✓ Claimed" : "Claim Pass"}
+                {passClaimed ? "✓ Claimed" : "Claim"}
               </button>
             </div>
 
-            {/* Error banner */}
-            {step.kind === "error" && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  background: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  fontSize: 12.5,
-                  color: "#FCA5A5",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div>{step.message}</div>
-              </div>
-            )}
-
-            {/* Tiers List with Web3 Wallet Deposit */}
-            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-              {TIERS.map((tier) => (
-                <div
-                  key={tier.amountUsd}
-                  style={{
-                    padding: "14px 16px",
-                    background: tier.badge ? "rgba(234, 88, 12, 0.08)" : "#181B26",
-                    border: tier.badge
-                      ? "1px solid rgba(234, 88, 12, 0.5)"
-                      : "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 600, fontSize: 14.5, color: "#FFFFFF" }}>
-                          {tier.title}
-                        </span>
-                        {tier.badge && (
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#EA580C",
-                              background: "rgba(234, 88, 12, 0.15)",
-                              padding: "2px 6px",
-                              borderRadius: 6,
-                              letterSpacing: "0.04em",
-                            }}
-                          >
-                            {tier.badge}
-                          </span>
+            {/* Tier Cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              {TIERS.map((tier) => {
+                const botAmt = botNeededByTier[tier.amountUsd];
+                const isBotNative = network === "botchain" && paymentMethod === "native";
+                return (
+                  <div
+                    key={tier.amountUsd}
+                    style={{
+                      padding: "13px 15px",
+                      background: tier.badge ? "rgba(234,88,12,0.07)" : "#131620",
+                      border: tier.badge
+                        ? "1px solid rgba(234,88,12,0.45)"
+                        : "1px solid rgba(255,255,255,0.07)",
+                      borderRadius: 11,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{tier.title}</span>
+                          {tier.badge && (
+                            <span
+                              style={{
+                                fontSize: 9.5,
+                                fontWeight: 700,
+                                color: "#EA580C",
+                                background: "rgba(234,88,12,0.14)",
+                                padding: "2px 6px",
+                                borderRadius: 5,
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              {tier.badge}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: 11.5, color: "#6B7280" }}>{tier.desc}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        {isBotNative ? (
+                          <>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "#FB923C" }}>{botAmt} BOT</div>
+                            <div style={{ fontSize: 10.5, color: "#6B7280" }}>${tier.amountUsd}.00</div>
+                          </>
+                        ) : (
+                          <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>${tier.amountUsd}.00</div>
                         )}
                       </div>
-                      <div style={{ marginTop: 3, fontSize: 12, color: "#9CA3AF" }}>
-                        {tier.desc}
-                      </div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: "#FFFFFF" }}>
-                      ${tier.amountUsd}.00
-                    </div>
-                  </div>
 
-                  {/* Action Button: Web3 Wallet */}
-                  <div style={{ marginTop: 12 }}>
                     <button
                       onClick={() => handleWalletDeposit(tier.amountUsd)}
+                      disabled={busy || !hasWallet}
                       style={{
                         width: "100%",
-                        padding: "10px 14px",
-                        background: "#EA580C",
+                        padding: "9px 14px",
+                        background: busy || !hasWallet ? "rgba(234,88,12,0.15)" : "#EA580C",
                         border: "none",
                         borderRadius: 8,
-                        color: "#FFFFFF",
+                        color: busy || !hasWallet ? "#9CA3AF" : "#fff",
                         fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
+                        fontWeight: 700,
+                        cursor: busy || !hasWallet ? "not-allowed" : "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 8,
-                        boxShadow: "0 0 12px rgba(234, 88, 12, 0.35)",
+                        gap: 7,
+                        boxShadow: busy || !hasWallet ? "none" : "0 0 12px rgba(234,88,12,0.3)",
                         transition: "all 0.15s ease",
                       }}
                     >
-                      <span>💳</span>
-                      <span>Send with Wallet (${tier.amountUsd}.00 {activeMeta.tokenSymbol})</span>
+                      {isBotNative ? (
+                        <><span>⚡</span> Pay {botAmt} BOT</>
+                      ) : (
+                        <><span>💳</span> Pay ${tier.amountUsd}.00 {network === "base" ? "USDC" : "USDT"}</>
+                      )}
                     </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* MetaMask Diagnostic Accordion */}
-            <div style={{ marginTop: 14, borderTop: "1px solid rgba(255, 255, 255, 0.06)", paddingTop: 12 }}>
-              <div
-                onClick={() => setShowMetaMaskHelp(!showMetaMaskHelp)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  color: "#9CA3AF",
-                }}
-              >
-                <span>Why did MetaMask show &quot;Sending 1 Unknown&quot;?</span>
-                <span style={{ fontSize: 14 }}>{showMetaMaskHelp ? "▲" : "▼"}</span>
-              </div>
-
-              {showMetaMaskHelp && (
-                <div
+            {/* Token Register Helper */}
+            {walletDiag && network === "base" && (
+              <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
+                <button
+                  onClick={handleRegisterToken}
                   style={{
-                    marginTop: 8,
-                    padding: 12,
-                    borderRadius: 8,
-                    background: "#0D0F16",
+                    background: "transparent",
+                    border: "none",
+                    color: "#6B7280",
                     fontSize: 11.5,
-                    color: "#9CA3AF",
-                    lineHeight: 1.5,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: 0,
                   }}
                 >
-                  <p style={{ margin: "0 0 8px" }}>
-                    When a wallet holds <strong>0 {activeMeta.tokenSymbol}</strong> or <strong>0 {activeMeta.currency}</strong>, MetaMask&apos;s transaction simulation reverts. MetaMask falls back to displaying &quot;Sending 1 Unknown&quot; and &quot;This transaction is likely to fail&quot;.
-                  </p>
-                  <button
-                    onClick={handleRegisterToken}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      borderRadius: 6,
-                      color: "#E5E7EB",
-                      fontSize: 11.5,
-                      fontWeight: 500,
-                      padding: "6px 12px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <span>🦊</span>
-                    <span>Register {activeMeta.tokenSymbol} in MetaMask ({activeMeta.name})</span>
-                  </button>
+                  <span>🦊</span> Add USDC to wallet
                   {watchAssetSuccess !== null && (
-                    <div style={{ marginTop: 6, color: watchAssetSuccess ? "#34D399" : "#F87171" }}>
-                      {watchAssetSuccess
-                        ? `✓ ${activeMeta.tokenSymbol} registered with official logo and 6 decimals.`
-                        : `Could not register asset in wallet.`}
-                    </div>
+                    <span style={{ color: watchAssetSuccess ? "#34D399" : "#F87171", marginLeft: 4 }}>
+                      {watchAssetSuccess ? "✓ Added" : "✗ Failed"}
+                    </span>
                   )}
-                </div>
-              )}
-            </div>
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {/* Claiming State */}
         {step.kind === "claiming" && (
-          <div style={{ marginTop: 24, textAlign: "center", padding: "16px 0" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>⚡</div>
+          <div style={{ marginTop: 20, textAlign: "center", padding: "14px 0" }}>
+            <div style={{ fontSize: 26, marginBottom: 8 }}>⚡</div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>Activating Research Fuel…</div>
-            <div style={{ marginTop: 6, fontSize: 12.5, color: "#9CA3AF" }}>
-              Minting settlement fuel to your session treasury.
-            </div>
           </div>
         )}
 
-        {/* Sending Transaction State */}
+        {/* Sending State */}
         {step.kind === "sending" && (
-          <div style={{ marginTop: 24, textAlign: "center", padding: "16px 0" }}>
+          <div style={{ marginTop: 20, textAlign: "center", padding: "14px 0" }}>
             <div
               style={{
-                width: 36,
-                height: 36,
-                margin: "0 auto 14px",
-                border: "3px solid rgba(234, 88, 12, 0.2)",
+                width: 34,
+                height: 34,
+                margin: "0 auto 12px",
+                border: "3px solid rgba(234,88,12,0.2)",
                 borderTopColor: "#EA580C",
                 borderRadius: "50%",
                 animation: "qerin-spin 0.8s linear infinite",
               }}
             />
-            <div style={{ fontWeight: 600, fontSize: 15 }}>
-              Awaiting Wallet Signature for ${step.amountUsd}.00 {activeMeta.tokenSymbol}…
+            <div style={{ fontWeight: 700, fontSize: 15 }}>
+              {step.paymentMethod === "native" && step.network === "botchain"
+                ? `Sending ${(step.amountUsd / botPrice).toFixed(4)} BOT…`
+                : `Sending $${step.amountUsd}.00 ${step.network === "base" ? "USDC" : "USDT"}…`}
             </div>
-            <div style={{ marginTop: 6, fontSize: 12.5, color: "#9CA3AF" }}>
-              Authorizing settlement deposit to Qerin Settlement Vault on {activeMeta.name}.
-            </div>
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 11.5,
-                fontFamily: "monospace",
-                color: "#6B7280",
-                background: "#0D0F16",
-                padding: "6px 12px",
-                borderRadius: 6,
-                display: "inline-block",
-              }}
-            >
-              Vault: 0x5b2131…34554311F2
+            <div style={{ marginTop: 5, fontSize: 12, color: "#6B7280" }}>
+              Awaiting wallet signature on {activeMeta.name}
             </div>
           </div>
         )}
 
-        {/* Confirming On-Chain State */}
+        {/* Confirming State */}
         {step.kind === "confirming" && (
-          <div style={{ marginTop: 24, textAlign: "center", padding: "16px 0" }}>
+          <div style={{ marginTop: 20, textAlign: "center", padding: "14px 0" }}>
             <div
               style={{
-                width: 36,
-                height: 36,
-                margin: "0 auto 14px",
-                border: "3px solid rgba(234, 88, 12, 0.2)",
+                width: 34,
+                height: 34,
+                margin: "0 auto 12px",
+                border: "3px solid rgba(234,88,12,0.2)",
                 borderTopColor: "#EA580C",
                 borderRadius: "50%",
                 animation: "qerin-spin 0.8s linear infinite",
               }}
             />
-            <div style={{ fontWeight: 600, fontSize: 15 }}>
-              Deposit Broadcast — Verifying on {activeMeta.name}…
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12.5, color: "#9CA3AF" }}>
-              Validating cryptographic receipt on-chain (Attempt {step.attempt}/{CONFIRM_MAX_ATTEMPTS})
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Verifying on {activeMeta.name}…</div>
+            <div style={{ marginTop: 4, fontSize: 11.5, color: "#6B7280" }}>
+              Attempt {step.attempt}/{CONFIRM_MAX_ATTEMPTS}
             </div>
             <a
               href={explorerUrl(step.txHash, step.network)}
               target="_blank"
               rel="noreferrer"
-              style={{
-                display: "inline-block",
-                marginTop: 12,
-                fontSize: 12,
-                color: "#EA580C",
-                textDecoration: "none",
-              }}
+              style={{ display: "inline-block", marginTop: 10, fontSize: 12, color: "#EA580C", textDecoration: "none" }}
             >
               {shortHash(step.txHash)} — View on Explorer ↗
             </a>
@@ -716,49 +780,37 @@ export function TopupModal({
 
         {/* Success State */}
         {step.kind === "success" && (
-          <div style={{ marginTop: 24, textAlign: "center", padding: "16px 0" }}>
+          <div style={{ marginTop: 20, textAlign: "center", padding: "14px 0" }}>
             <div
               style={{
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 borderRadius: "50%",
-                background: "rgba(16, 185, 129, 0.15)",
-                border: "1px solid rgba(16, 185, 129, 0.4)",
+                background: "rgba(16,185,129,0.14)",
+                border: "1px solid rgba(16,185,129,0.38)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                margin: "0 auto 12px",
+                margin: "0 auto 10px",
                 color: "#10B981",
-                fontSize: 22,
+                fontSize: 20,
               }}
             >
               ✓
             </div>
-            <div style={{ fontWeight: 700, fontSize: 17, color: "#FFFFFF" }}>
-              Agent Treasury Funded
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff" }}>Treasury Funded</div>
+            <div style={{ marginTop: 4, fontSize: 13, color: "#34D399" }}>
+              Balance: ${step.balance.toFixed(2)} Fuel
             </div>
-            <div style={{ marginTop: 6, fontSize: 13.5, color: "#34D399" }}>
-              Available Fuel: ${step.balance.toFixed(2)} USD
-            </div>
-            {step.message && (
-              <div style={{ marginTop: 4, fontSize: 12, color: "#9CA3AF" }}>
-                {step.message}
-              </div>
-            )}
+            {step.message && <div style={{ marginTop: 4, fontSize: 12, color: "#6B7280" }}>{step.message}</div>}
             {step.txHash && (
               <a
                 href={explorerUrl(step.txHash, network)}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  display: "inline-block",
-                  marginTop: 10,
-                  fontSize: 12,
-                  color: "#EA580C",
-                  textDecoration: "none",
-                }}
+                style={{ display: "inline-block", marginTop: 8, fontSize: 12, color: "#EA580C", textDecoration: "none" }}
               >
-                {shortHash(step.txHash)} — View On-Chain Receipt ↗
+                {shortHash(step.txHash)} — View On-Chain ↗
               </a>
             )}
           </div>
@@ -766,13 +818,9 @@ export function TopupModal({
 
         {/* Stuck State */}
         {step.kind === "stuck" && (
-          <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#F87171" }}>
-              Deposit sent but awaiting confirmation
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12.5, color: "#9CA3AF" }}>
-              {step.reason}
-            </div>
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F87171" }}>Deposit sent — awaiting confirmation</div>
+            <div style={{ marginTop: 5, fontSize: 12, color: "#9CA3AF" }}>{step.reason}</div>
             <a
               href={explorerUrl(step.txHash, step.network)}
               target="_blank"
@@ -784,24 +832,24 @@ export function TopupModal({
           </div>
         )}
 
-        {/* Dismiss / Close Button */}
+        {/* Dismiss Button */}
         {canDismiss && (
           <button
             onClick={onClose}
             style={{
-              marginTop: 18,
+              marginTop: 16,
               width: "100%",
-              height: 42,
+              height: 40,
               background: "transparent",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: 9,
               fontWeight: 500,
-              fontSize: 13.5,
-              color: "#9CA3AF",
+              fontSize: 13,
+              color: "#6B7280",
               cursor: "pointer",
             }}
           >
-            {step.kind === "success" ? "Done" : "Cancel"}
+            {step.kind === "success" ? "Done" : "Close"}
           </button>
         )}
       </div>
@@ -809,7 +857,7 @@ export function TopupModal({
       <style>{`
         @keyframes qerin-spin {
           from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          to   { transform: rotate(360deg); }
         }
       `}</style>
     </div>

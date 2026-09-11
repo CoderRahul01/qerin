@@ -12,7 +12,7 @@ import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance, claimEcosystemPass } from "./accounts.js";
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
-import { verifyAndCreditCryptoDeposit } from "./cryptoTopup.js";
+import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
 
 interface Bindings {
   RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> };
@@ -126,17 +126,27 @@ app.get("/v1/account/balance", async (c) => {
 // contract) is already visible on-chain to anyone; there's nothing to gate.
 // Lets the frontend build the USDC transfer without hardcoding addresses
 // in two places.
-app.get("/v1/network-info", (c) => {
+app.get("/v1/network-info", async (c) => {
   const target = c.req.query("network");
   const network = getNetwork(target);
+  let botPrice: number | null = null;
+  if (network.chainId === 677) {
+    try {
+      botPrice = await fetchLiveBotPrice();
+    } catch {
+      botPrice = 12.20;
+    }
+  }
   return c.json({
     name: network.name,
     payTo: getQerinAccount().address,
     chainId: network.chainId.toString(),
     usdc: network.usdc ?? null,
     usdt: network.usdt ?? null,
+    wbot: network.wbot ?? null,
     currency: network.currency,
     rpcUrl: network.rpcUrl,
+    botPrice,
   });
 });
 
@@ -151,7 +161,7 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const { txHash, signature } = body ?? {};
+  const { txHash, signature, network: depositNetwork } = body ?? {};
   if (typeof txHash !== "string" || typeof signature !== "string") {
     return c.json({ error: "txHash and signature are required" }, 400);
   }
@@ -160,7 +170,8 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
     const result = await verifyAndCreditCryptoDeposit(
       accountId,
       txHash as `0x${string}`,
-      signature as `0x${string}`
+      signature as `0x${string}`,
+      typeof depositNetwork === "string" ? depositNetwork : undefined
     );
     if (!result.verified) {
       return c.json({ error: result.reason ?? "Could not verify this transaction" }, 400);

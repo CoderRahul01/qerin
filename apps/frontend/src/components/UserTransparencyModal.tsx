@@ -1,7 +1,36 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { keccak256, toBytes } from "viem";
+import type { ReceiptItem } from "@/lib/types";
+
+export interface TransparencyChatMessage {
+  id?: string;
+  role?: string;
+  content?: string;
+  time?: string;
+  topic?: string;
+  question?: string;
+  userAccount?: string;
+  costDebited?: number;
+  rawReceipts?: ReceiptItem[];
+  receipt?: {
+    txId?: string;
+    registryTxHash?: string;
+    paid?: string;
+    to?: string;
+    registryContract?: string;
+    chainId?: number;
+  };
+}
+
+export interface TransparencyThread {
+  id: string;
+  title?: string;
+  network?: string;
+  preview?: string;
+  messages?: TransparencyChatMessage[];
+}
 
 export interface TransparencyEntry {
   id: string;
@@ -25,7 +54,7 @@ interface UserTransparencyModalProps {
   onClose: () => void;
   userAccount?: string | null;
   balance?: number | null;
-  threads: any[];
+  threads: TransparencyThread[];
   onOpenTopup?: () => void;
   activeNetwork?: "base" | "botchain";
 }
@@ -55,10 +84,12 @@ export function UserTransparencyModal({
   // Aggregate user queries and receipts from threads
   const entries: TransparencyEntry[] = useMemo(() => {
     const list: TransparencyEntry[] = [];
+    let entryIndex = 0;
 
     for (const thread of threads || []) {
       for (const msg of thread.messages || []) {
         if (msg.role === "assistant" && (msg.receipt || msg.content)) {
+          entryIndex++;
           const qText = msg.question || thread.preview || thread.title || "Web3 Protocol Research";
           let qHash = "0x";
           try {
@@ -67,35 +98,36 @@ export function UserTransparencyModal({
             qHash = "0x3f9a7c2b4e81d6051b8c6e2a94f10738d5c8e2b1";
           }
 
-          const isBot = thread.network?.toLowerCase().includes("bot") || msg.receipt?.chainId === 677;
+          const isBot = thread.network?.toLowerCase().includes("bot") || msg.receipt?.chainId === 677 || activeNetwork === "botchain";
           const chainId = isBot ? 677 : 8453;
           const networkLabel = isBot ? "BOT Chain Mainnet" : "Base Mainnet";
           const tx = msg.receipt?.registryTxHash || msg.receipt?.txId || "0x0bec1b4f4eb8b00bb112d5ec620b777d02da842253a20036e594372853118ffa";
 
           // Sources breakdown
+          const settleCurrency = isBot ? "BOT" : "USDC";
           let sourcesList: { name: string; cost: string; protocol: string }[] = [];
           if (msg.rawReceipts && msg.rawReceipts.length > 0) {
-            sourcesList = msg.rawReceipts.map((r: any) => ({
+            sourcesList = msg.rawReceipts.map((r: ReceiptItem) => ({
               name: r.source,
-              cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} USDC` : "0.005 USDC",
+              cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} ${settleCurrency}` : `0.005 ${settleCurrency}`,
               protocol: r.source.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
             }));
           } else if (msg.receipt?.to) {
             sourcesList = msg.receipt.to.split(",").map((s: string) => ({
               name: s.trim(),
-              cost: "0.005 USDC",
+              cost: `0.005 ${settleCurrency}`,
               protocol: "x402 Protocol (Exact EVM)",
             }));
           } else {
             sourcesList = [
-              { name: "Autonomous Web Research Node", cost: "0.010 USDC", protocol: "x402 Protocol" },
-              { name: "Web3 Protocol Intelligence", cost: "0.005 USDC", protocol: "x402 Protocol" },
-              { name: "Consensus State Node", cost: "0.005 USDC", protocol: "Consensus RPC" },
+              { name: "Autonomous Web Research Node", cost: `0.010 ${settleCurrency}`, protocol: "x402 Protocol" },
+              { name: "Web3 Protocol Intelligence", cost: `0.005 ${settleCurrency}`, protocol: "x402 Protocol" },
+              { name: "Consensus State Node", cost: `0.005 ${settleCurrency}`, protocol: "Consensus RPC" },
             ];
           }
 
           list.push({
-            id: msg.id || Math.random().toString(),
+            id: msg.id || `entry-${entryIndex}`,
             timestamp: msg.time || "Recent",
             topic: msg.topic || thread.title || "Autonomous Intelligence",
             question: qText,
@@ -139,7 +171,7 @@ export function UserTransparencyModal({
     }
 
     return list;
-  }, [threads, displayAccount, defaultContract, defaultAgentWallet]);
+  }, [threads, displayAccount, defaultContract, defaultAgentWallet, activeNetwork]);
 
   const totalQueries = entries.length;
   const totalCostDebited = entries.reduce((sum, e) => sum + e.costDebited, 0);
@@ -151,7 +183,7 @@ export function UserTransparencyModal({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleExportCsv = () => {
+  const handleExportCsv = useCallback(() => {
     const headers = ["Timestamp", "Topic", "Question", "Network", "User Account", "User Fuel Debited", "Agent Payout USD", "Sources Consulted", "Tx Hash", "Question Hash", "Contract"];
     const rows = entries.map(e => [
       `"${e.timestamp}"`,
@@ -168,15 +200,17 @@ export function UserTransparencyModal({
     ]);
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
+    const timestampStr = new Date().toISOString().replace(/[:.]/g, "-");
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `qerin_user_transparency_ledger_${Date.now()}.csv`);
+    link.setAttribute("download", `qerin_user_transparency_ledger_${timestampStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [entries]);
 
-  const handleExportJson = () => {
+  const handleExportJson = useCallback(() => {
+    const timestampStr = new Date().toISOString().replace(/[:.]/g, "-");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
       userAccount: displayAccount,
       exportTimestamp: new Date().toISOString(),
@@ -188,11 +222,11 @@ export function UserTransparencyModal({
     }, null, 2));
     const link = document.createElement("a");
     link.setAttribute("href", dataStr);
-    link.setAttribute("download", `qerin_cryptographic_proofs_${Date.now()}.json`);
+    link.setAttribute("download", `qerin_cryptographic_proofs_${timestampStr}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [displayAccount, balance, totalQueries, totalCostDebited, defaultContract, entries]);
 
   const computedVerifierHash = useMemo(() => {
     if (!verifierInput.trim()) return null;
@@ -581,7 +615,7 @@ export function UserTransparencyModal({
                         <div>
                           <div style={{ fontWeight: 600, color: "#f8fafc" }}>{entry.topic}</div>
                           <div style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>
-                            "{entry.question}"
+                            &quot;{entry.question}&quot;
                           </div>
                         </div>
                         <div>

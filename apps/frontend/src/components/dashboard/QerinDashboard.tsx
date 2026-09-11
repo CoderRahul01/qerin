@@ -666,7 +666,9 @@ export function QerinDashboard() {
               : [],
           }));
           localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
-          setThreads(cleaned);
+          setTimeout(() => {
+            setThreads(cleaned);
+          }, 0);
         }
       } else {
         localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(SEED_THREADS));
@@ -895,7 +897,6 @@ export function QerinDashboard() {
     const thinkingId = "th-" + makeId();
     const time = nowTime();
     const sources = selectSourcesForDisplay(q);
-    const sourceNames = sources.slice(0, 2).map(s => s.name).join(", ");
 
     updateThread(threadId, t => ({
       ...t,
@@ -990,7 +991,11 @@ export function QerinDashboard() {
     setTimeout(() => setCopyStatus(prev => ({ ...prev, [msgId]: "" })), 2000);
   };
 
-  const truncatedAddr = accountId ? shortAddr(accountId) : "0x0000...0000";
+  const truncatedAddr = connectedWallet
+    ? shortAddr(connectedWallet)
+    : accountId
+      ? shortAddr(accountId)
+      : "Not Connected";
 
   return (
     <>
@@ -1103,7 +1108,10 @@ export function QerinDashboard() {
             {!connectedWallet ? (
               <button
                 type="button"
-                onClick={handleConnectWallet}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConnectWallet();
+                }}
                 style={{
                   background: "rgba(255, 107, 0, 0.12)",
                   border: "1px solid rgba(255, 107, 0, 0.35)",
@@ -1495,7 +1503,7 @@ export function QerinDashboard() {
             <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11.5, color: "var(--qd-muted2)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1" /><path d="M4 4V3a2 2 0 0 1 4 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
-                <span>Settling via <strong>{selectedNetwork === "base" ? "Base (USDC)" : "BOT Chain (USDT/BOT)"}</strong></span>
+                <span>Settling via <strong>{selectedNetwork === "base" ? "Base (USDC)" : "BOT Chain (BOT/USDT)"}</strong></span>
               </div>
               <span>$0.15 / answer</span>
             </div>
@@ -1516,6 +1524,10 @@ export function QerinDashboard() {
           reason={topupReason}
           onClose={() => setShowTopup(false)}
           onCredited={(b) => setBalance(b)}
+          onAccountCreated={(id, b) => {
+            setAccountId(id);
+            setBalance(b);
+          }}
         />
       )}
 
