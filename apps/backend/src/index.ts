@@ -15,8 +15,13 @@ import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
 
+interface RateLimiterBinding {
+  limit: (opts: { key: string }) => Promise<{ success: boolean }>;
+}
+
 interface Bindings {
-  RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> };
+  RATE_LIMITER: RateLimiterBinding;
+  TOPUP_RATE_LIMITER: RateLimiterBinding;
 }
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -25,11 +30,44 @@ app.use("*", cors());
 
 app.get("/", (c) => c.json({ status: "ok" }));
 
-async function rateLimit(c: { req: { header: (name: string) => string | undefined }; env: Bindings; json: (body: unknown, status: number) => Response }, next: () => Promise<void>) {
-  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+type RateLimitContext = {
+  req: { header: (name: string) => string | undefined };
+  env: Bindings;
+  json: (body: unknown, status: number) => Response;
+};
+
+// Requests reach this Worker exclusively through Qerin's own Next.js API
+// routes (gated separately by requireInternalSecret on every handler below),
+// which forward the real visitor IP in X-Qerin-Client-Ip — see
+// apps/frontend/src/lib/clientIp.ts. Without that, cf-connecting-ip here is
+// Vercel's own egress IP on every request, not the visitor's, so per-IP
+// limiting would bucket every user together instead of limiting any one of
+// them. Fall back to cf-connecting-ip for direct/manual calls.
+function resolveClientIp(c: RateLimitContext): string {
+  return c.req.header("x-qerin-client-ip") || c.req.header("cf-connecting-ip") || "unknown";
+}
+
+async function rateLimit(c: RateLimitContext, next: () => Promise<void>) {
+  const ip = resolveClientIp(c);
   const { success } = await c.env.RATE_LIMITER.limit({ key: ip });
   if (!success) {
     return c.json({ error: "Too many requests" }, 429);
+  }
+  return next();
+}
+
+// Stricter, dedicated bucket for the Ecosystem Pass claim specifically — it
+// mints free balance with no on-chain cost to the caller, one click, no
+// retries needed. NOT applied to crypto-confirm: that endpoint legitimately
+// retries up to CONFIRM_MAX_ATTEMPTS (10) times a few seconds apart while a
+// real transaction confirms (see TopupModal.tsx runConfirm), which the
+// general 20 req/60s limiter already comfortably covers — a 5-per-10-minute
+// bucket would break that retry flow for genuine, paying users.
+async function topupRateLimit(c: RateLimitContext, next: () => Promise<void>) {
+  const ip = resolveClientIp(c);
+  const { success } = await c.env.TOPUP_RATE_LIMITER.limit({ key: ip });
+  if (!success) {
+    return c.json({ error: "Too many claim attempts — please wait a few minutes and try again" }, 429);
   }
   return next();
 }
@@ -38,6 +76,7 @@ app.use("/v1/keys", rateLimit);
 app.use("/v1/answer", rateLimit);
 app.use("/v1/account/*", rateLimit);
 app.use("/v1/waitlist", rateLimit);
+app.use("/v1/account/topup/demo-claim", topupRateLimit);
 
 // Issuing a key is free and unauthenticated (matches the DeveloperScreen
 // "Get API access" button) — it identifies a developer for future

@@ -1,3 +1,5 @@
+import { getClientIp } from "@/lib/clientIp";
+
 // Deployed managed siteverify Worker (cloudflare/skills turnstile-spin
 // template) — validates the Turnstile token before this free-credit claim
 // is allowed through. Public endpoint, not a secret; the actual Turnstile
@@ -49,6 +51,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "X-Qerin-Internal-Secret": internalSecret,
         "X-Qerin-Account-Id": accountId,
+        "X-Qerin-Client-Ip": getClientIp(req),
       },
     });
 

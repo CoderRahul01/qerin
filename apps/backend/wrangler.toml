@@ -37,3 +37,13 @@ type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 20, period = 60 }
 
+# Stricter dedicated bucket for /v1/account/topup/demo-claim (the free
+# Ecosystem Pass claim) only — NOT crypto-confirm, which legitimately
+# retries several times while a real transaction confirms. 5 attempts per
+# 10-minute window per client IP (see resolveClientIp in src/index.ts).
+[[unsafe.bindings]]
+name = "TOPUP_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 5, period = 600 }
+
