@@ -39,11 +39,14 @@ simple = { limit = 20, period = 60 }
 
 # Stricter dedicated bucket for /v1/account/topup/demo-claim (the free
 # Ecosystem Pass claim) only — NOT crypto-confirm, which legitimately
-# retries several times while a real transaction confirms. 5 attempts per
-# 10-minute window per client IP (see resolveClientIp in src/index.ts).
+# retries several times while a real transaction confirms. Cloudflare's
+# simple rate-limit binding only accepts a period of 10 or 60 seconds (not
+# an arbitrary window — confirmed via `wrangler dev`, which rejects
+# anything else), so this is 3 attempts per 60-second window per client IP
+# (see resolveClientIp in src/index.ts).
 [[unsafe.bindings]]
 name = "TOPUP_RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "1002"
-simple = { limit = 5, period = 600 }
+simple = { limit = 3, period = 60 }
 

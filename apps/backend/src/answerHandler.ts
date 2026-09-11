@@ -1,9 +1,11 @@
 import { selectSources } from "./selectSources.js";
-import { estimateCost, gatherSources } from "./orchestrator.js";
+import { estimateCost, gatherSources, type OnProgress } from "./orchestrator.js";
 import { synthesizeAnswer } from "./synthesize.js";
 import { checkSpendLimit, recordSpend, ANSWER_PRICE_USD } from "./spendGuard.js";
 import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
+
+export type { OnProgress } from "./orchestrator.js";
 
 export interface AnswerResult {
   status: 200 | 429 | 502;
@@ -19,7 +21,8 @@ export interface AnswerResult {
 export async function answerHandler(
   question: string,
   accountId: string | null = null,
-  targetNetwork?: string
+  targetNetwork?: string,
+  onProgress?: OnProgress
 ): Promise<AnswerResult> {
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
@@ -34,7 +37,7 @@ export async function answerHandler(
     };
   }
 
-  const paidResults = await gatherSources(question, sourceKeys, targetNetwork);
+  const paidResults = await gatherSources(question, sourceKeys, targetNetwork, onProgress);
 
   if (paidResults.length === 0) {
     return {
@@ -49,6 +52,7 @@ export async function answerHandler(
   const totalPaidNum = paidResults.reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
   await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
 
+  onProgress?.({ type: "synthesizing" });
   const synthesized = await synthesizeAnswer(question, paidResults);
 
   // Record verified on-chain receipt ASAP — but don't block the response on it.
