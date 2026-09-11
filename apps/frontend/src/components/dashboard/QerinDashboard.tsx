@@ -194,6 +194,68 @@ function QerinAvatar({ size = 28 }: { size?: number }) {
   return <Image src="/qerin-mark-orange.png" alt="Qerin" width={size} height={size} style={{ flexShrink: 0, borderRadius: 6 }} />;
 }
 
+const ANSWER_PRICE_USD = 0.15;
+// Visual reference for a "full" bar — matches the recommended top-up tier
+// (see TIERS in TopupModal.tsx), not a real account cap.
+const FUEL_METER_MAX_USD = 5;
+
+// Always-visible balance + real cumulative usage, replacing a bare "$X.XX"
+// text that gave no sense of scale or history. usedTotal is summed from
+// costDebited on actually-answered messages (real debits), never estimated.
+function FuelMeter({
+  balance,
+  usedTotal,
+  onClick,
+  compact = false,
+}: {
+  balance: number | null;
+  usedTotal: number;
+  onClick?: () => void;
+  compact?: boolean;
+}) {
+  if (balance === null) return null;
+
+  const queriesLeft = Math.floor(balance / ANSWER_PRICE_USD);
+  const pct = Math.max(4, Math.min(100, (balance / FUEL_METER_MAX_USD) * 100));
+  const level: "ok" | "low" | "empty" = balance < ANSWER_PRICE_USD ? "empty" : balance < 1 ? "low" : "ok";
+  const barColor = level === "empty" ? "#ef4444" : level === "low" ? "#eab308" : "#22c55e";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`$${balance.toFixed(2)} remaining · ~${queriesLeft} ${queriesLeft === 1 ? "query" : "queries"} left · $${usedTotal.toFixed(2)} used total · $${ANSWER_PRICE_USD.toFixed(2)}/query`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        minWidth: compact ? 100 : 150,
+        background: "transparent",
+        border: "none",
+        cursor: onClick ? "pointer" : "default",
+        padding: 0,
+        textAlign: "left",
+        font: "inherit",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+        <span style={{ fontSize: compact ? 12 : 13, fontWeight: 700, color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
+          ${balance.toFixed(2)}
+        </span>
+        <span style={{ fontSize: 10, color: "var(--qd-muted2)", whiteSpace: "nowrap" }}>~{queriesLeft} left</span>
+      </div>
+      <div style={{ height: 4, borderRadius: 999, background: "rgba(128,128,128,0.18)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 999, transition: "width 0.4s ease" }} />
+      </div>
+      {!compact && (
+        <div style={{ fontSize: 10, color: "var(--qd-muted2)", opacity: 0.75 }}>
+          ${usedTotal.toFixed(2)} used · ${ANSWER_PRICE_USD.toFixed(2)}/query
+        </div>
+      )}
+    </button>
+  );
+}
+
 // Driven entirely by real ProgressEvents streamed from the backend
 // (apps/backend/src/orchestrator.ts) — every row here reflects a payment
 // the agent actually attempted, not a decorative guess.
@@ -284,7 +346,7 @@ function ReceiptCard({
   receipt,
   rawReceipts,
   userAccount,
-  costDebited = 0.15,
+  costDebited = ANSWER_PRICE_USD,
   remainingBalance,
   question,
   onOpenLedger,
@@ -758,6 +820,14 @@ export function QerinDashboard() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Real cumulative spend, not an estimate — summed from costDebited on every
+  // answered message actually returned by the backend (each is the exact
+  // amount that request's /v1/answer call debited).
+  const totalUsed = useMemo(
+    () => threads.reduce((sum, t) => sum + t.messages.reduce((s, m) => s + (m.role === "assistant" ? (m.costDebited ?? 0) : 0), 0), 0),
+    [threads]
+  );
+
   const activeThread = threads.find(t => t.id === activeThreadId) ?? threads[0];
 
   useEffect(() => {
@@ -1001,7 +1071,7 @@ export function QerinDashboard() {
   const handleSubmit = async () => {
     const q = inputValue.trim();
     if (!q || isSubmitting) return;
-    if (balance !== null && balance < 0.15) {
+    if (balance !== null && balance < ANSWER_PRICE_USD) {
       setTopupReason("Your Agent Settlement Fuel is depleted. Fund your treasury to fuel autonomous research queries.");
       setShowTopup(true);
       return;
@@ -1062,7 +1132,7 @@ export function QerinDashboard() {
             personaInsights: result.data.personaInsights,
             question: q,
             userAccount: connectedWallet || accountId || undefined,
-            costDebited: 0.15,
+            costDebited: ANSWER_PRICE_USD,
             remainingBalance: typeof result.data.balance === "number" ? result.data.balance : balance,
           }),
         }));
@@ -1255,11 +1325,9 @@ export function QerinDashboard() {
                 Connect
               </button>
             ) : (
-              balance !== null && (
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)", flexShrink: 0 }}>
-                  ${balance.toFixed(2)}
-                </div>
-              )
+              <div style={{ flexShrink: 0 }}>
+                <FuelMeter balance={balance} usedTotal={totalUsed} />
+              </div>
             )}
             <button
               type="button"
@@ -1325,7 +1393,28 @@ export function QerinDashboard() {
             <div style={{ flex: 1 }} />
 
             {/* Network Selector & Actions */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {/* Always-visible fuel gauge — the sidebar's copy is hidden on
+                  mobile until the menu opens, so this is the one guaranteed
+                  spot showing remaining balance + usage at every width. */}
+              {balance !== null && (
+                <div
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    border: "1px solid var(--qd-border)",
+                    background: "var(--qd-surface)",
+                  }}
+                >
+                  <FuelMeter
+                    balance={balance}
+                    usedTotal={totalUsed}
+                    onClick={() => { setTopupReason(null); setShowTopup(true); }}
+                    compact
+                  />
+                </div>
+              )}
+
               {/* Personal Transparency Ledger Button */}
               <button
                 type="button"
@@ -1558,7 +1647,7 @@ export function QerinDashboard() {
                         receipt={msg.receipt}
                         rawReceipts={msg.rawReceipts}
                         userAccount={msg.userAccount || connectedWallet || accountId || undefined}
-                        costDebited={msg.costDebited ?? 0.15}
+                        costDebited={msg.costDebited ?? ANSWER_PRICE_USD}
                         remainingBalance={msg.remainingBalance ?? balance}
                         question={msg.question}
                         onOpenLedger={() => setShowTransparencyModal(true)}
@@ -1627,7 +1716,7 @@ export function QerinDashboard() {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1" /><path d="M4 4V3a2 2 0 0 1 4 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
                 <span>Settling via <strong>{selectedNetwork === "base" ? "Base (USDC)" : "BOT Chain (BOT/USDT)"}</strong></span>
               </div>
-              <span>$0.15 / answer</span>
+              <span>${ANSWER_PRICE_USD.toFixed(2)} / answer</span>
             </div>
           </div>
 
