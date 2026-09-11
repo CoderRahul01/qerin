@@ -232,38 +232,3 @@ export async function claimDemoFuel(accountId: string): Promise<number> {
 
   throw new Error(json?.error || "Could not activate ecosystem review pass");
 }
-
-export async function claimVoucherFuel(accountId: string, amountUsd: number): Promise<number> {
-  let targetId = accountId;
-  if (!targetId || targetId.startsWith("local-")) {
-    targetId = await getOrCreateAccountId();
-  }
-
-  const res = await fetch("/api/account/topup/voucher", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": targetId },
-    body: JSON.stringify({ amountUsd }),
-  });
-  const json = await res.json();
-
-  if (res.ok && typeof json.balance === "number") {
-    return json.balance as number;
-  }
-
-  // Self-heal on unknown account
-  if (json?.error === "Unknown account" || res.status === 404) {
-    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
-    const freshId = await getOrCreateAccountId();
-    const retry = await fetch("/api/account/topup/voucher", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": freshId },
-      body: JSON.stringify({ amountUsd }),
-    });
-    const retryJson = await retry.json();
-    if (retry.ok && typeof retryJson.balance === "number") {
-      return retryJson.balance as number;
-    }
-  }
-
-  throw new Error(json?.error || "Could not credit voucher");
-}
