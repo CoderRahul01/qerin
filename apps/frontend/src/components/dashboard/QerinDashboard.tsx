@@ -1789,9 +1789,31 @@ export function QerinDashboard() {
           </div>
 
           {/* Footer */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "7px 20px", borderTop: "1px solid var(--qd-footer-border)", fontSize: 11, color: "var(--qd-muted2)" }}>
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="3.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1" /><path d="M3 3.5V2.5a2.5 2.5 0 0 1 5 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
-            All answers backed by on-chain x402 payment receipts on Base & BOT Chain.
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "7px 20px", borderTop: "1px solid var(--qd-footer-border)", fontSize: 11, color: "var(--qd-muted2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="3.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1" /><path d="M3 3.5V2.5a2.5 2.5 0 0 1 5 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
+              <span>All answers backed by on-chain x402 receipts on Base & BOT Chain</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <a
+                href="https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "#8B5CF6", textDecoration: "none", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00e5a3", display: "inline-block" }}></span>
+                BOT Chain L1 (677) ↗
+              </a>
+              <span>•</span>
+              <a
+                href="https://scan.botchain.ai"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "var(--qd-muted2)", textDecoration: "none" }}
+              >
+                BOTScan ↗
+              </a>
+            </div>
           </div>
         </div>
       </div>

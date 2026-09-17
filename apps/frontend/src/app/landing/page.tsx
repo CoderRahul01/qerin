@@ -5,6 +5,7 @@ import { SocialUpdates } from "@/components/SocialUpdates";
 import { HeroScene } from "@/components/HeroScene";
 import { SOURCES, SourceIcon } from "@/components/SourceIcon";
 import { DimensionalBadge } from "@/components/DimensionalBadge";
+import { BotChainProofFooter } from "@/components/BotChainProofFooter";
 
 const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
 const DUNE_HUB_URL = "https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub";
@@ -479,30 +480,7 @@ export default function Home() {
           </section>
         </div>
 
-        <footer
-          className="qerin-fade-up"
-          style={{
-            marginTop: "clamp(24px, 4vw, 40px)",
-            paddingTop: 20,
-            borderTop: "1px solid var(--qerin-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
-            animationDelay: "420ms",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LogoMark size={16} />
-            <span style={{ fontSize: 12.5, color: "var(--qerin-text-muted)" }}>© {new Date().getFullYear()} Qerin Protocol</span>
-          </div>
-          <div style={{ display: "flex", gap: 16, fontSize: 12.5, color: "var(--qerin-text-muted)" }}>
-            <a href="/app" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>App</a>
-            <a href={DUNE_HUB_URL} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>Dune Analytics</a>
-            <a href="https://x.com/qerinai_26" target="_blank" rel="noreferrer" style={{ color: "var(--qerin-text-muted)", textDecoration: "none" }}>Twitter (X)</a>
-          </div>
-        </footer>
+        <BotChainProofFooter />
       </main>
     </div>
   );

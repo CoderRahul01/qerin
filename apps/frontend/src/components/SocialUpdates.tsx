@@ -1,6 +1,6 @@
 "use client";
 
-const PROFILE_URL = "https://x.com/qerinai_26";
+const PROFILE_URL = "https://x.com/Qerin_AI";
 
 interface ProtocolQuote {
   name: string;
@@ -92,7 +92,7 @@ export function SocialUpdates() {
           }}
         >
           <XMark />
-          @qerinai_26
+          @Qerin_AI
         </a>
       </div>
 
