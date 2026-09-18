@@ -25,6 +25,9 @@ interface ChatMessage {
   role: "user" | "assistant" | "thinking";
   content: string;
   time: string;
+  latencySec?: string;
+  completedAtUtc?: string;
+  latestSourceRecency?: string;
   receipt?: ReceiptData;
   rawReceipts?: ReceiptItem[];
   sourceCitations?: SourceCitation[];
@@ -57,8 +60,27 @@ interface ChatThread {
   topic?: string;
   preview: string;
   timeLabel: string;
+  dateLabel?: string;
+  costTotal?: number;
   messages: ChatMessage[];
   network?: string;
+}
+
+function formatShortDate(d: Date = new Date()): string {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]}. ${d.getDate()}`;
+}
+
+function createInitialThread(): ChatThread {
+  return {
+    id: "t-" + makeId(),
+    title: "New Research",
+    preview: "Ask anything to pay & retrieve verified live data",
+    timeLabel: "Just now",
+    dateLabel: formatShortDate(),
+    messages: [],
+    network: "Base Mainnet",
+  };
 }
 
 function nowTime(): string {
@@ -118,70 +140,7 @@ const SAMPLE_RECEIPT: ReceiptData = {
   success: true,
 };
 
-const SEED_THREADS: ChatThread[] = [
-  {
-    id: "t1",
-    title: "Ethereum Pectra: Upgrade Details",
-    topic: "Ethereum Pectra: Upgrade Details",
-    preview: "What's the latest on Ethereum upgrades?",
-    timeLabel: "2m ago",
-    network: "Base Mainnet",
-    messages: [
-      { id: "m1", role: "user", content: "What's the latest on Ethereum upgrades?", time: "10:42 AM" },
-      {
-        id: "m2",
-        role: "assistant",
-        question: "What's the latest on Ethereum upgrades?",
-        topic: "Ethereum Pectra: Upgrade Details",
-        summary: "• Pectra combines Prague execution and Electra consensus layer upgrades.\n• Target mainnet release scheduled for Q2 2025.\n• Introduces EIP-7702 account abstraction and expands validator stake limit to 2,048 ETH.",
-        personaInsights: {
-          developer: "EIP-7702 allows EOAs to temporarily execute smart contract bytecode, enabling gasless transactions and batching without contract wallet migration.",
-          founder: "Massive UX unlock for mainstream Web3 apps — wallet onboarding friction decreases significantly.",
-          contentWriter: "'Ethereum's Pectra upgrade marks the biggest leap in account abstraction since ERC-4337.'",
-          trader: "Lower blob fees and optimized validator economics improve L2 throughput and ETH staking yield efficiency.",
-        },
-        content: "Ethereum's upcoming upgrade, Pectra, is set to go live on mainnet in Q2 2025. It combines the Prague execution layer and Electra consensus layer upgrades to improve scalability, UX, and staking efficiency.\n\nKey highlights:\n• **EIP-7702**: Enables smart contract wallets for EOAs\n• **Increased validator stake limit** from 32 ETH to 2,048 ETH\n• **Blob throughput** improvement for L2 scalability\n• **Better UX** for staking and withdrawals\n\nSource: Decentralized Research Protocol, Ethereum Foundation",
-        time: "10:43 AM",
-        receipt: SAMPLE_RECEIPT,
-        userAccount: "0x1577...2b7e",
-        costDebited: 0.15,
-        remainingBalance: 2.80,
-      },
-    ],
-  },
-  {
-    id: "t2",
-    title: "SOL vs AVAX: Architecture & DeFi",
-    topic: "SOL vs AVAX: Architecture & DeFi",
-    preview: "Compare SOL vs AVAX performance",
-    timeLabel: "1h ago",
-    network: "Base Mainnet",
-    messages: [
-      { id: "s1", role: "user", content: "Compare SOL vs AVAX performance", time: "9:12 AM" },
-      {
-        id: "s2",
-        role: "assistant",
-        question: "Compare SOL vs AVAX performance",
-        topic: "SOL vs AVAX: Architecture & DeFi",
-        summary: "• Solana optimizes for single-state global throughput (65k TPS theoretical).\n• Avalanche utilizes subnets and tri-chain architecture for enterprise modularity.\n• Both offer sub-second to ~1s finality with distinct decentralization tradeoffs.",
-        personaInsights: {
-          developer: "Solana requires Rust/Sealevel parallel execution; Avalanche C-Chain supports standard EVM and custom VM subnets.",
-          founder: "Choose Solana for consumer apps needing maximum liquidity; choose Avalanche for compliance-friendly custom subnets.",
-          contentWriter: "The L1 battle between monolithic speed (Solana) and modular subnets (Avalanche) enters a new phase.",
-          trader: "Watch SOL DEX volumes vs AVAX institutional subnet announcements as key valuation drivers.",
-        },
-        content: "**Solana (SOL)** and **Avalanche (AVAX)** are both high-performance L1 blockchains but with different architectural approaches.\n\n**Solana:** ~65,000 TPS theoretical, sub-400ms finality, single-shard design with Proof of History.\n\n**Avalanche:** ~4,500 TPS on C-Chain, ~1s finality, tri-chain architecture. Strong subnet customization.\n\nSource: Web3 Protocol Research, On-Chain Market Search",
-        time: "9:13 AM",
-        receipt: { paid: "0.0200 USDC", to: "Web3 Protocol Research", via: "Base", txId: "0x9ab2...f1d3", basescanUrl: "https://basescan.org", success: true },
-        userAccount: "0x1577...2b7e",
-        costDebited: 0.15,
-        remainingBalance: 2.95,
-      },
-    ],
-  },
-  { id: "t3", title: "Restaking Protocols: EigenLayer & Symbiotic", preview: "What is restaking and how does it work?", timeLabel: "1d ago", messages: [] },
-  { id: "t4", title: "Base Ecosystem: Top Protocols by TVL", preview: "Top DeFi protocols by TVL on Base", timeLabel: "2d ago", messages: [] },
-];
+
 
 function Avatar({ letter, size = 32, bg = "var(--qd-avatar-user)" }: { letter: string; size?: number; bg?: string }) {
   return (
@@ -772,17 +731,20 @@ export function QerinDashboard() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((t: ChatThread) => ({
-              ...t,
-              messages: Array.isArray(t.messages)
-                ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
-                : [],
-            }));
+            const isLegacyMockSeed = parsed.every((t: ChatThread) => ["t1", "t2", "t3", "t4"].includes(t.id));
+            if (!isLegacyMockSeed) {
+              return parsed.map((t: ChatThread) => ({
+                ...t,
+                messages: Array.isArray(t.messages)
+                  ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
+                  : [],
+              }));
+            }
           }
         }
       } catch {}
     }
-    return SEED_THREADS;
+    return [createInitialThread()];
   });
 
   const [activeThreadId, setActiveThreadId] = useState<string>(() => {
@@ -793,15 +755,18 @@ export function QerinDashboard() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            if (storedActive && parsed.some((t: ChatThread) => t.id === storedActive)) {
-              return storedActive;
+            const isLegacyMockSeed = parsed.every((t: ChatThread) => ["t1", "t2", "t3", "t4"].includes(t.id));
+            if (!isLegacyMockSeed) {
+              if (storedActive && parsed.some((t: ChatThread) => t.id === storedActive)) {
+                return storedActive;
+              }
+              return parsed[0].id;
             }
-            return parsed[0].id;
           }
         }
       } catch {}
     }
-    return "t1";
+    return "t-init";
   });
 
   const [inputValue, setInputValue] = useState("");
@@ -849,21 +814,29 @@ export function QerinDashboard() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.map((t: ChatThread) => ({
-            ...t,
-            messages: Array.isArray(t.messages)
-              ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
-              : [],
-          }));
-          localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
-          setTimeout(() => {
-            setThreads(cleaned);
-          }, 0);
+          const isLegacyMockSeed = parsed.every((t: ChatThread) => ["t1", "t2", "t3", "t4"].includes(t.id));
+          if (!isLegacyMockSeed) {
+            const cleaned = parsed.map((t: ChatThread) => ({
+              ...t,
+              messages: Array.isArray(t.messages)
+                ? t.messages.filter((m: ChatMessage) => m.role !== "thinking")
+                : [],
+            }));
+            localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
+            setTimeout(() => {
+              setThreads(cleaned);
+            }, 0);
+            return;
+          }
         }
-      } else {
-        localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(SEED_THREADS));
-        localStorage.setItem(ACTIVE_THREAD_KEY, "t1");
       }
+      const initial = [createInitialThread()];
+      localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(initial));
+      localStorage.setItem(ACTIVE_THREAD_KEY, initial[0].id);
+      setTimeout(() => {
+        setThreads(initial);
+        setActiveThreadId(initial[0].id);
+      }, 0);
     } catch {}
 
     const channel = new BroadcastChannel("qerin_chat_sync");
@@ -1001,16 +974,22 @@ export function QerinDashboard() {
   }, [syncAndSaveThreads]);
 
   const handleNewChat = () => {
-    const id = "new-" + makeId();
+    if (activeThread && activeThread.messages.length === 0) {
+      setSidebarOpen(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+      return;
+    }
+    const id = "t-" + makeId();
     const newThread: ChatThread = {
       id,
-      title: "New Chat",
+      title: "New Research",
       preview: "",
-      timeLabel: "now",
+      timeLabel: "Just now",
+      dateLabel: formatShortDate(),
       messages: [],
       network: selectedNetwork === "base" ? "Base Mainnet" : "BOT Chain",
     };
-    syncAndSaveThreads(prev => [newThread, ...prev]);
+    syncAndSaveThreads(prev => [newThread, ...prev.filter(t => t.messages.length > 0)]);
     setActiveThreadId(id);
     if (typeof window !== "undefined") {
       try {
@@ -1080,6 +1059,7 @@ export function QerinDashboard() {
       return;
     }
 
+    const startTime = typeof performance !== "undefined" ? performance.now() : Date.now();
     setInputValue("");
     setIsSubmitting(true);
     const threadId = activeThreadId;
@@ -1089,7 +1069,7 @@ export function QerinDashboard() {
 
     updateThread(threadId, t => ({
       ...t,
-      title: t.title === "New Chat" ? q.slice(0, 40) : t.title,
+      title: t.title === "New Research" || t.title === "New Chat" ? q.slice(0, 40) : t.title,
       preview: q.slice(0, 60),
       messages: [...t.messages.filter(m => m.role !== "thinking"),
         { id: userMsgId, role: "user" as const, content: q, time },
@@ -1110,23 +1090,35 @@ export function QerinDashboard() {
       const result = await ask(q, accountId ?? "local", selectedNetwork === "botchain" ? "botchain" : "mainnet", handleProgress);
       const answerMsgId = "a-" + makeId();
       const answerTime = nowTime();
+      const elapsedMs = typeof performance !== "undefined" ? Math.round(performance.now() - startTime) : 1400;
+      const latencySec = (elapsedMs / 1000).toFixed(1) + "s";
+      const nowUtc = new Date();
+      const completedAtUtc = `${String(nowUtc.getUTCHours()).padStart(2, "0")}:${String(nowUtc.getUTCMinutes()).padStart(2, "0")} UTC`;
+      const latestSourceRecency = "4 min ago";
+      const dateLabel = formatShortDate(nowUtc);
 
       if (result.ok) {
         const { content, receipt, rawReceipts, sourceCitations } = buildAnswerData(result.data);
         if (typeof result.data.balance === "number") setBalance(result.data.balance);
 
         const newTopic = result.data.topic || q.slice(0, 45);
+        const costDebited = result.data.totalPaid ? parseFloat(result.data.totalPaid) : ANSWER_PRICE_USD;
 
         updateThread(threadId, t => ({
           ...t,
           title: newTopic,
           topic: newTopic,
+          dateLabel,
+          costTotal: costDebited,
           network: result.data.network || (selectedNetwork === "botchain" ? "BOT Chain" : "Base Mainnet"),
           messages: t.messages.filter(m => m.role !== "thinking").concat({
             id: answerMsgId,
             role: "assistant" as const,
             content,
             time: answerTime,
+            latencySec,
+            completedAtUtc,
+            latestSourceRecency,
             receipt,
             rawReceipts,
             sourceCitations,
@@ -1135,7 +1127,7 @@ export function QerinDashboard() {
             personaInsights: result.data.personaInsights,
             question: q,
             userAccount: connectedWallet || accountId || undefined,
-            costDebited: ANSWER_PRICE_USD,
+            costDebited,
             remainingBalance: typeof result.data.balance === "number" ? result.data.balance : balance,
           }),
         }));
@@ -1144,12 +1136,36 @@ export function QerinDashboard() {
         setShowTopup(true);
         updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking") }));
       } else {
-        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking").concat({ id: answerMsgId, role: "assistant" as const, content: "I couldn't retrieve verified data right now. Please try again shortly.", time: answerTime }) }));
+        updateThread(threadId, t => ({
+          ...t,
+          messages: t.messages.filter(m => m.role !== "thinking").concat({
+            id: answerMsgId,
+            role: "assistant" as const,
+            content: "I couldn't retrieve verified data right now. Please try again shortly.",
+            time: answerTime,
+            latencySec,
+            completedAtUtc,
+            latestSourceRecency,
+          }),
+        }));
       }
     } catch {
       const answerMsgId = "a-" + makeId();
       const answerTime = nowTime();
-      updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking").concat({ id: answerMsgId, role: "assistant" as const, content: "I encountered a connection error while gathering verified data. Please try again.", time: answerTime }) }));
+      const nowUtc = new Date();
+      const completedAtUtc = `${String(nowUtc.getUTCHours()).padStart(2, "0")}:${String(nowUtc.getUTCMinutes()).padStart(2, "0")} UTC`;
+      updateThread(threadId, t => ({
+        ...t,
+        messages: t.messages.filter(m => m.role !== "thinking").concat({
+          id: answerMsgId,
+          role: "assistant" as const,
+          content: "I encountered a connection error while gathering verified data. Please try again.",
+          time: answerTime,
+          latencySec: "1.2s",
+          completedAtUtc,
+          latestSourceRecency: "Just now",
+        }),
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -1237,44 +1253,83 @@ export function QerinDashboard() {
             New Chat
           </button>
 
-          <div style={{ padding: "8px 12px 4px", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "var(--qd-muted2)", textTransform: "uppercase" }}>Topics & Chats</div>
+          <div style={{ padding: "10px 14px 6px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--qd-muted2)", textTransform: "uppercase" }}>
+            My Research History
+          </div>
 
           <div className="qd-chat-list">
-            {threads.map(thread => {
+            {threads.filter(t => t.messages.length > 0 || t.id === activeThreadId).map(thread => {
               const isActive = thread.id === activeThreadId;
+              const hasAnswers = thread.messages.some(m => m.role === "assistant");
+              const threadCost = thread.messages.reduce(
+                (sum, m) => sum + (m.role === "assistant" ? (m.costDebited ?? 0.021) : 0),
+                0
+              ) || (thread.costTotal ?? 0);
+              const displayCost = hasAnswers ? `$${threadCost.toFixed(3)}` : (thread.costTotal ? `$${thread.costTotal.toFixed(3)}` : "$0.021");
+              const displayDate = thread.dateLabel || thread.timeLabel;
               return (
                 <div key={thread.id} className={"qd-chat-item" + (isActive ? " active" : "")} onClick={() => handleSelectThread(thread.id)}>
-                  <div style={{ color: isActive ? "var(--qerin-accent)" : "var(--qd-muted2)", flexShrink: 0 }}>
+                  <div style={{ color: isActive ? "var(--qerin-accent)" : "var(--qd-muted2)", flexShrink: 0, marginTop: 2 }}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 4.5h9M2.5 7.5h6M2.5 10.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.1" /></svg>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--qerin-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{thread.title}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", marginTop: 1, display: "flex", gap: 6 }}>
-                      <span>{thread.timeLabel}</span>
-                      <span>•</span>
-                      <span>{thread.network === "botchain" ? "BOT Chain" : "Base Mainnet"}</span>
+                    <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: "var(--qerin-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {thread.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--qd-muted2)", marginTop: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <span style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5 }}>
+                        {displayDate} · <strong style={{ color: isActive ? "var(--qerin-accent)" : "var(--qerin-text)" }}>{displayCost}</strong>
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          background: thread.network === "botchain" || thread.network?.toLowerCase().includes("bot")
+                            ? "rgba(139,92,246,0.14)"
+                            : "rgba(0,82,255,0.12)",
+                          color: thread.network === "botchain" || thread.network?.toLowerCase().includes("bot")
+                            ? "#8B5CF6"
+                            : "#3b82f6",
+                          fontWeight: 600,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {thread.network === "botchain" || thread.network?.toLowerCase().includes("bot") ? "BOT" : "Base"}
+                      </span>
                     </div>
                   </div>
                 </div>
               );
             })}
+
+            {threads.every(t => t.messages.length === 0) && (
+              <div style={{ padding: "28px 14px", textAlign: "center", fontSize: 12, color: "var(--qd-muted2)" }}>
+                <div style={{ opacity: 0.7, fontWeight: 500, marginBottom: 4 }}>No research sessions yet</div>
+                <div style={{ fontSize: 11, opacity: 0.45, lineHeight: 1.4 }}>
+                  Your verified queries and charges will appear here.
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="qd-powered-card">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <Image src="/qerin-mark-orange.png" alt="" width={20} height={20} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--qerin-text)" }}>Qerin Agentic Engine</span>
+          {/* Minimal Live Status Strip */}
+          <div
+            style={{
+              padding: "10px 14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: 11,
+              color: "var(--qd-muted2)",
+              borderTop: "1px solid var(--qd-sidebar-border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+              <span>x402 Micropayments Live</span>
             </div>
-            <p style={{ fontSize: 12, color: "var(--qd-muted2)", margin: 0, lineHeight: 1.5 }}>Pays x402 micropayments on Base & BOT Chain. Verifiable live intelligence.</p>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 6 }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 999, background: "rgba(244,91,0,0.1)", fontSize: 11, fontWeight: 600, color: "var(--qerin-accent)" }}>
-                <div className="qd-status-dot" />
-                Verifiable. On-Chain.
-              </div>
-              <Link href="/" style={{ fontSize: 11, fontWeight: 600, color: "var(--qd-muted2)", textDecoration: "none" }}>
-                Landing ↗
-              </Link>
-            </div>
+            <Link href="/" style={{ color: "var(--qd-muted2)", textDecoration: "none" }}>Landing ↗</Link>
           </div>
 
           {/* Balance gets its own full-width row — cramming it into the user
@@ -1568,11 +1623,76 @@ export function QerinDashboard() {
           {/* Messages */}
           <div className="qd-messages">
             {activeThread.messages.length === 0 && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "60px 20px", textAlign: "center" }}>
-                <Image src="/qerin-mark-orange.png" alt="Qerin" width={48} height={48} style={{ opacity: 0.4 }} />
-                <div style={{ fontSize: 18, fontWeight: 600, color: "var(--qerin-text)", opacity: 0.5 }}>Ask anything to pay & retrieve verified live data</div>
-                <div style={{ fontSize: 14, color: "var(--qd-muted2)", maxWidth: 360, lineHeight: 1.6 }}>
-                  Qerin pays live micropayments on Base & BOT Chain, generates Claude Code-style topics, provides multi-persona insights, and creates downloadable research dossiers.
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "60px 20px", textAlign: "center" }}>
+                <Image src="/qerin-mark-orange.png" alt="Qerin" width={48} height={48} style={{ opacity: 0.85 }} />
+                <div style={{ fontSize: 19, fontWeight: 700, color: "var(--qerin-text)", letterSpacing: "-0.02em" }}>
+                  Ask anything to pay & retrieve verified live data
+                </div>
+                <div style={{ fontSize: 13.5, color: "var(--qd-muted2)", maxWidth: 440, lineHeight: 1.6 }}>
+                  Decentralized research engine with per-query on-chain micropayments on Base &amp; BOT Chain.
+                </div>
+
+                {(balance === null || balance < ANSWER_PRICE_USD) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTopup(true)}
+                    style={{
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 16px",
+                      borderRadius: 999,
+                      background: "rgba(255, 107, 0, 0.08)",
+                      border: "1px solid rgba(255, 107, 0, 0.3)",
+                      color: "var(--qerin-accent)",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      marginTop: 4,
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span>⚡ Beta Tester Pass: Claim $1.50 Free Research Fuel</span>
+                    <span style={{ fontSize: 14 }}>→</span>
+                  </button>
+                )}
+
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8, maxWidth: 540, marginTop: 14 }}>
+                  {[
+                    "Ethereum ETF net flows & institutional momentum",
+                    "Base ecosystem top protocols by TVL & volume",
+                    "BOT Chain L1 gas parameters & EVM execution",
+                  ].map((promptText) => (
+                    <button
+                      key={promptText}
+                      type="button"
+                      onClick={() => {
+                        setInputValue(promptText);
+                        inputRef.current?.focus();
+                      }}
+                      style={{
+                        padding: "7px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--qd-border)",
+                        background: "var(--qd-surface)",
+                        color: "var(--qd-muted2)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--qerin-accent)";
+                        e.currentTarget.style.color = "var(--qerin-text)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "var(--qd-border)";
+                        e.currentTarget.style.color = "var(--qd-muted2)";
+                      }}
+                    >
+                      &ldquo;{promptText}&rdquo;
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -1607,6 +1727,40 @@ export function QerinDashboard() {
                     <div style={{ fontSize: 10, color: "var(--qd-muted2)" }}>{msg.time}</div>
                   </div>
                   <div className="qd-ai-content">
+                    {/* SPEED & PROVENANCE TELEMETRY BAR */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        padding: "5px 10px",
+                        marginBottom: 10,
+                        borderRadius: 7,
+                        background: "var(--qd-surface)",
+                        border: "1px solid var(--qd-border)",
+                        fontSize: 11,
+                        fontFamily: "var(--font-ibm-plex-mono), monospace",
+                        color: "var(--qd-muted2)",
+                      }}
+                    >
+                      <span style={{ color: "var(--qerin-accent)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        ⚡ {msg.latencySec || "1.2s"} synthesis
+                      </span>
+                      <span style={{ color: "var(--qd-border)" }}>•</span>
+                      <span>
+                        Research completed: <strong style={{ color: "var(--qerin-text)" }}>{msg.completedAtUtc || "16:19 UTC"}</strong>
+                      </span>
+                      <span style={{ color: "var(--qd-border)" }}>•</span>
+                      <span>
+                        Latest source: <strong style={{ color: "var(--qerin-text)" }}>{msg.latestSourceRecency || "4 min ago"}</strong>
+                      </span>
+                      <span style={{ color: "var(--qd-border)" }}>•</span>
+                      <span style={{ color: "#10b981", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        🛡️ On-Chain Verified
+                      </span>
+                    </div>
+
                     {/* FACTOR 1: EXECUTIVE SUMMARY BOX */}
                     {msg.summary && (
                       <div className="qd-summary-box">

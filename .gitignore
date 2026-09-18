@@ -30,3 +30,7 @@ apps/frontend/index.html
 .dev.vars
 # sa key
 qerin-sa-key.json
+
+# Internal architecture, payment-layer, and business docs — never public.
+docs/private/
+no-ai-slop/

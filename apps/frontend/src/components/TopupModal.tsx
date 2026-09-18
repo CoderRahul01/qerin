@@ -88,9 +88,20 @@ export function TopupModal({
     initialNetwork === "botchain" ? "native" : "token"
   );
   const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileReady, setTurnstileReady] = useState(() => {
+    if (typeof window !== "undefined" && (window as unknown as { turnstile?: unknown }).turnstile) {
+      return true;
+    }
+    return false;
+  });
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as unknown as { turnstile?: unknown }).turnstile) {
+      setTurnstileReady(true);
+    }
+  }, []);
 
   const activeMeta = TOPUP_NETWORKS[network];
 
@@ -616,31 +627,32 @@ export function TopupModal({
               </div>
             )}
 
-            {/* Free Ecosystem Pass */}
+            {/* Free Beta Tester & Ecosystem Pass */}
             <div
               style={{
                 marginBottom: 12,
-                padding: "12px 14px",
+                padding: "13px 15px",
                 background: passClaimed
                   ? "rgba(255,255,255,0.03)"
-                  : "linear-gradient(135deg, rgba(20,184,166,0.14) 0%, rgba(13,148,136,0.07) 100%)",
+                  : "linear-gradient(135deg, rgba(20,184,166,0.18) 0%, rgba(13,148,136,0.09) 100%)",
                 border: passClaimed
                   ? "1px solid rgba(255,255,255,0.08)"
-                  : "1px solid rgba(20,184,166,0.38)",
+                  : "1px solid rgba(20,184,166,0.45)",
                 borderRadius: 11,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                gap: 12,
                 opacity: passClaimed ? 0.7 : 1,
               }}
             >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: passClaimed ? "#9CA3AF" : "#2DD4BF", display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: passClaimed ? "#9CA3AF" : "#2DD4BF", display: "flex", alignItems: "center", gap: 6 }}>
                   <span>{passClaimed ? "✓" : "⚡"}</span>
-                  Ecosystem Review Pass {passClaimed ? "(Claimed)" : "(Free — $1.50)"}
+                  Beta Tester Pass {passClaimed ? "(Claimed)" : "(Free — $1.50)"}
                 </div>
-                <div style={{ marginTop: 2, fontSize: 11.5, color: passClaimed ? "#4B5563" : "#99F6E4" }}>
-                  {passClaimed ? "Already activated for this account." : "One-time pass — test autonomous research for free."}
+                <div style={{ marginTop: 3, fontSize: 11.5, color: passClaimed ? "#4B5563" : "#99F6E4", lineHeight: 1.4 }}>
+                  {passClaimed ? "Already activated for this account." : "One-time credit for beta testing autonomous on-chain research."}
                 </div>
                 {!passClaimed && (
                   <div ref={turnstileContainerRef} style={{ marginTop: 8 }} />
@@ -648,21 +660,22 @@ export function TopupModal({
               </div>
               <button
                 onClick={handleClaimDemoFuel}
-                disabled={passClaimed || busy || !turnstileToken}
+                disabled={passClaimed || busy}
                 style={{
-                  background: passClaimed || !turnstileToken ? "rgba(255,255,255,0.05)" : "#0D9488",
-                  border: passClaimed || !turnstileToken ? "1px solid rgba(255,255,255,0.1)" : "none",
-                  color: passClaimed || !turnstileToken ? "#6B7280" : "#fff",
+                  background: passClaimed ? "rgba(255,255,255,0.05)" : (turnstileToken ? "#0D9488" : "rgba(20,184,166,0.25)"),
+                  border: passClaimed ? "1px solid rgba(255,255,255,0.1)" : (turnstileToken ? "none" : "1px solid rgba(20,184,166,0.5)"),
+                  color: passClaimed ? "#6B7280" : (turnstileToken ? "#fff" : "#2DD4BF"),
                   fontWeight: 700,
                   fontSize: 12,
-                  padding: "7px 14px",
-                  borderRadius: 7,
-                  cursor: passClaimed || !turnstileToken ? "default" : "pointer",
-                  boxShadow: passClaimed || !turnstileToken ? "none" : "0 0 12px rgba(20,184,166,0.35)",
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  cursor: passClaimed ? "default" : "pointer",
+                  boxShadow: turnstileToken ? "0 0 14px rgba(20,184,166,0.4)" : "none",
                   flexShrink: 0,
+                  transition: "all 0.15s ease",
                 }}
               >
-                {passClaimed ? "✓ Claimed" : "Claim"}
+                {passClaimed ? "✓ Claimed" : busy ? "Activating…" : "Claim $1.50 Pass"}
               </button>
             </div>
 
