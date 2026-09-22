@@ -301,6 +301,7 @@ export class FirestoreClient {
       },
       async get(): Promise<QuerySnapshot> {
         const collectionId = collPath.split("/").pop()!;
+        const parentPath = collPath.split("/").slice(0, -1).join("/");
 
         let whereClause: any = undefined;
         if (filters.length === 1) {
@@ -327,7 +328,14 @@ export class FirestoreClient {
           };
         }
 
-        const res = await client.fetch(`${client.urlBase}:runQuery`, {
+        // Firestore's runQuery endpoint is scoped to the parent document for
+        // subcollections. Querying only urlBase:runQuery would look for a
+        // root-level collection with the same name and silently miss records
+        // stored under e.g. chatVaults/{vaultId}/deliveries.
+        const queryUrl = parentPath
+          ? `${client.urlBase}/${parentPath}:runQuery`
+          : `${client.urlBase}:runQuery`;
+        const res = await client.fetch(queryUrl, {
           method: "POST",
           body: JSON.stringify({
             structuredQuery: {

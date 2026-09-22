@@ -10,6 +10,7 @@ import { UserTransparencyModal } from "@/components/UserTransparencyModal";
 import { ProofCardModal } from "@/components/ProofCardModal";
 import { keccak256, toBytes } from "viem";
 import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
+import { getOrCreateChatVaultId, loadChatHistory, saveChatHistory, type RemoteChatHistory } from "@/lib/chatHistory";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import type { AnswerData, AnswerProgressEvent, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
 import { downloadDossierPdf, generateDossierMarkdown } from "@/lib/dossierExport";
@@ -36,6 +37,7 @@ interface ChatMessage {
   personaInsights?: PersonaInsights;
   thinkingEvents?: AnswerProgressEvent[];
   question?: string;
+  deliveryId?: string;
   userAccount?: string;
   costDebited?: number;
   remainingBalance?: number | null;
@@ -714,6 +716,83 @@ type PersonaType = "all" | "developer" | "founder" | "writer" | "trader";
 const THREADS_STORAGE_KEY = "qerin_chat_threads_v3";
 const ACTIVE_THREAD_KEY = "qerin_active_thread_id";
 
+function cleanStoredThreads(input: unknown): ChatThread[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((thread): thread is ChatThread => Boolean(thread && typeof thread === "object" && typeof (thread as ChatThread).id === "string"))
+    .map((thread) => ({
+      ...thread,
+      messages: Array.isArray(thread.messages)
+        ? thread.messages.filter((message) => message.role === "user" || message.role === "assistant")
+        : [],
+    }));
+}
+
+function recoverArchivedDeliveries(threads: ChatThread[], deliveries: unknown): ChatThread[] {
+  if (!Array.isArray(deliveries)) return threads;
+  const knownDeliveryIds = new Set(
+    threads.flatMap((thread) => thread.messages.map((message) => message.deliveryId).filter(Boolean))
+  );
+
+  const recovered = deliveries.flatMap((value): ChatThread[] => {
+    if (!value || typeof value !== "object") return [];
+    const delivery = value as Record<string, unknown>;
+    const deliveryId = typeof delivery.deliveryId === "string" ? delivery.deliveryId : null;
+    const question = typeof delivery.question === "string" ? delivery.question : "Recovered paid research";
+    const answer = typeof delivery.answer === "string" ? delivery.answer : "";
+    if (!deliveryId || !answer || knownDeliveryIds.has(deliveryId)) return [];
+
+    const receiptItems = Array.isArray(delivery.receipt) ? delivery.receipt as ReceiptItem[] : [];
+    const citations = Array.isArray(delivery.sourceCitations) ? delivery.sourceCitations as SourceCitation[] : [];
+    const topic = typeof delivery.topic === "string" ? delivery.topic : question.slice(0, 45);
+    const network = typeof delivery.network === "string" ? delivery.network : "Base Mainnet";
+    const totalPaid = typeof delivery.totalPaid === "string" ? delivery.totalPaid : "0";
+    const createdAt = typeof delivery.createdAt === "string" ? new Date(delivery.createdAt) : new Date();
+    const sourceNames = receiptItems.map((item) => item.source).filter(Boolean).join(", ");
+    const receipt = receiptItems.length ? {
+      paid: `${totalPaid} USDC`,
+      to: sourceNames || "Verified paid source",
+      via: network,
+      txId: "Source settlement archived",
+      basescanUrl: "#",
+      success: false,
+      sourceCitations: citations,
+      chainId: typeof delivery.chainId === "number" ? delivery.chainId : undefined,
+    } satisfies ReceiptData : undefined;
+
+    return [{
+      id: `recovered-${deliveryId}`,
+      title: topic,
+      topic,
+      preview: question.slice(0, 60),
+      timeLabel: formatShortDate(createdAt),
+      dateLabel: formatShortDate(createdAt),
+      network,
+      messages: [
+        { id: `u-${deliveryId}`, role: "user", content: question, time: nowTime(), question },
+        {
+          id: `a-${deliveryId}`,
+          role: "assistant",
+          content: answer,
+          time: nowTime(),
+          completedAtUtc: "Recovered from private delivery archive",
+          latestSourceRecency: "Settlement evidence retained",
+          receipt,
+          rawReceipts: receiptItems,
+          sourceCitations: citations,
+          topic,
+          summary: typeof delivery.summary === "string" ? delivery.summary : undefined,
+          personaInsights: typeof delivery.personaInsights === "object" && delivery.personaInsights ? delivery.personaInsights as PersonaInsights : undefined,
+          question,
+          deliveryId,
+          costDebited: ANSWER_PRICE_USD,
+        },
+      ],
+    }];
+  });
+  return [...recovered, ...threads];
+}
+
 export function QerinDashboard() {
   const [threads, setThreads] = useState<ChatThread[]>(() => {
     if (typeof window !== "undefined") {
@@ -774,10 +853,24 @@ export function QerinDashboard() {
   const [activePersona, setActivePersona] = useState<Record<string, PersonaType>>({});
   const [selectedNetwork, setSelectedNetwork] = useState<"base" | "botchain">("base");
   const [copyStatus, setCopyStatus] = useState<Record<string, string>>({});
+  const [historySyncState, setHistorySyncState] = useState<"loading" | "saved" | "syncing" | "local">("loading");
 
   const { ask } = useQerinAnswer();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatVaultIdRef = useRef<string | null>(null);
+  const historyReadyRef = useRef(false);
+  const historyTimerRef = useRef<number | null>(null);
+  const activeThreadIdRef = useRef(activeThreadId);
+  const threadsRef = useRef(threads);
+
+  useEffect(() => {
+    activeThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    threadsRef.current = threads;
+  }, [threads]);
 
   // Real cumulative spend, not an estimate — summed from costDebited on every
   // answered message actually returned by the backend (each is the exact
@@ -792,6 +885,65 @@ export function QerinDashboard() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeThread?.messages.length]);
+
+  const scheduleHistorySave = useCallback((nextThreads: ChatThread[], activeId: string) => {
+    const vaultId = chatVaultIdRef.current;
+    if (!vaultId || !historyReadyRef.current || typeof window === "undefined") return;
+
+    if (historyTimerRef.current !== null) window.clearTimeout(historyTimerRef.current);
+    setHistorySyncState("syncing");
+    const payload: RemoteChatHistory = { threads: nextThreads, activeThreadId: activeId };
+    historyTimerRef.current = window.setTimeout(() => {
+      void saveChatHistory(vaultId, payload)
+        .then(() => setHistorySyncState("saved"))
+        .catch(() => setHistorySyncState("local"));
+      historyTimerRef.current = null;
+    }, 650);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateHistory() {
+      try {
+        const vaultId = getOrCreateChatVaultId();
+        chatVaultIdRef.current = vaultId;
+        const remote = await loadChatHistory(vaultId);
+        if (cancelled) return;
+
+        const remoteThreads = recoverArchivedDeliveries(cleanStoredThreads(remote?.threads), remote?.deliveries);
+        if (remoteThreads.length > 0) {
+          const activeId = remote?.activeThreadId && remoteThreads.some((thread) => thread.id === remote.activeThreadId)
+            ? remote.activeThreadId
+            : remoteThreads[0].id;
+          threadsRef.current = remoteThreads;
+          activeThreadIdRef.current = activeId;
+          setThreads(remoteThreads);
+          setActiveThreadId(activeId);
+          try {
+            localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(remoteThreads));
+            localStorage.setItem(ACTIVE_THREAD_KEY, activeId);
+          } catch {}
+        }
+        historyReadyRef.current = true;
+        setHistorySyncState("saved");
+        if (remoteThreads.length === 0) {
+          scheduleHistorySave(threadsRef.current, activeThreadIdRef.current);
+        }
+      } catch {
+        // Local storage remains the fast, offline-safe copy. The next change
+        // will retry the cloud save automatically.
+        historyReadyRef.current = true;
+        setHistorySyncState("local");
+      }
+    }
+
+    void hydrateHistory();
+    return () => {
+      cancelled = true;
+      if (historyTimerRef.current !== null) window.clearTimeout(historyTimerRef.current);
+    };
+  }, [scheduleHistorySave]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -942,23 +1094,20 @@ export function QerinDashboard() {
   const syncAndSaveThreads = useCallback((updater: (prev: ChatThread[]) => ChatThread[]) => {
     setThreads(prev => {
       const next = updater(prev);
+      const sanitized = cleanStoredThreads(next);
+      threadsRef.current = sanitized;
       if (typeof window !== "undefined") {
         try {
-          const sanitized = next.map(t => ({
-            ...t,
-            messages: Array.isArray(t.messages)
-              ? t.messages.filter(m => m.role !== "thinking")
-              : [],
-          }));
           localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(sanitized));
           const channel = new BroadcastChannel("qerin_chat_sync");
           channel.postMessage({ type: "SYNC_THREADS", threads: sanitized });
           channel.close();
         } catch {}
       }
+      scheduleHistorySave(sanitized, activeThreadIdRef.current);
       return next;
     });
-  }, []);
+  }, [scheduleHistorySave]);
 
   const updateThread = useCallback((threadId: string, updater: (t: ChatThread) => ChatThread) => {
     syncAndSaveThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
@@ -980,8 +1129,9 @@ export function QerinDashboard() {
       messages: [],
       network: selectedNetwork === "base" ? "Base Mainnet" : "BOT Chain",
     };
-    syncAndSaveThreads(prev => [newThread, ...prev.filter(t => t.messages.length > 0)]);
+    activeThreadIdRef.current = id;
     setActiveThreadId(id);
+    syncAndSaveThreads(prev => [newThread, ...prev.filter(t => t.messages.length > 0)]);
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(ACTIVE_THREAD_KEY, id);
@@ -995,6 +1145,7 @@ export function QerinDashboard() {
   };
 
   const handleSelectThread = (id: string) => {
+    activeThreadIdRef.current = id;
     setActiveThreadId(id);
     setSidebarOpen(false);
     setThreads(prev => {
@@ -1009,6 +1160,7 @@ export function QerinDashboard() {
           localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(cleaned));
         } catch {}
       }
+      scheduleHistorySave(cleaned, id);
       return cleaned;
     });
     if (typeof window !== "undefined") {
@@ -1016,6 +1168,7 @@ export function QerinDashboard() {
         localStorage.setItem(ACTIVE_THREAD_KEY, id);
       } catch {}
     }
+    scheduleHistorySave(threadsRef.current, id);
   };
 
   const addBotChainToWallet = async () => {
@@ -1057,6 +1210,8 @@ export function QerinDashboard() {
     const userMsgId = "u-" + makeId();
     const thinkingId = "th-" + makeId();
     const time = nowTime();
+    const chatVaultId = chatVaultIdRef.current ?? getOrCreateChatVaultId();
+    chatVaultIdRef.current = chatVaultId;
 
     updateThread(threadId, t => ({
       ...t,
@@ -1078,7 +1233,13 @@ export function QerinDashboard() {
     };
 
     try {
-      const result = await ask(q, accountId ?? "local", selectedNetwork === "botchain" ? "botchain" : "mainnet", handleProgress);
+      const result = await ask(
+        q,
+        accountId ?? "local",
+        selectedNetwork === "botchain" ? "botchain" : "mainnet",
+        handleProgress,
+        chatVaultId
+      );
       const answerMsgId = "a-" + makeId();
       const answerTime = nowTime();
       const elapsedMs = typeof performance !== "undefined" ? Math.round(performance.now() - startTime) : 1400;
@@ -1120,6 +1281,7 @@ export function QerinDashboard() {
             summary: result.data.summary,
             personaInsights: result.data.personaInsights,
             question: q,
+            deliveryId: result.data.deliveryId,
             userAccount: connectedWallet || accountId || undefined,
             costDebited,
             remainingBalance: typeof result.data.balance === "number" ? result.data.balance : balance,
@@ -1319,9 +1481,18 @@ export function QerinDashboard() {
               borderTop: "1px solid var(--qd-sidebar-border)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-              <span>x402 Micropayments Live</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+                <span>Verifiable x402 settlement</span>
+              </div>
+              <div
+                title={historySyncState === "local" ? "Your browser has kept the local copy. Qerin will retry the private recovery sync on your next change." : "Chat history is retained locally for instant loading and synced to a private recovery vault."}
+                style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--qd-muted2)" }}
+              >
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: historySyncState === "local" ? "#eab308" : historySyncState === "syncing" || historySyncState === "loading" ? "#ff7700" : "#22c55e", display: "inline-block" }} />
+                <span>{historySyncState === "saved" ? "Chats saved privately" : historySyncState === "local" ? "Chats saved on this device" : "Saving chat history…"}</span>
+              </div>
             </div>
             <Link href="/" style={{ color: "var(--qd-muted2)", textDecoration: "none" }}>Landing ↗</Link>
           </div>

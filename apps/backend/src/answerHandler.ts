@@ -4,6 +4,7 @@ import { synthesizeAnswer } from "./synthesize.js";
 import { checkSpendLimit, recordSpend, ANSWER_PRICE_USD } from "./spendGuard.js";
 import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
+import { archivePaidDelivery } from "./chatHistory.js";
 
 export type { OnProgress } from "./orchestrator.js";
 
@@ -22,7 +23,8 @@ export async function answerHandler(
   question: string,
   accountId: string | null = null,
   targetNetwork?: string,
-  onProgress?: OnProgress
+  onProgress?: OnProgress,
+  chatVaultId: string | null = null
 ): Promise<AnswerResult> {
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
@@ -56,18 +58,46 @@ export async function answerHandler(
   onProgress?.({ type: "synthesizing" });
   const synthesized = await synthesizeAnswer(question, gatheredResults);
 
-  // Record verified on-chain receipt ASAP — but don't block the response on it.
-  // The blockchain write (Base/BOT Chain) involves RPC round-trips and tx propagation
-  // that can take 5-30s: waiting for it before returning the answer is the single
-  // largest source of perceived latency. Fire it as a background task and ship the
-  // answer immediately. The receipt will land on-chain regardless.
   const network = getNetwork(targetNetwork);
   // x402 source settlement uses the backend's configured payment rail. The
   // user-selected network controls the Qerin receipt registry, not a source
   // transaction that may have settled on a different supported rail.
   const sourceSettlementNetwork = getNetwork();
   const registryAddr = getRegistryAddress(targetNetwork);
+  const receipt = paidResults.map((r) => ({
+    source: r.sourceName,
+    amountPaid: r.amountPaid,
+    txHash: r.txHash,
+    basescanUrl: r.txHash ? sourceSettlementNetwork.explorerTxUrl(r.txHash) : null,
+    timestamp: r.timestamp,
+    content: r.content,
+    settlement: r.settlement,
+  }));
 
+  const answerBody: Record<string, unknown> = {
+    question,
+    topic: synthesized.topic,
+    summary: synthesized.summary,
+    answer: synthesized.answer,
+    personaInsights: synthesized.personaInsights,
+    sourceCitations: synthesized.sourceCitations || [],
+    receipt,
+    totalPaid: totalPaidNum.toFixed(3),
+    network: network.name,
+    chainId: network.chainId,
+  };
+
+  // A charge is only considered deliverable when its answer has been safely
+  // archived. If this write fails, the caller's existing route-level refund
+  // path runs rather than reporting a paid success that cannot be recovered.
+  const deliveryId = await archivePaidDelivery(chatVaultId, answerBody);
+  if (deliveryId) answerBody.deliveryId = deliveryId;
+
+  // Record verified on-chain receipt ASAP — but don't block the response on it.
+  // The blockchain write (Base/BOT Chain) involves RPC round-trips and tx propagation
+  // that can take 5-30s: waiting for it before returning the answer is the single
+  // largest source of perceived latency. Fire it as a background task and ship the
+  // answer immediately. The receipt will land on-chain regardless.
   // Background the chain write — intentionally not awaited
   let backgroundReceiptPromise: Promise<string | null>;
   try {
@@ -91,34 +121,13 @@ export async function answerHandler(
     ? network.explorerTxUrl(registryTxHash)
     : (registryAddr ? network.explorerAddressUrl(registryAddr) : "https://basescan.org");
 
-  const receipt = paidResults.map((r) => {
-    return {
-      source: r.sourceName,
-      amountPaid: r.amountPaid,
-      txHash: r.txHash,
-      basescanUrl: r.txHash ? sourceSettlementNetwork.explorerTxUrl(r.txHash) : null,
-      timestamp: r.timestamp,
-      content: r.content,
-      settlement: r.settlement,
-    };
-  });
-
   return {
     status: 200,
     body: {
-      question,
-      topic: synthesized.topic,
-      summary: synthesized.summary,
-      answer: synthesized.answer,
-      personaInsights: synthesized.personaInsights,
-      sourceCitations: synthesized.sourceCitations || [],
-      receipt,
+      ...answerBody,
       registryTxHash,
       registryContract: registryAddr,
       registryExplorerUrl: defaultExplorerUrl,
-      totalPaid: totalPaidNum.toFixed(3),
-      network: network.name,
-      chainId: network.chainId,
     },
   };
 }

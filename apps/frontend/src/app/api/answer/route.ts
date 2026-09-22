@@ -11,6 +11,10 @@ export async function POST(req: Request) {
   if (!accountId) {
     return Response.json({ error: "X-Qerin-Account-Id header is required" }, { status: 400 });
   }
+  const chatVaultId = req.headers.get("x-qerin-chat-vault-id");
+  if (!chatVaultId) {
+    return Response.json({ error: "X-Qerin-Chat-Vault-Id header is required" }, { status: 400 });
+  }
 
   try {
     const res = await fetchBackend("/v1/answer", {
@@ -19,6 +23,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "X-Qerin-Internal-Secret": internalSecret,
         "X-Qerin-Account-Id": accountId,
+        "X-Qerin-Chat-Vault-Id": chatVaultId,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(110_000),

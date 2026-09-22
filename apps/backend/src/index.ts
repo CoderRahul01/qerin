@@ -16,6 +16,7 @@ import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
 import { getPublicAnalytics } from "./analytics.js";
+import { getChatHistory, isValidChatVaultId, saveChatHistory } from "./chatHistory.js";
 
 interface RateLimiterBinding {
   limit: (opts: { key: string }) => Promise<{ success: boolean }>;
@@ -88,6 +89,7 @@ async function topupRateLimit(c: RateLimitContext, next: () => Promise<void>) {
 app.use("/v1/keys", rateLimit);
 app.use("/v1/answer", rateLimit);
 app.use("/v1/account/*", rateLimit);
+app.use("/v1/history", rateLimit);
 app.use("/v1/waitlist", rateLimit);
 app.use("/v1/account/topup/demo-claim", topupRateLimit);
 
@@ -186,6 +188,44 @@ app.get("/v1/account/balance", async (c) => {
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
+  }
+});
+
+// Private, browser-scoped research history. The vault identifier is a random
+// UUID generated and retained only by the user's browser; it is intentionally
+// not their public wallet address. Every request remains internal-secret
+// gated, so this worker is never exposed as an unauthenticated history API.
+function getChatVaultId(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  const vaultId = c.req.header("x-qerin-chat-vault-id");
+  return isValidChatVaultId(vaultId) ? vaultId : null;
+}
+
+app.get("/v1/history", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+  const vaultId = getChatVaultId(c);
+  if (!vaultId) return c.json({ error: "A valid chat vault is required" }, 400);
+
+  try {
+    return c.json({ history: await getChatHistory(vaultId) });
+  } catch (err) {
+    console.error("Could not load chat history:", err);
+    return c.json({ error: "Chat history is temporarily unavailable" }, 503);
+  }
+});
+
+app.put("/v1/history", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+  const vaultId = getChatVaultId(c);
+  if (!vaultId) return c.json({ error: "A valid chat vault is required" }, 400);
+
+  try {
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object") return c.json({ error: "A chat history payload is required" }, 400);
+    const history = await saveChatHistory(vaultId, body);
+    return c.json({ history });
+  } catch (err) {
+    console.error("Could not save chat history:", err);
+    return c.json({ error: "Chat history could not be saved" }, 503);
   }
 });
 
@@ -295,6 +335,8 @@ app.post("/v1/answer", async (c) => {
 
   const accountId = c.req.header("x-qerin-account-id");
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+  const chatVaultId = getChatVaultId(c);
+  if (!chatVaultId) return c.json({ error: "A valid chat vault is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
   const { question, network } = body ?? {};
@@ -335,7 +377,8 @@ app.post("/v1/answer", async (c) => {
         typeof network === "string" ? network : undefined,
         (event) => {
           stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
-        }
+        },
+        chatVaultId
       );
       if (result.status !== 200) {
         await creditBalance(accountId, ANSWER_PRICE_USD);

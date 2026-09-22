@@ -66,4 +66,5 @@ export interface AnswerData {
   balance?: number;
   network?: string;
   chainId?: number;
+  deliveryId?: string;
 }

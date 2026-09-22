@@ -31,14 +31,19 @@ export function useQerinAnswer() {
     question: string,
     accountId: string,
     network?: string,
-    onProgress?: (event: AnswerProgressEvent) => void
+    onProgress?: (event: AnswerProgressEvent) => void,
+    chatVaultId?: string
   ): Promise<AskResult> {
     setStatus("paying");
     setErrorMessage(null);
     try {
       const res = await fetch("/api/answer", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Qerin-Account-Id": accountId,
+          ...(chatVaultId ? { "X-Qerin-Chat-Vault-Id": chatVaultId } : {}),
+        },
         body: JSON.stringify({ question, network }),
         // Slightly longer than /api/answer's own 110s backend timeout, so
         // that route's controlled error response is what the user sees —
