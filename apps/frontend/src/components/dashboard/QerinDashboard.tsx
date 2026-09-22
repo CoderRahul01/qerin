@@ -103,9 +103,16 @@ function buildAnswerData(data: AnswerData): {
   sourceCitations: SourceCitation[] | undefined;
 } {
   const content = data.answer ?? "";
+  // The proof card is a payment ledger, not a bibliography. Keep public
+  // enrichment citations out of it: only receipt entries returned by the
+  // backend have passed the x402 settlement gate.
+  const settledSourceNames = new Set((data.receipt ?? []).map((item) => item.source.toLowerCase()));
+  const paidSourceCitations = data.sourceCitations?.filter((citation) =>
+    settledSourceNames.has(citation.name.toLowerCase())
+  );
   let receipt: ReceiptData | undefined;
   if (data.receipt && data.receipt.length > 0) {
-    const tx = data.registryTxHash || data.receipt[0].txHash;
+    const tx = data.registryTxHash;
     const isBotChain = data.chainId === 677 || (data.network && data.network.toLowerCase().includes("bot"));
     const botContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
     const baseContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
@@ -119,28 +126,17 @@ function buildAnswerData(data: AnswerData): {
       paid: data.totalPaid + " USDC",
       to: sourceNames || data.receipt[0].source,
       via: data.network || (isBotChain ? "BOT Chain Mainnet" : "Base Mainnet"),
-      txId: tx ? `${tx.slice(0, 8)}...${tx.slice(-6)}` : "0xb357...Ea45 (Contract)",
+      txId: tx ? `${tx.slice(0, 8)}...${tx.slice(-6)}` : "Registry submission pending",
       basescanUrl: defaultUrl,
-      success: true,
-      sourceCitations: data.sourceCitations,
+      success: Boolean(tx),
+      sourceCitations: paidSourceCitations,
       registryTxHash: data.registryTxHash,
       registryContract: data.registryContract || (isBotChain ? botContract : baseContract),
       chainId: data.chainId || (isBotChain ? 677 : 8453),
     };
   }
-  return { content, receipt, rawReceipts: data.receipt, sourceCitations: data.sourceCitations };
+  return { content, receipt, rawReceipts: data.receipt, sourceCitations: paidSourceCitations };
 }
-
-const SAMPLE_RECEIPT: ReceiptData = {
-  paid: "0.0200 USDC",
-  to: "Institutional Signal Node",
-  via: "Base",
-  txId: "0x3fa7...8c1e",
-  basescanUrl: "https://basescan.org",
-  success: true,
-};
-
-
 
 function Avatar({ letter, size = 32, bg = "var(--qd-avatar-user)" }: { letter: string; size?: number; bg?: string }) {
   return (
@@ -348,26 +344,13 @@ function ReceiptCard({
         cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} USDC` : "0.005 USDC",
         protocol: r.source.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
         citation: receipt.sourceCitations?.find(c => c.name.toLowerCase() === r.source.toLowerCase())?.citation,
-        txHash: r.txHash || receipt.registryTxHash,
+        txHash: r.txHash,
+        explorerUrl: r.basescanUrl,
       }));
     }
-    if (receipt.sourceCitations && receipt.sourceCitations.length > 0) {
-      return receipt.sourceCitations.map(c => ({
-        name: c.name,
-        cost: "0.005 USDC",
-        protocol: c.name.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
-        citation: c.citation,
-        txHash: receipt.registryTxHash,
-      }));
-    }
-    const names = (receipt.to || "").split(",").map(s => s.trim()).filter(Boolean);
-    return names.map(name => ({
-      name,
-      cost: "0.005 USDC",
-      protocol: "x402 Protocol (Exact EVM)",
-      citation: undefined as string | undefined,
-      txHash: receipt.registryTxHash,
-    }));
+    // Never invent itemized payment amounts. A receipt without raw source
+    // records cannot prove an individual source settlement.
+    return [];
   })();
 
   const agentWallet = "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2";
@@ -382,8 +365,12 @@ function ReceiptCard({
             <svg width="9" height="9" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.2 5.7L6.5 2" stroke="var(--qd-receipt-success)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
           <div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--qd-receipt-success)" }}>Autonomous Settlement Verified</span>
-            <span style={{ fontSize: 11, color: "var(--qd-muted2)", marginLeft: 6 }}>• On-Chain Proof</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: receipt.success ? "var(--qd-receipt-success)" : "var(--qerin-accent)" }}>
+              {receipt.success ? "Registry Receipt Confirmed" : "Paid Source Settlement Confirmed"}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--qd-muted2)", marginLeft: 6 }}>
+              • {receipt.success ? "On-Chain Registry Proof" : "Registry submission pending"}
+            </span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -398,15 +385,15 @@ function ReceiptCard({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--qerin-text)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              👤 Individual Settlement For You
+              👤 Query Settlement Record
             </span>
             <span style={{ fontSize: 9.5, padding: "1px 5px", borderRadius: 4, background: "rgba(34,197,94,0.15)", color: "#22c55e", fontWeight: 600 }}>
-              Verified Client
+              Account-linked
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
-              {userAccount ? shortAddr(userAccount) : "0x1577...2b7e"}
+              {userAccount ? shortAddr(userAccount) : "Anonymous account"}
             </span>
             {onOpenLedger && (
               <button
@@ -460,8 +447,8 @@ function ReceiptCard({
               {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
             </span>
           </div>
-          <span style={{ fontSize: 10.5, color: "var(--qd-receipt-success)", fontWeight: 600 }}>
-            ✓ Etched into smart contract
+          <span style={{ fontSize: 10.5, color: receipt.success ? "var(--qd-receipt-success)" : "var(--qd-muted2)", fontWeight: 600 }}>
+            {receipt.success ? "✓ Etched into smart contract" : "Registry proof pending"}
           </span>
         </div>
       </div>
@@ -486,9 +473,13 @@ function ReceiptCard({
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-                    {src.cost}
-                  </span>
+                  {src.explorerUrl ? (
+                    <a href={src.explorerUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none" }}>
+                      {src.cost} ↗
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{src.cost}</span>
+                  )}
                   <span style={{ fontSize: 10, color: "var(--qd-receipt-success)", fontWeight: 600 }}>✓ Settled</span>
                 </div>
               </div>
@@ -564,7 +555,7 @@ function ReceiptCard({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Your Client Identity</span>
               <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontWeight: 600 }}>
-                {userAccount ? shortAddr(userAccount) : "0x1577...2b7e"} <span style={{ color: "var(--qd-receipt-success)", fontSize: 10 }}>(Verified)</span>
+                {userAccount ? shortAddr(userAccount) : "Anonymous account"}
               </span>
             </div>
 
@@ -590,7 +581,7 @@ function ReceiptCard({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Smart Contract Method</span>
               <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5, fontWeight: 500, background: "var(--qerin-surface)", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--qd-receipt-border)" }}>
-                recordReceipt(bytes32,uint256,uint256,string)
+                recordReceipt(bytes32,bytes32,uint256,uint256)
               </span>
             </div>
 
@@ -1102,7 +1093,10 @@ export function QerinDashboard() {
         if (typeof result.data.balance === "number") setBalance(result.data.balance);
 
         const newTopic = result.data.topic || q.slice(0, 45);
-        const costDebited = result.data.totalPaid ? parseFloat(result.data.totalPaid) : ANSWER_PRICE_USD;
+        // This is the user's Qerin query charge, not the agent's separate
+        // downstream x402 spend. Keeping them distinct makes the fuel ledger
+        // reconcile with the account balance.
+        const costDebited = ANSWER_PRICE_USD;
 
         updateThread(threadId, t => ({
           ...t,

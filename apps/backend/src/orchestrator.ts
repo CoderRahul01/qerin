@@ -18,6 +18,21 @@ export type ProgressEvent =
 
 export type OnProgress = (event: ProgressEvent) => void;
 
+function enrichmentResult(
+  sourceName: string,
+  content: unknown,
+  settlement: "enrichment" | "telemetry"
+): PaidResult {
+  return {
+    sourceName,
+    content,
+    amountPaid: "0",
+    txHash: null,
+    timestamp: new Date().toISOString(),
+    settlement,
+  };
+}
+
 export function estimateCost(sourceKeys: string[]): number {
   return sourceKeys.reduce((sum, key) => {
     const source = SOURCES[key];
@@ -53,9 +68,10 @@ export async function gatherOnChainTelemetry(targetNetwork?: string): Promise<Pa
 
   return {
     sourceName: `${net.name} Node (Chain ${net.chainId})`,
-    amountPaid: "0.005",
+    amountPaid: "0",
     txHash: null,
     timestamp: new Date().toISOString(),
+    settlement: "telemetry",
     content: {
       network: net.name,
       chainId: net.chainId,
@@ -81,10 +97,6 @@ export async function gatherSources(
     type: "sources_selected",
     sources: [
       ...selected.map((s) => ({ name: s.name, priceUsd: s.priceUsd })),
-      { name: "Web3 Protocol Intelligence", priceUsd: "0.010" },
-      { name: "On-Chain Market Search", priceUsd: "0.005" },
-      { name: "Autonomous Web Research Node", priceUsd: "0.005" },
-      { name: `${getNetwork(targetNetwork).name} Node`, priceUsd: "0.005" },
     ],
   });
 
@@ -112,19 +124,15 @@ export async function gatherSources(
     ),
     // Free enrichment sources (always run, supplement the answer regardless)
     findCryptoSlateIntelligence(question).then((r) => {
-      onProgress?.({ type: "source_settled", name: "Web3 Protocol Intelligence", success: r.length > 0 });
       return r;
     }),
     fetchCoinGeckoIntelligence(question).then((r) => {
-      onProgress?.({ type: "source_settled", name: "On-Chain Market Search", success: Boolean(r) });
       return r;
     }),
     fetchWebResearch(question).then((r) => {
-      onProgress?.({ type: "source_settled", name: "Autonomous Web Research Node", success: r.length > 0 });
       return r;
     }),
     gatherOnChainTelemetry(targetNetwork).then((r) => {
-      onProgress?.({ type: "source_settled", name: r.sourceName, success: true });
       return r;
     }),
   ]);
@@ -133,41 +141,23 @@ export async function gatherSources(
     .filter((r): r is PromiseFulfilledResult<PaidResult> => r.status === "fulfilled")
     .map((r) => r.value);
 
-  // Always enrich with free sources — they run in parallel so there is
-  // no extra latency cost for including them.
+  // Free sources are clearly marked as enrichment. They help synthesis but
+  // never add an invented payment, source count, or transaction hash.
   if (csArticles.length > 0) {
-    successful.push({
-      sourceName: "Web3 Protocol Intelligence",
-      amountPaid: "0.010",
-      txHash: null,
-      timestamp: new Date().toISOString(),
-      content: {
+    successful.push(enrichmentResult("Web3 Protocol Intelligence", {
         feed: "Verified Web3 Protocol Intelligence",
         articles: csArticles,
-      },
-    });
+      }, "enrichment"));
   }
 
   if (cgData) {
-    successful.push({
-      sourceName: "On-Chain Market Search",
-      amountPaid: "0.005",
-      txHash: null,
-      timestamp: new Date().toISOString(),
-      content: cgData,
-    });
+    successful.push(enrichmentResult("On-Chain Market Search", cgData, "enrichment"));
   }
 
   if (webFindings.length > 0) {
-    successful.push({
-      sourceName: "Autonomous Web Research Node",
-      amountPaid: "0.005",
-      txHash: null,
-      timestamp: new Date().toISOString(),
-      content: {
+    successful.push(enrichmentResult("Autonomous Web Research Node", {
         researchFindings: webFindings,
-      },
-    });
+      }, "enrichment"));
   }
 
   // Always anchor with live consensus node telemetry

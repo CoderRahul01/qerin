@@ -8,7 +8,10 @@ const BOT_CHAIN_ID = 677;
 const BOT_REGISTRY_ADDRESS =
   process.env.NEXT_PUBLIC_BOTCHAIN_REGISTRY_ADDRESS ||
   "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
-const BOT_LATEST_RECEIPT =
+// This is the BOT Chain registry deployment transaction, not a fabricated
+// "latest receipt". Per-query receipt links are shown only after the backend
+// has an actual transaction hash to return.
+const BOT_DEPLOYMENT_TRANSACTION =
   "0xddf75e5bfea642d2dc6b800b3e479d8a79ec048cbcd3857063fc320a8d84a1aa";
 const BOT_WEBSITE_URL = "https://botchain.ai";
 const BOT_EXPLORER_URL = "https://scan.botchain.ai";
@@ -339,7 +342,7 @@ export function BotChainProofFooter() {
                 </div>
               </div>
 
-              {/* Latest Receipt */}
+              {/* Deployment transaction */}
               <div
                 style={{
                   display: "grid",
@@ -348,11 +351,11 @@ export function BotChainProofFooter() {
                 }}
               >
                 <span style={{ color: "#94a3b8", letterSpacing: "0.05em", fontWeight: 600 }}>
-                  LATEST RECEIPT
+                  DEPLOYMENT TX
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <a
-                    href={`${BOT_EXPLORER_URL}/tx/${BOT_LATEST_RECEIPT}`}
+                    href={`${BOT_EXPLORER_URL}/tx/${BOT_DEPLOYMENT_TRANSACTION}`}
                     target="_blank"
                     rel="noreferrer"
                     style={{
@@ -361,25 +364,25 @@ export function BotChainProofFooter() {
                       fontFamily: "var(--font-ibm-plex-mono), monospace",
                       wordBreak: "break-all",
                     }}
-                    title={`View tx ${BOT_LATEST_RECEIPT} on BOTScan`}
+                    title={`View deployment tx ${BOT_DEPLOYMENT_TRANSACTION} on BOTScan`}
                   >
-                    {truncateHash(BOT_LATEST_RECEIPT, 14, 12)}
+                    {truncateHash(BOT_DEPLOYMENT_TRANSACTION, 14, 12)}
                   </a>
                   <button
-                    onClick={() => copyToClipboard(BOT_LATEST_RECEIPT, "receipt")}
+                    onClick={() => copyToClipboard(BOT_DEPLOYMENT_TRANSACTION, "deployment")}
                     type="button"
                     style={{
                       background: "transparent",
                       border: "none",
-                      color: copiedField === "receipt" ? "#00e5a3" : "#64748b",
+                      color: copiedField === "deployment" ? "#00e5a3" : "#64748b",
                       cursor: "pointer",
                       padding: 2,
                       display: "flex",
                       alignItems: "center",
                     }}
-                    title="Copy full tx hash"
+                    title="Copy deployment transaction hash"
                   >
-                    {copiedField === "receipt" ? (
+                    {copiedField === "deployment" ? (
                       <span style={{ fontSize: 10, color: "#00e5a3" }}>✓</span>
                     ) : (
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -411,7 +414,7 @@ export function BotChainProofFooter() {
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
               >
-                View transaction on BOTScan ↗
+                View registry on BOTScan ↗
               </a>
             </div>
           </div>

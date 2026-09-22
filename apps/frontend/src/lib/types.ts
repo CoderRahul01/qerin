@@ -16,6 +16,7 @@ export interface ReceiptItem {
   basescanUrl: string | null;
   timestamp: string;
   content: unknown;
+  settlement?: "x402" | "enrichment" | "telemetry";
 }
 
 export interface PersonaInsights {

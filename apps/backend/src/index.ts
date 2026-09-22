@@ -15,6 +15,7 @@ import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBala
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
+import { getPublicAnalytics } from "./analytics.js";
 
 interface RateLimiterBinding {
   limit: (opts: { key: string }) => Promise<{ success: boolean }>;
@@ -30,6 +31,17 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use("*", cors());
 
 app.get("/", (c) => c.json({ status: "ok" }));
+
+// Public aggregate protocol-growth data for the investor/community dashboard.
+// It contains no wallet addresses, questions, balances, or API keys.
+app.get("/v1/analytics", async (c) => {
+  try {
+    return c.json(await getPublicAnalytics());
+  } catch (err) {
+    console.error("Could not build public analytics:", err);
+    return c.json({ error: "Analytics are temporarily unavailable" }, 503);
+  }
+});
 
 type RateLimitContext = {
   req: { header: (name: string) => string | undefined };

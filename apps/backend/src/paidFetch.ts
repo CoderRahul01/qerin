@@ -17,6 +17,8 @@ export interface PaidResult {
   amountPaid: string;
   txHash: string | null;
   timestamp: string;
+  /** True only when the x402 facilitator returned an on-chain settlement tx. */
+  settlement: "x402" | "enrichment" | "telemetry";
 }
 
 // Lazily built on first paySource() call — the wallet and network config it
@@ -59,23 +61,22 @@ export async function paySource(
 
   const content = await response.json();
 
-  // SettleResponse.amount is only populated for schemes like `upto` where the
-  // settled amount can differ from the authorized max — for `exact`, fall back
-  // to the price we already know we agreed to pay this source. If the resource
-  // turned out not to require payment at all, no settle header will be present.
+  // A 2xx response alone is not proof of a paid resource. Only a settlement
+  // header carrying an on-chain transaction is eligible for Qerin's paid
+  // ledger, receipt registry, or customer-facing settlement UI.
   let txHash: string | null = null;
-  let amountPaid = expectedPriceUsd;
+  let amountPaid = "0";
   try {
     const settleResponse = httpClient.getPaymentSettleResponse((name) =>
       response.headers.get(name)
     );
     txHash = settleResponse.transaction ?? null;
-    if (settleResponse.amount) {
-      amountPaid = formatUsdcAtomicAmount(settleResponse.amount);
-    }
+    if (!txHash) throw new Error("missing settlement transaction");
+    amountPaid = settleResponse.amount
+      ? formatUsdcAtomicAmount(settleResponse.amount)
+      : expectedPriceUsd;
   } catch {
-    // No payment was actually required/settled for this request.
-    amountPaid = "0";
+    throw new Error(`${sourceName} returned no verifiable x402 settlement`);
   }
 
   return {
@@ -84,5 +85,6 @@ export async function paySource(
     amountPaid,
     txHash,
     timestamp: new Date().toISOString(),
+    settlement: "x402",
   };
 }

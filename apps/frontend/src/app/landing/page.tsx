@@ -1,5 +1,4 @@
 import { Nav } from "@/components/Nav";
-import { LogoMark } from "@/components/LogoMark";
 import { StepsFlow, type FlowStep } from "@/components/StepsFlow";
 import { SocialUpdates } from "@/components/SocialUpdates";
 import { HeroScene } from "@/components/HeroScene";
@@ -406,7 +405,7 @@ export default function Home() {
                 Verified on-chain smart contracts & Dune analytics
               </div>
               <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-                <code>QerinReceiptRegistry.sol</code> is deployed and source-verified on Base mainnet and fully prepared for BOT Chain mainnet deployment.
+                <code>QerinReceiptRegistry.sol</code> provides an append-only record for verified Qerin deliveries on Base and BOT Chain.
                 Track live verification metrics and throughput on our official Dune Intelligence Hub.
               </p>
               <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 14 }}>
@@ -448,8 +447,8 @@ export default function Home() {
             <Eyebrow>PRODUCTION PROTOCOL STATUS</Eyebrow>
           </div>
           <p style={{ marginTop: 8, fontSize: 15, lineHeight: 1.55, color: "var(--qerin-text-muted)", maxWidth: 620 }}>
-            Qerin is fully live in production. You can execute real autonomous AI queries, verify on-chain settlements,
-            switch seamlessly between Base (8453) and BOT Chain (677), and export verified PDF research dossiers right now.
+            Qerin is built for real autonomous AI queries, wallet-funded access, and auditable payment receipts across
+            Base (8453) and BOT Chain (677). Paid-source settlement is shown only when a verifiable x402 transaction exists.
           </p>
         </section>
 
@@ -473,7 +472,7 @@ export default function Home() {
             <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 18, flexWrap: "wrap", fontSize: 12.5, color: "var(--qerin-text-muted)" }}>
               <span>⚡ Sub-second synthesis</span>
               <span>•</span>
-              <span>🛡️ 100% Cryptographic verification</span>
+              <span>🛡️ Verifiable paid-source receipts</span>
               <span>•</span>
               <span>📄 Instant PDF dossier export</span>
             </div>

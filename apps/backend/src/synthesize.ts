@@ -40,6 +40,16 @@ function generateFallbackTopic(question: string): string {
   return words.length > 0 ? `${words}: Research Dossier` : "Verified Research Dossier";
 }
 
+function sourceLabel(source: PaidResult): string {
+  if (source.settlement === "x402") {
+    return `Paid x402 source settled on-chain (${source.amountPaid} USDC).`;
+  }
+  if (source.settlement === "telemetry") {
+    return "Live public execution-node telemetry (not a paid source).";
+  }
+  return "Public enrichment source (not a paid source).";
+}
+
 function parseJsonResponse(raw: string, question: string, fallbackSources: PaidResult[]): SynthesizedResult {
   let cleaned = raw.trim();
   if (cleaned.startsWith("```")) {
@@ -68,33 +78,28 @@ function parseJsonResponse(raw: string, question: string, fallbackSources: PaidR
     }
 
     // Normalize source citations
-    let citations: SourceCitation[] = [];
-    if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
-      citations = parsed.sources.map((s: any) => ({
-        name: String(s.name || s.source || "Verified Source"),
-        citation: String(s.citation || s.summary || s.data || "Data verified on-chain"),
-      }));
-    } else {
-      citations = fallbackSources.map((s) => ({
-        name: s.sourceName,
-        citation: `Verified intelligence & telemetry settled on-chain (${s.amountPaid} USDC)`,
-      }));
-    }
+    // Source provenance is system-derived, never taken from the model. A
+    // model may summarize content, but it must not be able to turn public
+    // enrichment into a paid citation by changing a label in its JSON.
+    const citations: SourceCitation[] = fallbackSources.map((s) => ({
+      name: s.sourceName,
+      citation: sourceLabel(s),
+    }));
 
     return {
       topic:
         typeof parsed.topic === "string" && parsed.topic.trim()
           ? parsed.topic.trim()
           : generateFallbackTopic(question),
-      summary: summaryText || "Verified protocol intelligence retrieved on-chain.",
+      summary: summaryText || "Research synthesized from paid sources and clearly labeled public enrichment.",
       answer: answerText || cleaned,
       personaInsights: {
         developer:
           parsed.personaInsights?.developer ||
-          "Technical details, RPC endpoints, and contract specs verified on-chain.",
+          "Technical details, RPC endpoints, and contract specs drawn from the supplied sources.",
         founder:
           parsed.personaInsights?.founder ||
-          "Strategic market implications and unit economics synthesized from paid publishers.",
+          "Strategic market implications and unit economics synthesized from the supplied research.",
         contentWriter:
           parsed.personaInsights?.contentWriter ||
           "Key actionable takeaways and quotable verified insights.",
@@ -117,7 +122,7 @@ function parseJsonResponse(raw: string, question: string, fallbackSources: PaidR
       },
       sourceCitations: fallbackSources.map((s) => ({
         name: s.sourceName,
-        citation: `Verified intelligence settled on-chain (${s.amountPaid} USDC)`,
+      citation: sourceLabel(s),
       })),
     };
   }
@@ -136,12 +141,11 @@ export async function synthesizeAnswer(
     )
     .join("\n\n");
 
-  const prompt = `You are Qerin, an autonomous AI research agent that pays micropayments on-chain to access premium live sources.
-Synthesize an authoritative, in-depth, verified research dossier based on the question and gathered intelligence below.
+  const prompt = `You are Qerin, an autonomous AI research agent. Synthesize an authoritative, in-depth research dossier based on the question and gathered intelligence below.
 
 Question: ${question}
 
-Gathered source intelligence & verified on-chain telemetry:
+Gathered source intelligence. Sources are labelled as paid x402 settlements, public enrichment, or public telemetry. Never describe public enrichment or telemetry as paid, premium, or settled:
 ${sourceText}
 
 Provide your response as a valid JSON object matching this exact schema:
@@ -228,17 +232,17 @@ Return ONLY the raw JSON object without additional surrounding text.`;
   // 3. Fallback if all LLMs are unreachable
   return {
     topic: generateFallbackTopic(question),
-    summary: "• Verified multi-source intelligence retrieved on-chain.\n• Consensus state confirmed via live execution nodes.\n• Settlement receipts recorded in immutable smart contract registry.",
-    answer: `**Verified Research Dossier**\n\nThis intelligence dossier was synthesized from live data feeds: ${sources.map((s) => s.sourceName).join(", ")}.\n\n**On-Chain Verification**\n\nAll underlying telemetry has been verified against execution node states and anchored into the on-chain QerinReceiptRegistry contract on Base Mainnet.`,
+    summary: "• Research assembled from the sources listed below.\n• Paid sources and public enrichment are distinguished in the receipt.\n• Settlement evidence is recorded only for verified x402 payments.",
+    answer: `**Research Dossier**\n\nThis dossier was synthesized from: ${sources.map((s) => s.sourceName).join(", ")}.\n\n**Settlement evidence**\n\nOnly sources explicitly marked as x402 settlements have an associated paid transaction and are eligible for the on-chain receipt registry.`,
     personaInsights: {
-      developer: "Inspect transaction logs on-chain for payment proofs and technical contracts.",
-      founder: "Data sourced directly from live protocol and ecosystem feeds.",
-      contentWriter: "Direct citations from verified network intelligence.",
-      trader: "Live liquidity and on-chain intelligence retrieved.",
+      developer: "Inspect the source labels and transaction links before relying on settlement evidence.",
+      founder: "Distinguish paid research from public enrichment when evaluating coverage.",
+      contentWriter: "Use the source labels and citations to attribute claims accurately.",
+      trader: "Validate market-sensitive information against the cited source and timestamp.",
     },
     sourceCitations: sources.map((s) => ({
       name: s.sourceName,
-      citation: `Live data extracted and anchored on-chain with ${s.amountPaid} USDC micropayment.`,
+      citation: sourceLabel(s),
     })),
   };
 }

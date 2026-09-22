@@ -37,7 +37,8 @@ export async function answerHandler(
     };
   }
 
-  const paidResults = await gatherSources(question, sourceKeys, targetNetwork, onProgress);
+  const gatheredResults = await gatherSources(question, sourceKeys, targetNetwork, onProgress);
+  const paidResults = gatheredResults.filter((result) => result.settlement === "x402");
 
   if (paidResults.length === 0) {
     return {
@@ -53,7 +54,7 @@ export async function answerHandler(
   await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
 
   onProgress?.({ type: "synthesizing" });
-  const synthesized = await synthesizeAnswer(question, paidResults);
+  const synthesized = await synthesizeAnswer(question, gatheredResults);
 
   // Record verified on-chain receipt ASAP — but don't block the response on it.
   // The blockchain write (Base/BOT Chain) involves RPC round-trips and tx propagation
@@ -61,6 +62,10 @@ export async function answerHandler(
   // largest source of perceived latency. Fire it as a background task and ship the
   // answer immediately. The receipt will land on-chain regardless.
   const network = getNetwork(targetNetwork);
+  // x402 source settlement uses the backend's configured payment rail. The
+  // user-selected network controls the Qerin receipt registry, not a source
+  // transaction that may have settled on a different supported rail.
+  const sourceSettlementNetwork = getNetwork();
   const registryAddr = getRegistryAddress(targetNetwork);
 
   // Background the chain write — intentionally not awaited
@@ -87,14 +92,14 @@ export async function answerHandler(
     : (registryAddr ? network.explorerAddressUrl(registryAddr) : "https://basescan.org");
 
   const receipt = paidResults.map((r) => {
-    const tx = r.txHash || registryTxHash;
     return {
       source: r.sourceName,
       amountPaid: r.amountPaid,
-      txHash: tx,
-      basescanUrl: tx ? network.explorerTxUrl(tx) : defaultExplorerUrl,
+      txHash: r.txHash,
+      basescanUrl: r.txHash ? sourceSettlementNetwork.explorerTxUrl(r.txHash) : null,
       timestamp: r.timestamp,
       content: r.content,
+      settlement: r.settlement,
     };
   });
 

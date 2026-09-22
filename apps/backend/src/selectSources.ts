@@ -16,7 +16,9 @@ export function selectSources(question: string): string[] {
       selected.push("coingecko", "coinmarketcap");
     }
     if (/\b(sentiment|trending|momentum|mindshare|research)\b/.test(lower)) {
-      selected.push("messari");
+      // Messari's advertised $0.55 route exceeds Qerin's $0.50 per-query
+      // hard cap and the $0.15 customer price. Do not select a route the
+      // spend guard must reject before it can be paid for honestly.
     }
   }
   if (/\b(news|happened|today|this week|announced)\b/.test(lower)) {

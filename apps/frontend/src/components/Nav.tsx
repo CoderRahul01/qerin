@@ -6,7 +6,7 @@ const links = [
   { href: "/app", label: "Terminal" },
   { href: "/developers", label: "Developers & MCP" },
   { href: "/rewards", label: "Rewards & Points" },
-  { href: "https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub", label: "Dune Analytics ↗" },
+  { href: "/analytics", label: "Protocol Growth" },
 ];
 
 export function Nav() {
@@ -81,4 +81,3 @@ export function Nav() {
     </header>
   );
 }
-

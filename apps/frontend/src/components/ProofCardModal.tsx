@@ -38,6 +38,7 @@ export function ProofCardModal({
   const explorerUrl = receipt?.basescanUrl || (isBotChain ? "https://scan.botchain.ai" : "https://basescan.org");
   const contractAddress = receipt?.registryContract || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
   const txId = receipt?.txId || "0xb357...Ea45";
+  const hasRegistryProof = Boolean(receipt?.registryTxHash);
   const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
 
   const verificationUrl = typeof window !== "undefined"
@@ -152,10 +153,10 @@ export function ProofCardModal({
       // Sources
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "14px monospace";
-      ctx.fillText("AUTHENTICATED PUBLISHERS", 70, 475);
+      ctx.fillText("PAID X402 SOURCES", 70, 475);
       const sourceList = sourceCitations.length > 0
         ? sourceCitations.map(s => s.name).join("  •  ")
-        : "CryptoSlate Alpha  •  Superhighway Validator  •  Veles Finance";
+        : "No verified paid source records";
       ctx.fillStyle = "#f45b00";
       ctx.font = "bold 16px Inter, sans-serif";
       ctx.fillText(sourceList, 70, 505);
@@ -250,7 +251,7 @@ export function ProofCardModal({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", borderRadius: 4, background: "rgba(34,197,94,0.12)", color: "#16a34a", fontSize: 11.5, fontWeight: 700 }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e" }} />
-              IMMUTABLE RECORD CONFIRMED
+              {hasRegistryProof ? "IMMUTABLE RECORD CONFIRMED" : "PAID SOURCE SETTLEMENT CONFIRMED"}
             </span>
             <span style={{ fontSize: 11.5, color: "var(--qerin-text-muted)", fontFamily: "var(--font-ibm-plex-mono)" }}>
               {timestamp}
@@ -280,9 +281,13 @@ export function ProofCardModal({
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--qerin-text-muted)" }}>Receipt Transaction:</span>
-              <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)", textDecoration: "none", fontWeight: 600 }}>
-                {txId} ↗
-              </a>
+              {hasRegistryProof ? (
+                <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)", textDecoration: "none", fontWeight: 600 }}>
+                  {txId} ↗
+                </a>
+              ) : (
+                <span style={{ color: "var(--qerin-text-muted)", fontWeight: 600 }}>Submission pending</span>
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--qerin-text-muted)" }}>Registry Contract:</span>
@@ -291,7 +296,7 @@ export function ProofCardModal({
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--qerin-text-muted)" }}>Paid Sources:</span>
               <span style={{ color: "var(--qerin-text)", fontWeight: 600 }}>
-                {sourceCitations.length > 0 ? sourceCitations.length : 3} Authenticated Publishers
+                {sourceCitations.length} Verified x402 {sourceCitations.length === 1 ? "Source" : "Sources"}
               </span>
             </div>
           </div>
