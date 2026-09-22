@@ -1135,7 +1135,7 @@ export function QerinDashboard() {
           messages: t.messages.filter(m => m.role !== "thinking").concat({
             id: answerMsgId,
             role: "assistant" as const,
-            content: "I couldn't retrieve verified data right now. Please try again shortly.",
+            content: result.message || "Qerin could not complete a verifiable payment to a paid source. Your query was not charged.",
             time: answerTime,
             latencySec,
             completedAtUtc,

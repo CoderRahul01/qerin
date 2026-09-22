@@ -25,12 +25,12 @@ export function selectSources(question: string): string[] {
     selected.push("cryptoslate", "superhighway");
   }
 
-  // General-purpose web search fallback: always included when nothing more
-  // specific matched, and a reasonable single-source answer when it's the
-  // only thing selected — Tavily's payers/volume on the x402 Bazaar (see
-  // sources.ts) made it the strongest generic pick over Superhighway alone.
+  // General-purpose web search fallback. Superhighway advertises an exact
+  // Base-USDC x402 challenge, which is the scheme Qerin's payer supports.
+  // Tavily's current endpoint instead requires AWS `agent-pay`; selecting it
+  // here would guarantee a failed paid request, not a verified result.
   if (selected.length === 0) {
-    selected.push("tavily");
+    selected.push("superhighway");
   }
 
   return [...new Set(selected)].slice(0, 4);

@@ -44,8 +44,8 @@ export async function answerHandler(
     return {
       status: 502,
       body: {
-        error: "No sources responded",
-        message: "Qerin could not reach any paid source. No charge was made.",
+        error: "No verifiable paid settlement",
+        message: "Qerin could not complete a verifiable x402 payment to a paid source. Your query was not charged.",
       },
     };
   }

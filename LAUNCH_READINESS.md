@@ -9,6 +9,10 @@ until the corresponding evidence below exists.
 - [ ] Deploy the backend Worker with production secrets, including
   `QERIN_INTERNAL_SECRET`, `QERIN_WALLET_PRIVATE_KEY`,
   `QERIN_REGISTRY_ADDRESS_BOTCHAIN`, and the configured LLM/provider keys.
+- [ ] Fund Qerin's operational Base wallet with a small USDC float before
+  accepting paid queries. The agent cannot settle x402 source payments with
+  an empty wallet; verify its public USDC balance and record the funding
+  transaction in the launch evidence sheet.
 - [ ] Deploy the frontend with `QERIN_BACKEND_URL`,
   `QERIN_INTERNAL_SECRET`, `NEXT_PUBLIC_REGISTRY_ADDRESS`, and
   `NEXT_PUBLIC_BOTCHAIN_REGISTRY_ADDRESS` set for production.
