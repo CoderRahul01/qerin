@@ -85,6 +85,12 @@ export function TopupModal({
   const [addressCopied, setAddressCopied] = useState(false);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualTxHash, setManualTxHash] = useState("");
+  // Open by default only for people with no injected wallet — for them this
+  // is the only way in, not an "advanced" option to go dig for.
+  const [depositPanelOpen, setDepositPanelOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return getInjectedProvider() === null;
+  });
   const [hasWallet, setHasWallet] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null;
     return getInjectedProvider() !== null;
@@ -463,7 +469,7 @@ export function TopupModal({
         </div>
 
         <p style={{ fontSize: 12, lineHeight: 1.5, color: "#D1D5DB", margin: "0 0 14px" }}>
-          Every account gets a Qerin deposit address below. Connect a wallet to pay in one click, or copy the address and send from MetaMask, Coinbase Wallet, or any wallet you already hold funds in — a top-up never spends beyond what you send, and research draws down that credited balance only.
+          Fund your Qerin balance, then spend it on research — never a second charge from your wallet.
         </p>
         {paidSourcesReady === false && <div role="status" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(251,146,60,0.35)", background: "rgba(251,146,60,0.08)", color: "#FCD34D", fontSize: 12 }}>
           Paid research is temporarily unavailable while Qerin&apos;s source wallet is replenished. You can still top up — your deposit funds your balance and helps restore source payments right away.
@@ -474,15 +480,37 @@ export function TopupModal({
           <div
             style={{
               marginBottom: 14,
-              padding: "12px 14px",
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              padding: depositPanelOpen ? "12px 14px" : "2px 0",
+              background: depositPanelOpen ? "rgba(255,255,255,0.03)" : "transparent",
+              border: depositPanelOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
               borderRadius: 10,
             }}
           >
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>
-              Your Qerin deposit address · {activeMeta.name}
-            </div>
+            <button
+              onClick={() => setDepositPanelOpen((v) => !v)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                marginBottom: depositPanelOpen ? 7 : 0,
+              }}
+            >
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: depositPanelOpen ? "#9CA3AF" : "#FB923C", textTransform: depositPanelOpen ? "uppercase" : "none", letterSpacing: depositPanelOpen ? "0.04em" : "normal" }}>
+                {depositPanelOpen
+                  ? `Your Qerin deposit address · ${activeMeta.name}`
+                  : hasWallet === false
+                    ? "No browser wallet? Pay from any wallet or exchange instead →"
+                    : "Or pay from a different wallet or exchange →"}
+              </span>
+              <span style={{ color: "#6B7280", fontSize: 11 }}>{depositPanelOpen ? "▾" : "▸"}</span>
+            </button>
+            {depositPanelOpen && (
+            <>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span
                 style={{
@@ -571,26 +599,8 @@ export function TopupModal({
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Wallet Not Detected */}
-        {hasWallet === false && step.kind !== "connecting" && (
-          <div
-            style={{
-              marginBottom: 14,
-              padding: "12px 14px",
-              background: "rgba(251, 146, 60, 0.08)",
-              border: "1px solid rgba(251,146,60,0.3)",
-              borderRadius: 10,
-              fontSize: 12.5,
-              color: "#FCD34D",
-            }}
-          >
-            ⚠ No Web3 wallet detected. Install{" "}
-            <a href="https://metamask.io" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>MetaMask</a>,{" "}
-            <a href="https://www.okx.com/web3" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>OKX Wallet</a>, or{" "}
-            <a href="https://web3.bitget.com" target="_blank" rel="noreferrer" style={{ color: "#FB923C" }}>Bitget Wallet</a>.
+            </>
+            )}
           </div>
         )}
 
