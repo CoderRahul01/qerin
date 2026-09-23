@@ -11,6 +11,9 @@
   --qerin-accent-contrast: #ffffff;
   --qerin-danger: #b3261e;
   --qerin-gradient: linear-gradient(115deg, #f45b00, #ff9a5c);
+  /* Chart series (validated categorical slots 1-2) */
+  --qerin-series-1: #2a78d6;
+  --qerin-series-2: #eb6834;
 }
 
 :root[data-theme="dark"] {
@@ -24,6 +27,8 @@
   --qerin-accent-soft: #ff9a5c;
   --qerin-accent-contrast: #ffffff;
   --qerin-danger: #ff6b5c;
+  --qerin-series-1: #3987e5;
+  --qerin-series-2: #d95926;
 }
 
 html,

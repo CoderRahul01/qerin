@@ -128,9 +128,36 @@ function parseJsonResponse(raw: string, question: string, fallbackSources: PaidR
   }
 }
 
+export interface LlmUsage {
+  provider: "openrouter" | "nvidia" | "none";
+  model: string | null;
+  promptTokens: number;
+  completionTokens: number;
+  // Provider-reported USD cost. OpenRouter returns it when usage accounting
+  // is requested; NVIDIA NIM does not report one, so it stays null there.
+  costUsd: number | null;
+}
+
+interface CompletionUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  cost?: number;
+}
+
+function toLlmUsage(provider: LlmUsage["provider"], model: string, usage: CompletionUsage | undefined): LlmUsage {
+  return {
+    provider,
+    model,
+    promptTokens: Number(usage?.prompt_tokens ?? 0),
+    completionTokens: Number(usage?.completion_tokens ?? 0),
+    costUsd: typeof usage?.cost === "number" ? usage.cost : null,
+  };
+}
+
 export async function synthesizeAnswer(
   question: string,
-  sources: PaidResult[]
+  sources: PaidResult[],
+  onUsage?: (usage: LlmUsage) => void
 ): Promise<SynthesizedResult> {
   const sourceText = sources
     .map(
@@ -193,10 +220,13 @@ Return ONLY the raw JSON object without additional surrounding text.`;
           temperature: 0.2,
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
-        });
+          // OpenRouter extension: include the USD cost in `usage`.
+          usage: { include: true },
+        } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
 
         const content = completion.choices[0]?.message?.content ?? "";
         if (content) {
+          onUsage?.(toLlmUsage("openrouter", model, completion.usage as CompletionUsage | undefined));
           return parseJsonResponse(content, question, sources);
         }
       } catch (err) {
@@ -222,6 +252,7 @@ Return ONLY the raw JSON object without additional surrounding text.`;
       });
       const content = completion.choices[0]?.message?.content ?? "";
       if (content) {
+        onUsage?.(toLlmUsage("nvidia", model, completion.usage as CompletionUsage | undefined));
         return parseJsonResponse(content, question, sources);
       }
     } catch (err) {
@@ -230,6 +261,7 @@ Return ONLY the raw JSON object without additional surrounding text.`;
   }
 
   // 3. Fallback if all LLMs are unreachable
+  onUsage?.({ provider: "none", model: null, promptTokens: 0, completionTokens: 0, costUsd: 0 });
   return {
     topic: generateFallbackTopic(question),
     summary: "• Research assembled from the sources listed below.\n• Paid sources and public enrichment are distinguished in the receipt.\n• Settlement evidence is recorded only for verified x402 payments.",

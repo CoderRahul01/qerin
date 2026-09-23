@@ -1,3 +1,5 @@
+import { identifyWallet, track } from "./analytics";
+
 const STORAGE_KEY = "qerin_account_id";
 
 // ── Multi-Wallet Provider Resolution ────────────────────────────────────────
@@ -92,7 +94,10 @@ export async function requestWalletConnection(): Promise<string | null> {
   try {
     const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
     if (Array.isArray(accounts) && accounts.length > 0 && accounts[0].startsWith("0x")) {
-      return accounts[0].toLowerCase();
+      const address = accounts[0].toLowerCase();
+      identifyWallet(address);
+      track("wallet_connected");
+      return address;
     }
     return null;
   } catch (err) {
@@ -207,6 +212,7 @@ export async function confirmCryptoTopup(
   if (!res.ok) {
     throw new Error(json?.error || "Could not confirm top-up");
   }
+  track("topup_confirmed", { network: network ?? "default" });
   return json.balance as number;
 }
 
@@ -224,6 +230,7 @@ export async function claimDemoFuel(accountId: string, turnstileToken: string): 
   const json = await res.json();
 
   if (res.ok && typeof json.balance === "number") {
+    track("free_pass_claimed");
     return json.balance as number;
   }
 

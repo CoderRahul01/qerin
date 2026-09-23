@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
+const POSTHOG_ORIGIN = process.env.NEXT_PUBLIC_POSTHOG_REGION === "eu" ? "eu" : "us";
+
 const nextConfig: NextConfig = {
+  // PostHog reverse proxy (see src/instrumentation-client.ts).
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      { source: "/ingest/static/:path*", destination: `https://${POSTHOG_ORIGIN}-assets.i.posthog.com/static/:path*` },
+      { source: "/ingest/:path*", destination: `https://${POSTHOG_ORIGIN}.i.posthog.com/:path*` },
+    ];
+  },
   async redirects() {
     return [
       {

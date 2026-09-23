@@ -1,6 +1,7 @@
 import { selectSources } from "./selectSources.js";
 import { estimateCost, gatherSources, type OnProgress } from "./orchestrator.js";
-import { synthesizeAnswer } from "./synthesize.js";
+import { synthesizeAnswer, type LlmUsage } from "./synthesize.js";
+import { getDb } from "./db.js";
 import { checkSpendLimit, recordSpend, ANSWER_PRICE_USD } from "./spendGuard.js";
 import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
@@ -53,10 +54,22 @@ export async function answerHandler(
   }
 
   const totalPaidNum = paidResults.reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
-  await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
+  const spendLogId = await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
 
   onProgress?.({ type: "synthesizing" });
-  const synthesized = await synthesizeAnswer(question, gatheredResults);
+  let llmUsage: LlmUsage | null = null;
+  const synthesized = await synthesizeAnswer(question, gatheredResults, (usage) => {
+    llmUsage = usage;
+  });
+  if (llmUsage) {
+    // Attach AI cost to the same delivery record so the founder dashboard
+    // can compute per-query margin. Analytics must never fail a delivery.
+    await getDb()
+      .collection("spendLog")
+      .doc(spendLogId)
+      .update(llmUsageFields(llmUsage))
+      .catch((err) => console.error("Could not record LLM usage:", err));
+  }
 
   const network = getNetwork(targetNetwork);
   // x402 source settlement uses the backend's configured payment rail. The
@@ -129,5 +142,15 @@ export async function answerHandler(
       registryContract: registryAddr,
       registryExplorerUrl: defaultExplorerUrl,
     },
+  };
+}
+
+function llmUsageFields(usage: LlmUsage): Record<string, unknown> {
+  return {
+    llmProvider: usage.provider,
+    llmModel: usage.model,
+    llmPromptTokens: usage.promptTokens,
+    llmCompletionTokens: usage.completionTokens,
+    llmCostUsd: usage.costUsd,
   };
 }

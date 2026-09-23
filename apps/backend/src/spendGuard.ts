@@ -89,20 +89,26 @@ export async function recordSpend(
   sourceCount: number,
   accountId: string | null = null,
   debitedUsd: number | null = null
-): Promise<void> {
+): Promise<string> {
   const db = getDb();
   const day = todayKey();
   const globalRef = db.collection("spendCounters").doc(day);
 
-  await Promise.all([
+  // `channel` and `revenueUsd` feed the private founder dashboard
+  // (adminAnalytics.ts): the balance-gated app debits the account, the
+  // developer API is paid the same flat price through x402.
+  const [logRef] = await Promise.all([
     db.collection("spendLog").add({
       sourceCostUsd,
       sourceCount,
       userId: accountId,
       debitedUsd,
+      channel: accountId ? "app" : "api",
+      revenueUsd: ANSWER_PRICE_USD,
       createdAt: FieldValue.serverTimestamp(),
     }),
     bumpCounter(globalRef, sourceCostUsd),
     accountId ? bumpCounter(globalRef.collection("accounts").doc(accountId), sourceCostUsd) : Promise.resolve(),
   ]);
+  return logRef.id;
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AnswerData, AnswerProgressEvent } from "./types";
+import { track } from "./analytics";
 
 export type AskStatus = "idle" | "paying" | "done" | "error" | "insufficient_balance";
 
@@ -36,6 +37,7 @@ export function useQerinAnswer() {
   ): Promise<AskResult> {
     setStatus("paying");
     setErrorMessage(null);
+    track("query_submitted", { network: network ?? "default" });
     try {
       const res = await fetch("/api/answer", {
         method: "POST",
@@ -76,6 +78,7 @@ export function useQerinAnswer() {
               } catch {}
             } else if (parsed.event === "done") {
               const json = JSON.parse(parsed.data) as AnswerData;
+              track("query_completed", { network: network ?? "default", paidSources: Array.isArray(json.receipt) ? json.receipt.length : 0 });
               setData(json);
               setStatus("done");
               return { ok: true, data: json };
@@ -100,6 +103,7 @@ export function useQerinAnswer() {
       const json = await res.json();
       if (!res.ok) {
         if (json?.error === "insufficient_balance") {
+          track("insufficient_balance");
           setStatus("insufficient_balance");
           const required = typeof json.required === "number" ? json.required : null;
           return { ok: false, reason: "insufficient_balance", required };
@@ -116,6 +120,7 @@ export function useQerinAnswer() {
         : err instanceof Error
           ? err.message
           : "Qerin couldn't reach a paid source. Try again.";
+      track("query_failed", { timedOut });
       setStatus("error");
       setErrorMessage(message);
       return { ok: false, reason: "error", message };

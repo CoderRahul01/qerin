@@ -16,6 +16,7 @@ import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
 import { getPublicAnalytics } from "./analytics.js";
+import { getAdminAnalytics } from "./adminAnalytics.js";
 import { getChatHistory, isValidChatVaultId, saveChatHistory } from "./chatHistory.js";
 
 interface RateLimiterBinding {
@@ -146,6 +147,20 @@ function validateQuestion(question: unknown): string | null {
   }
   return null;
 }
+
+// Private founder dashboard: revenue, costs, funnel and per-account data.
+// Only Qerin's own frontend holds the internal secret, and its
+// /api/admin/analytics route additionally checks QERIN_ADMIN_KEY.
+app.get("/v1/admin/analytics", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+  const days = Number(c.req.query("days") ?? 30);
+  try {
+    return c.json(await getAdminAnalytics(Number.isFinite(days) ? days : 30));
+  } catch (err) {
+    console.error("Could not build admin analytics:", err);
+    return c.json({ error: "Admin analytics are temporarily unavailable" }, 503);
+  }
+});
 
 // Consumer accounts: anonymous, no email/password — the account id itself
 // is the bearer secret (same trust model as an API key). Only reachable
