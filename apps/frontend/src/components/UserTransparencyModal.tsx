@@ -44,6 +44,7 @@ export interface TransparencyEntry {
   agentDisbursedUsd: string;
   sources: { name: string; cost: string; protocol: string }[];
   txHash: string;
+  registryTxHash?: string;
   questionHash: string;
   registryContract: string;
   agentPayer: string;
@@ -77,9 +78,8 @@ export function UserTransparencyModal({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [verifierInput, setVerifierInput] = useState("");
 
-  const displayAccount = userAccount || "0x15777a83d463dE553F191834220b2b7e";
+  const displayAccount = userAccount || "Wallet not connected";
   const defaultAgentWallet = "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2";
-  const defaultContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
 
   // Aggregate user queries and receipts from threads
   const entries: TransparencyEntry[] = useMemo(() => {
@@ -88,7 +88,7 @@ export function UserTransparencyModal({
 
     for (const thread of threads || []) {
       for (const msg of thread.messages || []) {
-        if (msg.role === "assistant" && (msg.receipt || msg.content)) {
+        if (msg.role === "assistant" && msg.receipt && msg.rawReceipts?.some((r) => r.txHash)) {
           entryIndex++;
           const qText = msg.question || thread.preview || thread.title || "Web3 Protocol Research";
           let qHash = "0x";
@@ -98,32 +98,20 @@ export function UserTransparencyModal({
             qHash = "0x3f9a7c2b4e81d6051b8c6e2a94f10738d5c8e2b1";
           }
 
-          const isBot = thread.network?.toLowerCase().includes("bot") || msg.receipt?.chainId === 677 || activeNetwork === "botchain";
+          const isBot = msg.receipt?.chainId === 677 || thread.network?.toLowerCase().includes("bot") || (!thread.network && activeNetwork === "botchain");
           const chainId = isBot ? 677 : 8453;
           const networkLabel = isBot ? "BOT Chain Mainnet" : "Base Mainnet";
-          const tx = msg.receipt?.registryTxHash || msg.receipt?.txId || "0x0bec1b4f4eb8b00bb112d5ec620b777d02da842253a20036e594372853118ffa";
+          const tx = msg.receipt?.registryTxHash || msg.rawReceipts.find((r) => r.txHash)?.txHash || "";
 
           // Sources breakdown
-          const settleCurrency = isBot ? "BOT" : "USDC";
+          const settleCurrency = "USDC";
           let sourcesList: { name: string; cost: string; protocol: string }[] = [];
           if (msg.rawReceipts && msg.rawReceipts.length > 0) {
             sourcesList = msg.rawReceipts.map((r: ReceiptItem) => ({
               name: r.source,
-              cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} ${settleCurrency}` : `0.005 ${settleCurrency}`,
+              cost: `${parseFloat(r.amountPaid || "0").toFixed(3)} ${settleCurrency}`,
               protocol: r.source.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
             }));
-          } else if (msg.receipt?.to) {
-            sourcesList = msg.receipt.to.split(",").map((s: string) => ({
-              name: s.trim(),
-              cost: `0.005 ${settleCurrency}`,
-              protocol: "x402 Protocol (Exact EVM)",
-            }));
-          } else {
-            sourcesList = [
-              { name: "Autonomous Web Research Node", cost: `0.010 ${settleCurrency}`, protocol: "x402 Protocol" },
-              { name: "Web3 Protocol Intelligence", cost: `0.005 ${settleCurrency}`, protocol: "x402 Protocol" },
-              { name: "Consensus State Node", cost: `0.005 ${settleCurrency}`, protocol: "Consensus RPC" },
-            ];
           }
 
           list.push({
@@ -134,44 +122,21 @@ export function UserTransparencyModal({
             network: networkLabel,
             chainId,
             userAccount: msg.userAccount || displayAccount,
-            costDebited: typeof msg.costDebited === "number" ? msg.costDebited : 0.15,
-            agentDisbursedUsd: msg.receipt?.paid || "0.020 USDC",
+            costDebited: typeof msg.costDebited === "number" ? msg.costDebited : 0,
+            agentDisbursedUsd: msg.receipt?.paid || "0 USDC",
             sources: sourcesList,
-            txHash: tx.startsWith("0x") ? tx : `0x${tx}`,
+            txHash: tx,
+            registryTxHash: msg.receipt.registryTxHash,
             questionHash: qHash,
-            registryContract: msg.receipt?.registryContract || defaultContract,
+            registryContract: msg.receipt?.registryContract || "",
             agentPayer: defaultAgentWallet,
           });
         }
       }
     }
 
-    // If empty, supply representative verified entry matching the live session
-    if (list.length === 0) {
-      list.push({
-        id: "seed-entry-1",
-        timestamp: "10:40 PM",
-        topic: "Voice Agent Harness",
-        question: "agent harness for voice",
-        network: "Base Mainnet",
-        chainId: 8453,
-        userAccount: displayAccount,
-        costDebited: 0.15,
-        agentDisbursedUsd: "0.020 USDC",
-        sources: [
-          { name: "CryptoSlate Intelligence", cost: "0.010 USDC", protocol: "x402 Protocol" },
-          { name: "Protocol & Web Research", cost: "0.005 USDC", protocol: "x402 Protocol" },
-          { name: "Base Mainnet Node (Chain 8453)", cost: "0.005 USDC", protocol: "Consensus RPC" },
-        ],
-        txHash: "0x0bec1b4f4eb8b00bb112d5ec620b777d02da842253a20036e594372853118ffa",
-        questionHash: keccak256(toBytes("agent harness for voice")),
-        registryContract: defaultContract,
-        agentPayer: defaultAgentWallet,
-      });
-    }
-
     return list;
-  }, [threads, displayAccount, defaultContract, defaultAgentWallet, activeNetwork]);
+  }, [threads, displayAccount, defaultAgentWallet, activeNetwork]);
 
   const totalQueries = entries.length;
   const totalCostDebited = entries.reduce((sum, e) => sum + e.costDebited, 0);
@@ -214,10 +179,9 @@ export function UserTransparencyModal({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
       userAccount: displayAccount,
       exportTimestamp: new Date().toISOString(),
-      balance: balance ?? 2.80,
+      balance,
       totalQueries,
       totalCostDebited,
-      contractAddress: defaultContract,
       entries,
     }, null, 2));
     const link = document.createElement("a");
@@ -226,7 +190,7 @@ export function UserTransparencyModal({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [displayAccount, balance, totalQueries, totalCostDebited, defaultContract, entries]);
+  }, [displayAccount, balance, totalQueries, totalCostDebited, entries]);
 
   const computedVerifierHash = useMemo(() => {
     if (!verifierInput.trim()) return null;
@@ -316,7 +280,7 @@ export function UserTransparencyModal({
                   border: "1px solid rgba(34, 197, 94, 0.3)",
                 }}
               >
-                ✓ On-Chain Verified
+                {entries.length > 0 ? "Paid source receipts" : "No paid receipts yet"}
               </span>
             </div>
             <p style={{ margin: "4px 0 0 36px", fontSize: 12.5, color: "#94a3b8" }}>
@@ -393,7 +357,7 @@ export function UserTransparencyModal({
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                 <span style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "#22c55e" }}>
-                  ${(balance ?? 2.80).toFixed(2)} Fuel
+                  {balance === null || balance === undefined ? "Balance unavailable" : `$${balance.toFixed(2)} Fuel`}
                 </span>
                 {onOpenTopup && (
                   <button
@@ -440,75 +404,12 @@ export function UserTransparencyModal({
                 {totalSourcesPaid} Data Nodes
               </div>
               <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                Via x402 Micropayments on Base & BOT Chain
+                Via x402 USDC micropayments on Base
               </div>
             </div>
           </div>
 
-          {/* DUAL NETWORK REGISTRY CARDS */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
-            {/* BOT Chain Mainnet Card */}
-            <div
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: "rgba(139, 92, 246, 0.05)",
-                border: "1px solid rgba(139, 92, 246, 0.2)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#a855f7" }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#c084fc" }}>BOT Chain Mainnet (Chain ID 677)</span>
-                </div>
-                <a
-                  href={`https://scan.botchain.ai/address/${defaultContract}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: "#a855f7", textDecoration: "none", fontWeight: 600 }}
-                >
-                  BOT Scan ↗
-                </a>
-              </div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-                Contract: {shortHex(defaultContract, 10, 8)}
-              </div>
-            </div>
-
-            {/* Base Mainnet Card */}
-            <div
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: "rgba(59, 130, 246, 0.05)",
-                border: "1px solid rgba(59, 130, 246, 0.2)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3b82f6" }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#60a5fa" }}>Base Mainnet (Chain ID 8453)</span>
-                </div>
-                <a
-                  href={`https://basescan.org/address/${defaultContract}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 11, color: "#3b82f6", textDecoration: "none", fontWeight: 600 }}
-                >
-                  Basescan ↗
-                </a>
-              </div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-                Contract: {shortHex(defaultContract, 10, 8)}
-              </div>
-            </div>
-          </div>
+          <p style={{ margin: 0, color: "#94a3b8", fontSize: 12 }}>Source payments settle in USDC on Base. Your Qerin balance may be funded on Base or BOT Chain. Registry transactions appear only when a hash is available.</p>
 
           {/* INDIVIDUAL SETTLEMENT HISTORY TABLE */}
           <div>
@@ -517,7 +418,7 @@ export function UserTransparencyModal({
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   Your Individual Query Settlement History
                 </h3>
-                <span style={{ fontSize: 11, color: "#94a3b8" }}>({entries.length} verified sessions)</span>
+                <span style={{ fontSize: 11, color: "#94a3b8" }}>({entries.length} paid sessions)</span>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -586,10 +487,11 @@ export function UserTransparencyModal({
               </div>
 
               <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                {entries.length === 0 && <div style={{ padding: 24, color: "#cbd5e1" }}>No paid research yet. Completed payments will appear here with their transaction links.</div>}
                 {entries.map((entry) => {
                   const isExpanded = selectedEntryId === entry.id;
                   const isBot = entry.chainId === 677;
-                  const explorerLink = isBot
+                  const explorerLink = entry.registryTxHash && isBot
                     ? `https://scan.botchain.ai/tx/${entry.txHash}`
                     : `https://basescan.org/tx/${entry.txHash}`;
 
@@ -695,7 +597,7 @@ export function UserTransparencyModal({
                             <div style={{ background: "rgba(255,255,255,0.02)", padding: 8, borderRadius: 6, border: "1px solid rgba(255,255,255,0.04)" }}>
                               <div style={{ color: "#94a3b8", fontSize: 10.5 }}>Target Receipt Registry Contract</div>
                               <div style={{ color: "#c084fc", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, marginTop: 2, wordBreak: "break-all" }}>
-                                {entry.registryContract}
+                                {entry.registryContract || "No registry transaction available"}
                               </div>
                             </div>
                           </div>
@@ -709,7 +611,7 @@ export function UserTransparencyModal({
                             </div>
 
                             <div style={{ background: "rgba(255,255,255,0.02)", padding: 8, borderRadius: 6, border: "1px solid rgba(255,255,255,0.04)" }}>
-                              <div style={{ color: "#94a3b8", fontSize: 10.5 }}>Smart Contract Method Signature</div>
+                              <div style={{ color: "#94a3b8", fontSize: 10.5 }}>Registry method (if submitted)</div>
                               <div style={{ color: "#fb923c", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, marginTop: 2 }}>
                                 recordReceipt(bytes32 receiptId, bytes32 questionHash, uint256 sourceCount, uint256 totalPaidMicroUSDC)
                               </div>
@@ -858,7 +760,7 @@ export function UserTransparencyModal({
                   {computedVerifierHash}
                 </div>
                 <div style={{ fontSize: 10.5, color: "#94a3b8" }}>
-                  This exact 32-byte digest is emitted in the `ReceiptRecorded` event on contract <code>0xb3578892...</code>, ensuring zero tampering with your query.
+                  This digest identifies your question. Check the registry transaction in the explorer before treating it as an on-chain proof.
                 </div>
               </div>
             )}
@@ -877,7 +779,7 @@ export function UserTransparencyModal({
           }}
         >
           <div style={{ fontSize: 11.5, color: "#64748b" }}>
-            All queries cryptographically sealed to registry <code>{shortHex(defaultContract, 8, 6)}</code>.
+            Only completed paid source transactions appear in this ledger. Registry status is shown when available.
           </div>
 
           <button

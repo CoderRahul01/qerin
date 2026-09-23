@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   const internalSecret = getInternalSecret();
 
   const accountId = req.headers.get("x-qerin-account-id");
+  const accountProof = req.headers.get("x-qerin-account-proof");
   if (!accountId) {
     return Response.json({ error: "X-Qerin-Account-Id header is required" }, { status: 400 });
   }
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "X-Qerin-Internal-Secret": internalSecret,
         "X-Qerin-Account-Id": accountId,
+        "X-Qerin-Account-Proof": accountProof || "",
         "X-Qerin-Chat-Vault-Id": chatVaultId,
       },
       body: JSON.stringify(body),
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error: timedOut
-          ? "Qerin's backend took too long to respond. No charge was made — try again."
+          ? "Qerin's backend took too long to respond. Check your Qerin balance before retrying."
           : "Could not reach Qerin's backend. Try again shortly.",
       },
       { status: 504 }

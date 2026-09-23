@@ -5,6 +5,7 @@ import {
   formatUnits,
   formatEther,
   parseEther,
+  isAddress,
 } from "viem";
 import { getProvider, type EthereumProvider } from "./account";
 
@@ -287,7 +288,21 @@ export async function sendCryptoDeposit(
   // Fetch destination settlement address + network info
   const infoRes = await fetch(`/api/network-info?network=${network}`);
   const info = await infoRes.json().catch(() => ({}));
-  const payTo = (info.payTo || "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2") as `0x${string}`;
+  if (!infoRes.ok || !isAddress(info.payTo || "")) {
+    throw new Error("Qerin could not verify its deposit address. No wallet transaction was requested.");
+  }
+  // No paidSourcesReady gate here: top-ups fund the same wallet paidSourcesReady
+  // checks, so blocking deposits on it would deadlock the first depositor when
+  // the wallet is empty. Their confirmed USDC transfer both credits their own
+  // ledger balance and replenishes the platform's source-payment float — see
+  // payerReadiness.ts. Only /v1/answer (spending) gates on readiness.
+  if (paymentMethod === "native" && network === "base") {
+    throw new Error("Use USDC for Base top-ups.");
+  }
+  if (paymentMethod === "native" && network === "botchain" && !(Number(info.botPrice) > 0)) {
+    throw new Error("A live BOT price is unavailable. Use USDT or try again shortly.");
+  }
+  const payTo = info.payTo as `0x${string}`;
 
   // Pre-flight balance diagnostics
   let diag: WalletBalanceReport | null = null;
@@ -336,7 +351,7 @@ export async function sendCryptoDeposit(
   if (paymentMethod === "native") {
     let weiAmount: bigint;
     if (network === "botchain") {
-      const botPrice = diag?.botPrice ?? info.botPrice ?? BOT_PRICE_FALLBACK;
+      const botPrice = Number(info.botPrice);
       const botAmount = amountUsd / botPrice;
       weiAmount = parseEther(botAmount.toFixed(8));
     } else {

@@ -12,6 +12,12 @@ export interface DossierOptions {
   date?: string;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char] || char);
+}
+
 export function generateDossierMarkdown(opt: DossierOptions): string {
   const date = opt.date || new Date().toLocaleString();
   const topic = opt.topic || opt.question;
@@ -20,11 +26,11 @@ export function generateDossierMarkdown(opt: DossierOptions): string {
   md += `**Inquiry:** ${opt.question}\n`;
   md += `**Date:** ${date}\n`;
   md += `**Settlement Network:** ${opt.network || "Base Mainnet"}\n`;
-  md += `**On-Chain Micropayment Total:** ${opt.totalPaid || "0.020"} USDC\n\n`;
+  md += `**Paid-source settlement total:** ${opt.totalPaid || "0"} USDC\n\n`;
   md += `---\n\n`;
 
   if (opt.summary) {
-    md += `## ⚡ Executive Summary (Verified TL;DR)\n\n${opt.summary}\n\n`;
+    md += `## ⚡ Executive Summary\n\n${opt.summary}\n\n`;
   }
 
   md += `## 📑 Comprehensive Research & Analysis\n\n${opt.answer}\n\n`;
@@ -69,7 +75,7 @@ export function downloadDossierPdf(opt: DossierOptions): void {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Qerin Dossier — ${topic}</title>
+  <title>Qerin Dossier — ${escapeHtml(topic)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
     body {
@@ -218,40 +224,40 @@ export function downloadDossierPdf(opt: DossierOptions): void {
       <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Autonomous AI Agent with x402 Micropayment Verification</div>
     </div>
     <div style="text-align: right; font-size: 12px; color: #4b5563;">
-      <div>${date}</div>
-      <div style="font-weight: 600; color: #16a34a; margin-top: 2px;">● On-Chain Verified</div>
+      <div>${escapeHtml(date)}</div>
+      <div style="font-weight: 600; color: #16a34a; margin-top: 2px;">● Paid-source transaction recorded</div>
     </div>
   </div>
 
   <div class="meta-box">
     <div class="meta-row">
       <span class="meta-label">Topic:</span>
-      <span class="meta-value" style="font-weight: 600;">${topic}</span>
+      <span class="meta-value" style="font-weight: 600;">${escapeHtml(topic)}</span>
     </div>
     <div class="meta-row">
       <span class="meta-label">Research Inquiry:</span>
-      <span class="meta-value">${opt.question}</span>
+      <span class="meta-value">${escapeHtml(opt.question)}</span>
     </div>
     <div class="meta-row">
       <span class="meta-label">Settlement Network:</span>
-      <span class="meta-value">${opt.network || "Base Mainnet"}</span>
+      <span class="meta-value">${escapeHtml(opt.network || "Base Mainnet")}</span>
     </div>
     <div class="meta-row">
       <span class="meta-label">Total On-Chain Paid:</span>
-      <span class="meta-value" style="color: #f45b00; font-weight: 600;">${opt.totalPaid || "0.020"} USDC</span>
+      <span class="meta-value" style="color: #f45b00; font-weight: 600;">${escapeHtml(opt.totalPaid || "0")} USDC</span>
     </div>
   </div>
 
   ${opt.summary ? `
   <div class="summary-box">
-    <div class="summary-title">⚡ Executive Summary (Verified TL;DR)</div>
-    <div style="font-size: 14px; line-height: 1.6;">${opt.summary.replace(/\n/g, "<br/>")}</div>
+    <div class="summary-title">⚡ Executive Summary</div>
+    <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(opt.summary).replace(/\n/g, "<br/>")}</div>
   </div>
   ` : ""}
 
   <div class="section-title">Comprehensive Verified Analysis</div>
   <div style="font-size: 14px; line-height: 1.7; white-space: pre-line; color: #1f2937;">
-    ${opt.answer.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}
+    ${escapeHtml(opt.answer).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")}
   </div>
 
   ${opt.personaInsights ? `
@@ -259,19 +265,19 @@ export function downloadDossierPdf(opt: DossierOptions): void {
   <div class="persona-grid">
     <div class="persona-card">
       <div class="persona-name">🛠 Developer & Tech Specs</div>
-      <div style="font-size: 13px;">${opt.personaInsights.developer || "Verified on-chain receipt available."}</div>
+      <div style="font-size: 13px;">${escapeHtml(opt.personaInsights.developer || "Source receipt available.")}</div>
     </div>
     <div class="persona-card">
       <div class="persona-name">🚀 Founder & Market Strategy</div>
-      <div style="font-size: 13px;">${opt.personaInsights.founder || "Market impact synthesized from paid sources."}</div>
+      <div style="font-size: 13px;">${escapeHtml(opt.personaInsights.founder || "Market impact synthesized from paid sources.")}</div>
     </div>
     <div class="persona-card">
       <div class="persona-name">✍️ Content & Media Hook</div>
-      <div style="font-size: 13px;">${opt.personaInsights.contentWriter || "Direct quotes and insights."}</div>
+      <div style="font-size: 13px;">${escapeHtml(opt.personaInsights.contentWriter || "Direct quotes and insights.")}</div>
     </div>
     <div class="persona-card">
       <div class="persona-name">📈 Trader & Alpha Signals</div>
-      <div style="font-size: 13px;">${opt.personaInsights.trader || "Real-time liquidity & volume catalysts."}</div>
+      <div style="font-size: 13px;">${escapeHtml(opt.personaInsights.trader || "Real-time liquidity & volume catalysts.")}</div>
     </div>
   </div>
   ` : ""}
@@ -290,10 +296,10 @@ export function downloadDossierPdf(opt: DossierOptions): void {
     <tbody>
       ${receipts.map(r => `
         <tr>
-          <td style="font-weight: 600;">${r.source}</td>
-          <td style="color: #f45b00;">${r.amountPaid} USDC</td>
-          <td>${r.txHash ? r.txHash.slice(0, 16) + "..." : "—"}</td>
-          <td>${r.timestamp}</td>
+          <td style="font-weight: 600;">${escapeHtml(r.source)}</td>
+          <td style="color: #f45b00;">${escapeHtml(r.amountPaid)} USDC</td>
+          <td>${r.txHash ? escapeHtml(r.txHash.slice(0, 16)) + "..." : "—"}</td>
+          <td>${escapeHtml(r.timestamp)}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -301,8 +307,8 @@ export function downloadDossierPdf(opt: DossierOptions): void {
   ` : ""}
 
   <div class="footer">
-    Verified by Qerin Receipt Registry — Base (0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45) & BOT Chain Mainnet (0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45 | Chain ID 677)<br/>
-    Autonomous agent micropayment settlement via x402 protocol.
+    Source payment transaction hashes are listed above. Check each in its block explorer.<br/>
+    Qerin source payments use x402 on Base; your Qerin balance may be funded on Base or BOT Chain.
   </div>
 
   <script>

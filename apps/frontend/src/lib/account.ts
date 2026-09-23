@@ -1,4 +1,31 @@
+import { isAddress, stringToHex } from "viem";
+
 const STORAGE_KEY = "qerin_account_id";
+const ACCOUNT_PROOF_PREFIX = "qerin_account_proof_";
+
+export async function getAccountProof(accountId: string): Promise<string> {
+  if (!isAddress(accountId)) throw new Error("Connect your wallet to use its Qerin balance.");
+  const key = `${ACCOUNT_PROOF_PREFIX}${accountId.toLowerCase()}`;
+  const cached = window.sessionStorage.getItem(key);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached) as { expiresAt: string };
+      if (Date.parse(parsed.expiresAt) > Date.now() + 60_000) return cached;
+    } catch {}
+  }
+  const provider = getProvider();
+  const accounts = await provider.request({ method: "eth_accounts" }) as string[];
+  const wallet = accounts?.[0];
+  if (!wallet || wallet.toLowerCase() !== accountId.toLowerCase()) {
+    throw new Error("Connect the wallet that owns this Qerin balance.");
+  }
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+  const message = `Qerin account access\nDomain:qerin.vercel.app\nAccount:${accountId.toLowerCase()}\nExpires:${expiresAt}`;
+  const signature = await provider.request({ method: "personal_sign", params: [stringToHex(message), wallet] }) as string;
+  const proof = JSON.stringify({ expiresAt, signature });
+  window.sessionStorage.setItem(key, proof);
+  return proof;
+}
 
 // ── Multi-Wallet Provider Resolution ────────────────────────────────────────
 // Supports MetaMask, OKX Wallet, Bitget Wallet, TokenPocket, and any standard
@@ -216,9 +243,10 @@ export async function claimDemoFuel(accountId: string, turnstileToken: string): 
     targetId = await getOrCreateAccountId();
   }
 
+  const proof = await getAccountProof(targetId);
   const res = await fetch("/api/account/topup/demo-claim", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": targetId },
+    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": targetId, "X-Qerin-Account-Proof": proof },
     body: JSON.stringify({ turnstileToken }),
   });
   const json = await res.json();

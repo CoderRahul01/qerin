@@ -2,20 +2,16 @@ import { Hono } from "hono";
 import { isAddress } from "viem";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { x402ResourceServer, type RoutesConfig } from "@x402/core/server";
-import { registerExactEvmScheme } from "@x402/evm/exact/server";
-import { paymentMiddleware } from "@x402/hono";
-import type { MiddlewareHandler } from "hono";
 import { answerHandler } from "./answerHandler.js";
-import { issueApiKey } from "./apiKeys.js";
 import { getQerinAccount } from "./wallet.js";
+import { paidSourcesReady } from "./payerReadiness.js";
+import { verifyAccountProof } from "./accountProof.js";
 import { getNetwork } from "./networks.js";
-import { createQerinCdpFacilitatorClient } from "./cdpFacilitator.js";
 import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBalance, claimEcosystemPass, getRewardsSummary } from "./accounts.js";
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
-import { getPublicAnalytics } from "./analytics.js";
+import { getPublicAnalytics, getPrivateAnalytics } from "./analytics.js";
 import { getChatHistory, isValidChatVaultId, saveChatHistory } from "./chatHistory.js";
 
 interface RateLimiterBinding {
@@ -93,29 +89,13 @@ app.use("/v1/history", rateLimit);
 app.use("/v1/waitlist", rateLimit);
 app.use("/v1/account/topup/demo-claim", topupRateLimit);
 
-// Issuing a key is free and unauthenticated (matches the DeveloperScreen
-// "Get API access" button) — it identifies a developer for future
-// dashboards, but is no longer what gates or bills a call; see
-// /v1/paid/answer below for the real paywall.
-app.post("/v1/keys", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const label = typeof body?.label === "string" ? body.label : undefined;
-
-  try {
-    const { apiKey, prefix } = await issueApiKey(label);
-    return c.json({
-      apiKey,
-      prefix,
-      message: "Store this key now — it will not be shown again.",
-    });
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Internal error" }, 500);
-  }
-});
+// Keys issued by earlier previews never authorized paid calls. Stop creating
+// credentials that appear functional but cannot be used for research.
+app.post("/v1/keys", (c) => c.json({ error: "API keys are not available. Use the x402 paid endpoint or Qerin web app." }, 410));
 
 // Free-tier rewards summary endpoint — reads existing account doc directly
 app.get("/v1/rewards/:accountId", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
   const accountId = c.req.param("accountId");
   if (!accountId) return c.json({ error: "accountId required" }, 400);
 
@@ -132,6 +112,16 @@ function requireInternalSecret(c: { req: { header: (name: string) => string | un
   const internalSecret = process.env.QERIN_INTERNAL_SECRET;
   return Boolean(internalSecret) && c.req.header("x-qerin-internal-secret") === internalSecret;
 }
+
+app.get("/v1/admin/analytics", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+  try {
+    return c.json(await getPrivateAnalytics());
+  } catch (err) {
+    console.error("Could not build private analytics:", err);
+    return c.json({ error: "Analytics are temporarily unavailable" }, 503);
+  }
+});
 
 // Shared by both answer routes. An unbounded question string is both a cost
 // vector (every extra character is paid-source query text and LLM input)
@@ -241,7 +231,7 @@ app.get("/v1/network-info", async (c) => {
     try {
       botPrice = await fetchLiveBotPrice();
     } catch {
-      botPrice = 12.20;
+      botPrice = null;
     }
   }
   return c.json({
@@ -254,6 +244,7 @@ app.get("/v1/network-info", async (c) => {
     currency: network.currency,
     rpcUrl: network.rpcUrl,
     botPrice,
+    paidSourcesReady: await paidSourcesReady(),
   });
 });
 
@@ -309,6 +300,9 @@ app.post("/v1/account/topup/demo-claim", async (c) => {
       error: "Connect your wallet to claim the Ecosystem Review Pass.",
     }, 400);
   }
+  if (!(await verifyAccountProof(accountId, c.req.header("x-qerin-account-proof")))) {
+    return c.json({ error: "Sign in with this wallet to claim its Qerin credit." }, 401);
+  }
 
   try {
     const result = await claimEcosystemPass(accountId, 1.50);
@@ -335,6 +329,9 @@ app.post("/v1/answer", async (c) => {
 
   const accountId = c.req.header("x-qerin-account-id");
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
+  if (!(await verifyAccountProof(accountId, c.req.header("x-qerin-account-proof")))) {
+    return c.json({ error: "Sign in with this wallet before using its Qerin balance. No charge was made." }, 401);
+  }
   const chatVaultId = getChatVaultId(c);
   if (!chatVaultId) return c.json({ error: "A valid chat vault is required" }, 400);
 
@@ -343,6 +340,13 @@ app.post("/v1/answer", async (c) => {
   const questionError = validateQuestion(question);
   if (questionError) {
     return c.json({ error: questionError }, 400);
+  }
+
+  if (!(await paidSourcesReady())) {
+    return c.json({
+      error: "paid_sources_unavailable",
+      message: "Paid research is temporarily unavailable while Qerin's source wallet is replenished. Your balance was not charged.",
+    }, 503);
   }
 
   let balanceAfterDebit: number | null;
@@ -378,7 +382,8 @@ app.post("/v1/answer", async (c) => {
         (event) => {
           stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
         },
-        chatVaultId
+        chatVaultId,
+        (task) => c.executionCtx.waitUntil(task)
       );
       if (result.status !== 200) {
         await creditBalance(accountId, ANSWER_PRICE_USD);
@@ -415,59 +420,13 @@ app.post("/v1/waitlist", async (c) => {
   }
 });
 
-// Paid path: the public developer API. Payment is the auth — no signup,
-// no key. Mirrors exactly how paidFetch.ts pays Qerin's own sources, just
-// with Qerin as the seller instead of the buyer. Requires CDP_API_KEY_ID /
-// CDP_API_KEY_SECRET (facilitator auth); payTo points straight at Qerin's
-// existing wallet address, so no separate CDP wallet is provisioned.
-//
-// Built lazily on the first request rather than at module scope: it reads
-// process.env (via createQerinCdpFacilitatorClient and getQerinAccount/getNetwork),
-// which Workers only populates once a request is being handled — see
-// wallet.ts for the full explanation.
-let paidMiddleware: MiddlewareHandler | null = null;
-
-function getPaidMiddleware(): MiddlewareHandler {
-  if (!paidMiddleware) {
-    const facilitator = createQerinCdpFacilitatorClient();
-    const resourceServer = new x402ResourceServer(facilitator);
-    registerExactEvmScheme(resourceServer);
-
-    const paidRoutes: RoutesConfig = {
-      "/v1/paid/answer": {
-        accepts: {
-          scheme: "exact",
-          payTo: getQerinAccount().address,
-          price: "$0.15",
-          network: getNetwork().caip2,
-        },
-        description: "Qerin verified answer: a synthesized, sourced answer with an on-chain receipt.",
-      },
-    };
-
-    paidMiddleware = paymentMiddleware(paidRoutes, resourceServer);
-  }
-  return paidMiddleware;
-}
-
-app.use("/v1/paid/answer", rateLimit);
-app.use("/v1/paid/answer", (c, next) => getPaidMiddleware()(c, next));
-
-app.post("/v1/paid/answer", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const { question } = body ?? {};
-  const questionError = validateQuestion(question);
-  if (questionError) {
-    return c.json({ error: questionError }, 400);
-  }
-
-  try {
-    const result = await answerHandler(question);
-    return c.json(result.body, result.status);
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Internal error" }, 500);
-  }
-});
+// Direct x402 billing settles before the answer is generated. Until failed
+// delivery can be refunded automatically, keep this path closed so a caller
+// cannot be charged for a source failure. The prepaid app route above refunds
+// failed answers and remains the early-access research path.
+app.post("/v1/paid/answer", (c) => c.json({
+  error: "direct_api_unavailable",
+  message: "Direct x402 API access is paused during early access. Use the Qerin web app.",
+}, 503));
 
 export default app;

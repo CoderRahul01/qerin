@@ -1,7 +1,7 @@
 import { selectSources } from "./selectSources.js";
 import { estimateCost, gatherSources, type OnProgress } from "./orchestrator.js";
 import { synthesizeAnswer } from "./synthesize.js";
-import { checkSpendLimit, recordSpend, ANSWER_PRICE_USD } from "./spendGuard.js";
+import { checkSpendLimit, recordSpend, markSpendDelivered, ANSWER_PRICE_USD } from "./spendGuard.js";
 import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
 import { archivePaidDelivery } from "./chatHistory.js";
@@ -24,7 +24,8 @@ export async function answerHandler(
   accountId: string | null = null,
   targetNetwork?: string,
   onProgress?: OnProgress,
-  chatVaultId: string | null = null
+  chatVaultId: string | null = null,
+  keepBackgroundAlive?: (task: Promise<unknown>) => void
 ): Promise<AnswerResult> {
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
@@ -53,7 +54,7 @@ export async function answerHandler(
   }
 
   const totalPaidNum = paidResults.reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
-  await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
+  const spendLogId = await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
 
   onProgress?.({ type: "synthesizing" });
   const synthesized = await synthesizeAnswer(question, gatheredResults);
@@ -92,6 +93,7 @@ export async function answerHandler(
   // path runs rather than reporting a paid success that cannot be recovered.
   const deliveryId = await archivePaidDelivery(chatVaultId, answerBody);
   if (deliveryId) answerBody.deliveryId = deliveryId;
+  await markSpendDelivered(spendLogId);
 
   // Record verified on-chain receipt ASAP — but don't block the response on it.
   // The blockchain write (Base/BOT Chain) involves RPC round-trips and tx propagation
@@ -104,6 +106,7 @@ export async function answerHandler(
     backgroundReceiptPromise = recordReceiptOnChain(question, paidResults.length, totalPaidNum, accountId, targetNetwork);
     // Attach a no-op catch so unhandled-rejection warnings don't fire
     backgroundReceiptPromise.catch((err) => console.error("QerinReceiptRegistry background write failed:", err));
+    keepBackgroundAlive?.(backgroundReceiptPromise);
   } catch (err) {
     console.error("QerinReceiptRegistry launch failed:", err);
     backgroundReceiptPromise = Promise.resolve(null);

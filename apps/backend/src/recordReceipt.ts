@@ -113,7 +113,7 @@ export async function recordReceiptOnChain(
       REGISTRY_WRITE_TIMEOUT_MS,
       `QerinReceiptRegistry write (${networkName})`
     );
-    console.log(`QerinReceiptRegistry (${networkName}) recorded receipt for ${payer}: ${hash}`);
+    console.log(`QerinReceiptRegistry (${networkName}) submitted receipt transaction for ${payer}: ${hash}`);
     return hash;
   } catch (err) {
     console.error(`QerinReceiptRegistry (${networkName}) write failed (non-fatal):`, err);

@@ -133,13 +133,14 @@ export async function synthesizeAnswer(
   sources: PaidResult[]
 ): Promise<SynthesizedResult> {
   const sourceText = sources
-    .map(
-      (s) =>
-        `Source: ${s.sourceName}\n${
-          typeof s.content === "string" ? s.content : JSON.stringify(s.content, null, 2)
-        }`
-    )
-    .join("\n\n");
+    .map((s) => {
+      const raw = typeof s.content === "string" ? s.content : JSON.stringify(s.content, null, 2);
+      // Keep LLM input bounded for the small early-access budget. The full
+      // retrieved payload remains in the answer receipt for the user.
+      return `Source: ${s.sourceName}\n${raw.slice(0, 12_000)}${raw.length > 12_000 ? "\n[Source excerpt ends; full data is in the receipt.]" : ""}`;
+    })
+    .join("\n\n")
+    .slice(0, 30_000);
 
   const prompt = `You are Qerin, an autonomous AI research agent. Synthesize an authoritative, in-depth research dossier based on the question and gathered intelligence below.
 

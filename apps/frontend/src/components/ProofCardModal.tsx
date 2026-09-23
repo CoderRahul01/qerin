@@ -17,7 +17,6 @@ export function ProofCardModal({
   onClose,
   topic = "Autonomous Protocol Research",
   receipt,
-  sourceCitations = [],
 }: ProofCardModalProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -35,15 +34,14 @@ export function ProofCardModal({
 
   const isBotChain = receipt?.chainId === 677 || (receipt?.via && receipt.via.toLowerCase().includes("bot"));
   const networkName = isBotChain ? "BOT Chain Mainnet (677)" : "Base Mainnet (8453)";
-  const explorerUrl = receipt?.basescanUrl || (isBotChain ? "https://scan.botchain.ai" : "https://basescan.org");
-  const contractAddress = receipt?.registryContract || "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
-  const txId = receipt?.txId || "0xb357...Ea45";
+  const explorerUrl = receipt?.basescanUrl || "";
+  const contractAddress = receipt?.registryContract || "";
+  const txId = receipt?.txId || "";
   const hasRegistryProof = Boolean(receipt?.registryTxHash);
+  const paidSourceNames = receipt?.to?.split(",").map((name) => name.trim()).filter(Boolean) || [];
   const timestamp = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
 
-  const verificationUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/app?proof=${encodeURIComponent(txId)}`
-    : `https://qerin.vercel.app/app?proof=${encodeURIComponent(txId)}`;
+  const verificationUrl = explorerUrl;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(verificationUrl);
@@ -53,14 +51,14 @@ export function ProofCardModal({
 
   const handleShareX = () => {
     const text = encodeURIComponent(
-      `Autonomous research query verified by @qerin_ai.\nSettled via x402 micropayments on ${isBotChain ? "BOT Chain" : "Base"}.\n\nCryptographic Audit Trail: ${verificationUrl}`
+      `Qerin paid a research source through x402.\n\nPayment transaction: ${verificationUrl}`
     );
     window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank", "noopener,noreferrer");
   };
 
   const handleShareWarpcast = () => {
     const text = encodeURIComponent(
-      `Autonomous research query verified by Qerin. Settled via x402 micropayments on ${isBotChain ? "BOT Chain" : "Base"}.\n\nAudit: ${verificationUrl}`
+      `Qerin paid a research source through x402.\n\nPayment transaction: ${verificationUrl}`
     );
     window.open(`https://warpcast.com/~/compose?text=${text}`, "_blank", "noopener,noreferrer");
   };
@@ -97,7 +95,7 @@ export function ProofCardModal({
 
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "500 15px monospace";
-      ctx.fillText("VERIFIED ON-CHAIN AUDIT DOSSIER", 70, 125);
+      ctx.fillText("PAID SOURCE SETTLEMENT RECORD", 70, 125);
 
       // Status Badge
       ctx.fillStyle = "rgba(34, 197, 94, 0.15)";
@@ -106,7 +104,7 @@ export function ProofCardModal({
       ctx.strokeRect(940, 75, 180, 36);
       ctx.fillStyle = "#22c55e";
       ctx.font = "bold 13px Inter, sans-serif";
-      ctx.fillText("SETTLED ON-CHAIN", 965, 98);
+      ctx.fillText(hasRegistryProof ? "REGISTRY TX SUBMITTED" : "SOURCE PAID", 965, 98);
 
       // Topic
       ctx.fillStyle = "#f7f5f0";
@@ -124,21 +122,21 @@ export function ProofCardModal({
       // Parameters Grid
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "14px monospace";
-      ctx.fillText("SETTLEMENT RAIL", 70, 275);
+      ctx.fillText("QERIN ACCOUNT RAIL", 70, 275);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px Inter, sans-serif";
       ctx.fillText(networkName, 70, 305);
 
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "14px monospace";
-      ctx.fillText("REGISTRY CONTRACT", 450, 275);
+      ctx.fillText("REGISTRY CONTRACT (IF AVAILABLE)", 450, 275);
       ctx.fillStyle = "#ffffff";
       ctx.font = "16px monospace";
-      ctx.fillText(contractAddress, 450, 305);
+      ctx.fillText(contractAddress || "No registry transaction yet", 450, 305);
 
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "14px monospace";
-      ctx.fillText("TRANSACTION HASH", 70, 375);
+      ctx.fillText(hasRegistryProof ? "REGISTRY TRANSACTION" : "SOURCE PAYMENT TRANSACTION", 70, 375);
       ctx.fillStyle = "#ffffff";
       ctx.font = "16px monospace";
       ctx.fillText(txId, 70, 405);
@@ -154,9 +152,7 @@ export function ProofCardModal({
       ctx.fillStyle = "#a3a3a3";
       ctx.font = "14px monospace";
       ctx.fillText("PAID X402 SOURCES", 70, 475);
-      const sourceList = sourceCitations.length > 0
-        ? sourceCitations.map(s => s.name).join("  •  ")
-        : "No verified paid source records";
+      const sourceList = paidSourceNames.join("  •  ") || "Source name unavailable";
       ctx.fillStyle = "#f45b00";
       ctx.font = "bold 16px Inter, sans-serif";
       ctx.fillText(sourceList, 70, 505);
@@ -164,7 +160,7 @@ export function ProofCardModal({
       // Footer
       ctx.fillStyle = "#6b6b6b";
       ctx.font = "13px monospace";
-      ctx.fillText("Cryptographic proof generated under x402 specification | qerin.vercel.app", 70, 580);
+      ctx.fillText("Check the source payment transaction in the block explorer | qerin.vercel.app", 70, 580);
 
       // Download
       const link = document.createElement("a");
@@ -220,7 +216,7 @@ export function ProofCardModal({
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <LogoLockup size={18} />
             <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--qerin-text-muted)", fontFamily: "var(--font-ibm-plex-mono)" }}>
-              / VERIFIED AUDIT PROOF
+              / PAID SOURCE RECEIPT
             </span>
           </div>
 
@@ -251,7 +247,7 @@ export function ProofCardModal({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", borderRadius: 4, background: "rgba(34,197,94,0.12)", color: "#16a34a", fontSize: 11.5, fontWeight: 700 }}>
               <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e" }} />
-              {hasRegistryProof ? "IMMUTABLE RECORD CONFIRMED" : "PAID SOURCE SETTLEMENT CONFIRMED"}
+              {hasRegistryProof ? "REGISTRY TRANSACTION SUBMITTED" : "PAID SOURCE TRANSACTION"}
             </span>
             <span style={{ fontSize: 11.5, color: "var(--qerin-text-muted)", fontFamily: "var(--font-ibm-plex-mono)" }}>
               {timestamp}
@@ -276,27 +272,27 @@ export function ProofCardModal({
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--qerin-text-muted)" }}>Settlement Rail:</span>
+              <span style={{ color: "var(--qerin-text-muted)" }}>Qerin account rail:</span>
               <span style={{ fontWeight: 600, color: "var(--qerin-text)" }}>{networkName}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--qerin-text-muted)" }}>Receipt Transaction:</span>
-              {hasRegistryProof ? (
+              <span style={{ color: "var(--qerin-text-muted)" }}>{hasRegistryProof ? "Registry transaction:" : "Source payment on Base:"}</span>
+              {txId && explorerUrl ? (
                 <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)", textDecoration: "none", fontWeight: 600 }}>
-                  {txId} ↗
+                  {txId.slice(0, 8)}…{txId.slice(-6)} ↗
                 </a>
               ) : (
-                <span style={{ color: "var(--qerin-text-muted)", fontWeight: 600 }}>Submission pending</span>
+                <span style={{ color: "var(--qerin-text-muted)", fontWeight: 600 }}>Unavailable</span>
               )}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            {contractAddress && <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--qerin-text-muted)" }}>Registry Contract:</span>
               <span style={{ color: "var(--qerin-text)" }}>{contractAddress.slice(0, 10)}...{contractAddress.slice(-6)}</span>
-            </div>
+            </div>}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "var(--qerin-text-muted)" }}>Paid Sources:</span>
               <span style={{ color: "var(--qerin-text)", fontWeight: 600 }}>
-                {sourceCitations.length} Verified x402 {sourceCitations.length === 1 ? "Source" : "Sources"}
+                {paidSourceNames.length} paid x402 {paidSourceNames.length === 1 ? "source" : "sources"}
               </span>
             </div>
           </div>

@@ -1,79 +1,13 @@
-# Qerin Model Context Protocol (MCP) Server
+# Qerin MCP server (preview)
 
-The official Model Context Protocol (MCP) server for **Qerin** — enabling AI agents, Cursor, Claude Desktop, and Antigravity to autonomously access verified paywalled intelligence backed by on-chain cryptographic settlement proofs.
+This package is a preview. It does **not** run paid research through MCP yet. The `qerin_verified_query` tool returns an explicit error and never fabricates an answer or receipt. Use the [Qerin web app](https://qerin.vercel.app/app) for paid research, Direct x402 API billing is paused during early access.
 
----
+Run a local build with `npm run build` and `npm start`. This repository does not imply that an npm release is available.
 
-## 1. Quickstart
+## Tools
 
-Run directly without installation:
+- `qerin_list_sources` lists source routes and quoted prices. Availability and final charges depend on each provider's live x402 challenge.
+- `qerin_verify_receipt` checks a successful on-chain transaction for the `AnswerDelivered` event at a configured Qerin registry. Set `QERIN_REGISTRY_ADDRESS_BASE` or `QERIN_REGISTRY_ADDRESS_BOTCHAIN` for the network you verify. A transaction hash alone is not proof of a paid source.
+- `qerin_verified_query` reports that MCP payment support is unavailable.
 
-```bash
-npx -y @qerin/mcp@latest
-```
-
----
-
-## 2. Claude Desktop Integration
-
-Add to your `claude_desktop_config.json`:
-
-* **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-* **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "qerin": {
-      "command": "npx",
-      "args": ["-y", "@qerin/mcp@latest"],
-      "env": {
-        "QERIN_API_KEY": "YOUR_QERIN_API_KEY"
-      }
-    }
-  }
-}
-```
-
----
-
-## 3. Cursor IDE Integration
-
-In **Cursor Settings > Features > MCP**, click **+ Add New MCP Server**:
-
-* **Name**: `qerin`
-* **Type**: `command`
-* **Command**: `npx -y @qerin/mcp@latest`
-
----
-
-## 4. Antigravity IDE Integration
-
-Add to your `~/.gemini/config/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "qerin": {
-      "command": "npx",
-      "args": ["-y", "@qerin/mcp@latest"]
-    }
-  }
-}
-```
-
----
-
-## 5. Available Tools
-
-* **`qerin_verified_query`**: Queries paywalled data sources (CryptoSlate, Superhighway, Veles, CoinGecko, Messari) with on-chain settlement receipts.
-* **`qerin_verify_receipt`**: Verifies any cryptographic transaction hash against the on-chain registry on Base or BOT Chain.
-* **`qerin_list_sources`**: Returns live status, unit pricing, and coverage of active publisher feeds.
-
----
-
-## 6. Multi-Chain Neutrality
-
-Qerin settles cryptographic receipts natively across supported EVM networks:
-* **Base Mainnet**: Chain ID `8453`, Registry `0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`
-* **BOT Chain Mainnet**: Chain ID `677`, Registry `0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`
+Source payments currently use Base USDC. User top-ups may use supported Qerin rails; those are separate transactions from source payments and answer receipt records.

@@ -89,20 +89,26 @@ export async function recordSpend(
   sourceCount: number,
   accountId: string | null = null,
   debitedUsd: number | null = null
-): Promise<void> {
+): Promise<string> {
   const db = getDb();
   const day = todayKey();
   const globalRef = db.collection("spendCounters").doc(day);
 
-  await Promise.all([
+  const [log] = await Promise.all([
     db.collection("spendLog").add({
       sourceCostUsd,
       sourceCount,
       userId: accountId,
       debitedUsd,
+      delivered: false,
       createdAt: FieldValue.serverTimestamp(),
     }),
     bumpCounter(globalRef, sourceCostUsd),
     accountId ? bumpCounter(globalRef.collection("accounts").doc(accountId), sourceCostUsd) : Promise.resolve(),
   ]);
+  return log.id;
+}
+
+export async function markSpendDelivered(logId: string): Promise<void> {
+  await getDb().collection("spendLog").doc(logId).update({ delivered: true });
 }

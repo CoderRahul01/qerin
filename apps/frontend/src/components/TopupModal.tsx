@@ -16,9 +16,9 @@ import {
 import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider } from "@/lib/account";
 
 const TIERS = [
-  { amountUsd: 1,  title: "Explorer Fuel",      desc: "~50 Queries",               badge: null },
-  { amountUsd: 5,  title: "Intelligence Pack",   desc: "~250 Queries · Multi-Source", badge: "RECOMMENDED" },
-  { amountUsd: 20, title: "Institutional Vault", desc: "~1,000 Queries · Priority",  badge: null },
+  { amountUsd: 1,  title: "Explorer Fuel",      desc: "Up to 6 answers", badge: null },
+  { amountUsd: 5,  title: "Research Fuel",      desc: "Up to 33 answers", badge: "RECOMMENDED" },
+  { amountUsd: 20, title: "Research Fuel Plus", desc: "Up to 133 answers", badge: null },
 ];
 
 // Public sitekey — pairs with the secret held only by the deployed
@@ -80,6 +80,7 @@ export function TopupModal({
     return false;
   });
   const [botPrice, setBotPrice] = useState<number>(12.20);
+  const [paidSourcesReady, setPaidSourcesReady] = useState<boolean | null>(null);
   const [hasWallet, setHasWallet] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null;
     return getInjectedProvider() !== null;
@@ -97,13 +98,16 @@ export function TopupModal({
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && (window as unknown as { turnstile?: unknown }).turnstile) {
-      setTurnstileReady(true);
-    }
-  }, []);
-
   const activeMeta = TOPUP_NETWORKS[network];
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/network-info?network=${network}`, { cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((info) => { if (!cancelled) setPaidSourcesReady(info?.paidSourcesReady === true); })
+      .catch(() => { if (!cancelled) setPaidSourcesReady(false); });
+    return () => { cancelled = true; };
+  }, [network]);
 
   // Render the Turnstile widget imperatively once the script is loaded and
   // the pass hasn't been claimed — bot-gates the free $1.50 claim so it
@@ -390,7 +394,7 @@ export function TopupModal({
               </svg>
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>Agent Settlement Treasury</div>
+              <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>Your Qerin balance</div>
               {reason && <div style={{ marginTop: 2, fontSize: 12, color: "#9CA3AF" }}>{reason}</div>}
             </div>
           </div>
@@ -412,6 +416,13 @@ export function TopupModal({
             </button>
           )}
         </div>
+
+        <p style={{ fontSize: 12, lineHeight: 1.5, color: "#D1D5DB", margin: "0 0 14px" }}>
+          Connecting your wallet does not spend funds. A gasless signature protects your Qerin balance. A top-up is one wallet transfer to Qerin; research uses that credited balance, never a second charge from your wallet.
+        </p>
+        {paidSourcesReady === false && <div role="status" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(251,146,60,0.35)", background: "rgba(251,146,60,0.08)", color: "#FCD34D", fontSize: 12 }}>
+          Paid research is temporarily unavailable while Qerin's source wallet is replenished. You can still top up — your deposit funds your balance and helps restore source payments right away.
+        </div>}
 
         {/* Wallet Not Detected */}
         {hasWallet === false && step.kind !== "connecting" && (

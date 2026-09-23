@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AnswerData, AnswerProgressEvent } from "./types";
+import { getAccountProof } from "./account";
 
 export type AskStatus = "idle" | "paying" | "done" | "error" | "insufficient_balance";
 
@@ -37,11 +38,13 @@ export function useQerinAnswer() {
     setStatus("paying");
     setErrorMessage(null);
     try {
+      const accountProof = await getAccountProof(accountId);
       const res = await fetch("/api/answer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Qerin-Account-Id": accountId,
+          "X-Qerin-Account-Proof": accountProof,
           ...(chatVaultId ? { "X-Qerin-Chat-Vault-Id": chatVaultId } : {}),
         },
         body: JSON.stringify({ question, network }),
@@ -112,7 +115,7 @@ export function useQerinAnswer() {
     } catch (err) {
       const timedOut = err instanceof Error && err.name === "TimeoutError";
       const message = timedOut
-        ? "Qerin took too long to respond. No charge was made — try again."
+        ? "Qerin took too long to respond. Check your Qerin balance and chat history before retrying."
         : err instanceof Error
           ? err.message
           : "Qerin couldn't reach a paid source. Try again.";

@@ -12,7 +12,10 @@ until the corresponding evidence below exists.
 - [ ] Fund Qerin's operational Base wallet with a small USDC float before
   accepting paid queries. The agent cannot settle x402 source payments with
   an empty wallet; verify its public USDC balance and record the funding
-  transaction in the launch evidence sheet.
+  transaction in the launch evidence sheet. On 2026-09-23, the deployed payer
+  `0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2` held **0 Base USDC**.
+  The new readiness guard requires at least $0.07 USDC; seed more for the
+  10–20 tester cohort (for example $5, the current global daily source cap).
 - [ ] Deploy the frontend with `QERIN_BACKEND_URL`,
   `QERIN_INTERNAL_SECRET`, `NEXT_PUBLIC_REGISTRY_ADDRESS`, and
   `NEXT_PUBLIC_BOTCHAIN_REGISTRY_ADDRESS` set for production.
@@ -25,6 +28,11 @@ until the corresponding evidence below exists.
 - [ ] Run one successful paid query for each supported settlement rail. Its
   response must include at least one x402 source transaction; a source that
   does not return a verifiable settlement transaction is not launch evidence.
+- [ ] Keep `/v1/paid/answer` paused until direct x402 charges can be refunded
+  automatically when source retrieval or answer delivery fails. The prepaid
+  app path is the early-access research flow.
+- [ ] Verify the user signs the gasless Qerin account access message before a
+  query or one-time pass claim. Connecting the wallet alone must not spend.
 - [ ] Confirm any registry receipt transaction in the appropriate explorer.
   If the receipt is pending, do not publish it as an immutable registry proof.
 
@@ -51,6 +59,12 @@ the explorer:
    the evidence sheet. Investigate any mismatch before promotion.
 4. Take a dated screenshot of the reconciled dashboard and keep the query URL.
 
+The private operator summary is available directly from the Worker at
+`/v1/admin/analytics` with the `X-Qerin-Internal-Secret` header. It shows
+wallet users, funded users, research users, top-ups by Base/BOT Chain, and
+per-account balances and paid queries. Never expose this endpoint through a
+public frontend route or publish its account rows to Dune.
+
 ## Launch-Day Smoke Test
 
 1. Load the landing page in an incognito browser and follow every footer link.
@@ -76,7 +90,7 @@ the explorer:
 ## Repository Test Plan
 
 ```bash
-cd apps/backend && npm run typecheck
+cd apps/backend && npm test && npm run typecheck
 cd ../frontend && npm run lint && npm run build
 cd ../contracts && forge test
 ```

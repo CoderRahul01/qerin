@@ -1,4 +1,5 @@
 import { getDb } from "./db.js";
+import { isAddress } from "viem";
 
 export interface GrowthWindow {
   paidResearchQueries: number;
@@ -11,6 +12,70 @@ export interface PublicAnalytics {
   last30Days: GrowthWindow;
   generatedAt: string;
   methodology: string;
+}
+
+export interface PrivateAnalytics {
+  totalAccounts: number;
+  walletUsers: number;
+  fundedUsers: number;
+  researchUsers: number;
+  paidQueries: number;
+  topups: { base: number; botChain: number; totalUsd: number };
+  users: Array<{ accountId: string; balanceUsd: number; topups: number; topupUsd: number; paidQueries: number; baseTopups: number; botChainTopups: number }>;
+  generatedAt: string;
+}
+
+/** Owner-only view. Never route this through a public Next.js API endpoint. */
+export async function getPrivateAnalytics(): Promise<PrivateAnalytics> {
+  const db = getDb();
+  const [accounts, deposits, spends] = await Promise.all([
+    db.collection("accounts").get(),
+    db.collection("usedDeposits").get(),
+    db.collection("spendLog").get(),
+  ]);
+  const users = new Map<string, PrivateAnalytics["users"][number]>();
+  for (const doc of accounts.docs) {
+    users.set(doc.id, {
+      accountId: doc.id,
+      balanceUsd: Number(doc.data()?.balance ?? 0),
+      topups: 0, topupUsd: 0, paidQueries: 0, baseTopups: 0, botChainTopups: 0,
+    });
+  }
+  let base = 0;
+  let botChain = 0;
+  let totalUsd = 0;
+  for (const doc of deposits.docs) {
+    const data = doc.data() ?? {};
+    const user = users.get(String(data.accountId));
+    if (!user) continue;
+    const amount = Number(data.amount ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    user.topups += 1;
+    user.topupUsd += amount;
+    totalUsd += amount;
+    if (doc.id.startsWith("8453:")) { user.baseTopups += 1; base += 1; }
+    if (doc.id.startsWith("677:")) { user.botChainTopups += 1; botChain += 1; }
+  }
+  for (const doc of spends.docs) {
+    const data = doc.data() ?? {};
+    const user = users.get(String(data.userId));
+    if (user && data.delivered !== false) user.paidQueries += 1;
+  }
+  const rows = [...users.values()].map((user) => ({
+    ...user,
+    balanceUsd: Number(user.balanceUsd.toFixed(3)),
+    topupUsd: Number(user.topupUsd.toFixed(3)),
+  }));
+  return {
+    totalAccounts: rows.length,
+    walletUsers: rows.filter((user) => isAddress(user.accountId)).length,
+    fundedUsers: rows.filter((user) => user.topups > 0).length,
+    researchUsers: rows.filter((user) => user.paidQueries > 0).length,
+    paidQueries: rows.reduce((sum, user) => sum + user.paidQueries, 0),
+    topups: { base, botChain, totalUsd: Number(totalUsd.toFixed(3)) },
+    users: rows.sort((a, b) => b.paidQueries - a.paidQueries),
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 const ANALYTICS_CACHE_MS = 5 * 60 * 1000;
@@ -52,10 +117,16 @@ export async function getPublicAnalytics(): Promise<PublicAnalytics> {
   const snapshot = await getDb().collection("spendLog").get();
   for (const doc of snapshot.docs) {
     const record = doc.data() ?? {};
+    if (record.delivered === false) continue;
     recordWindow(allTime, allTimeAccounts, record);
 
-    const createdAt = record.createdAt;
-    if (createdAt instanceof Date && createdAt >= thirtyDaysAgo) {
+    const rawCreatedAt = record.createdAt;
+    const createdAt = rawCreatedAt instanceof Date
+      ? rawCreatedAt
+      : rawCreatedAt && typeof rawCreatedAt === "object" && "toDate" in rawCreatedAt && typeof rawCreatedAt.toDate === "function"
+        ? rawCreatedAt.toDate() as Date
+        : null;
+    if (createdAt && createdAt >= thirtyDaysAgo) {
       recordWindow(last30Days, recentAccounts, record);
     }
   }

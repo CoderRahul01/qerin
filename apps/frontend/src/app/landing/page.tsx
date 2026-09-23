@@ -266,7 +266,7 @@ export default function Home() {
         {/* Trusted sources */}
         <section className="qerin-fade-up" style={{ padding: "clamp(16px, 3vw, 20px) 0", borderTop: "1px solid var(--qerin-border)", animationDelay: "60ms" }}>
           <div style={{ fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--qerin-text-muted)" }}>
-            VERIFIED DATA SOURCES & NETWORKS
+            EARLY ACCESS SOURCE ROUTES · PAID ACCESS DEPENDS ON AVAILABILITY
           </div>
           <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
             {SOURCES.map((source) => (

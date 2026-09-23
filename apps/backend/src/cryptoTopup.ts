@@ -19,7 +19,6 @@ const TRANSFER_TOPIC0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55
 // BOT price cache: fetched from BDEX price API, refreshed every 5 minutes.
 let _botPriceCache: { price: number; ts: number } | null = null;
 const BOT_PRICE_TTL_MS = 5 * 60 * 1000;
-const BOT_PRICE_FALLBACK = 12.20;
 const WBOT_ADDRESS = "0xD5452816194a3784dBa983426cCe7c122F4abd30";
 
 export async function fetchLiveBotPrice(): Promise<number> {
@@ -43,13 +42,12 @@ export async function fetchLiveBotPrice(): Promise<number> {
   } catch {
     // fall through to fallback
   }
-  return BOT_PRICE_FALLBACK;
+  throw new Error("Live BOT price is unavailable; retry deposit confirmation shortly");
 }
 
 // ETH price cache: same pattern as BOT — live via Coinbase's public spot
 // price endpoint (no API key required), refreshed every 5 minutes.
 let _ethPriceCache: { price: number; ts: number } | null = null;
-const ETH_PRICE_FALLBACK = 2500;
 
 export async function fetchLiveEthPrice(): Promise<number> {
   const now = Date.now();
@@ -70,7 +68,7 @@ export async function fetchLiveEthPrice(): Promise<number> {
   } catch {
     // fall through to fallback
   }
-  return ETH_PRICE_FALLBACK;
+  throw new Error("Live ETH price is unavailable; retry deposit confirmation shortly");
 }
 
 interface RpcLog {
@@ -183,12 +181,16 @@ export async function verifyAndCreditCryptoDeposit(
   const nativeValue = BigInt(tx.value || "0x0");
   if (txTo === qerinAddress && nativeValue > 0n) {
     const nativeAmount = Number(nativeValue) / NATIVE_DECIMALS;
-    if (isBotChain) {
-      const botPrice = await fetchLiveBotPrice();
-      transferredUsd = nativeAmount * botPrice;
-    } else {
-      const ethPrice = await fetchLiveEthPrice();
-      transferredUsd = nativeAmount * ethPrice;
+    try {
+      if (isBotChain) {
+        const botPrice = await fetchLiveBotPrice();
+        transferredUsd = nativeAmount * botPrice;
+      } else {
+        const ethPrice = await fetchLiveEthPrice();
+        transferredUsd = nativeAmount * ethPrice;
+      }
+    } catch {
+      return { verified: false, balance: 0, reason: "Live token pricing is unavailable. Your transfer is safe; retry confirmation shortly." };
     }
   }
 

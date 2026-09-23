@@ -5,8 +5,6 @@ export const SOURCES: { id: SourceId; label: string }[] = [
   { id: "superhighway", label: "Superhighway" },
   { id: "veles", label: "Veles Finance" },
   { id: "coingecko", label: "CoinGecko" },
-  { id: "coinmarketcap", label: "CoinMarketCap" },
-  { id: "messari", label: "Messari" },
 ];
 
 // Simplified, original geometric marks (not trademark reproductions) that

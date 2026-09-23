@@ -32,39 +32,20 @@ function extractTickerSymbol(question: string): string | null {
 
 function selectSourceKeys(question: string): string[] {
   const lower = question.toLowerCase();
-  const selected: string[] = [];
-
+  const isCrypto = /\b(crypto|bitcoin|btc|ethereum|eth|token|coin|arbitrum|defi)\b/.test(lower);
+  let specialist: string | null = null;
   if (/\b(stock|filing|sec|earnings|10-k)\b/.test(lower)) {
-    selected.push("veles");
-    if (extractTickerSymbol(question)) {
-      selected.push("ottoaiTradfiData");
-    }
+    specialist = extractTickerSymbol(question) ? "ottoaiTradfiData" : "veles";
+  } else if (isCrypto && /\b(pool|dex|liquidity)\b/.test(lower)) {
+    specialist = "coingecko";
+  } else if (isCrypto && /\b(news|happened|today|this week|announced)\b/.test(lower)) {
+    specialist = "cryptoslate";
+  } else if (isCrypto && /\b(price|market cap)\b/.test(lower)) {
+    specialist = null;
+  } else if (isCrypto) {
+    specialist = "ottoaiCryptoNews";
   }
-  if (/\b(crypto|bitcoin|ethereum|token|coin)\b/.test(lower)) {
-    selected.push("ottoaiCryptoNews");
-    if (/\b(price|market cap|volume|pool|dex|liquidity)\b/.test(lower)) {
-      selected.push("coingecko", "coinmarketcap");
-    }
-    if (/\b(sentiment|trending|momentum|mindshare|research)\b/.test(lower)) {
-      selected.push("messari");
-    }
-  }
-  if (/\b(news|happened|today|this week|announced)\b/.test(lower)) {
-    selected.push("cryptoslate", "superhighway");
-  }
-
-  // General-purpose fallback for anything that doesn't match a specific
-  // category above (e.g. a question with nothing crypto/finance-specific
-  // in it) — matches the backend's fallback exactly. This used to fall
-  // back to Superhighway here even though the backend had already moved
-  // to Tavily as the general-purpose source, which is why the "paying"
-  // screen kept saying "Superhighway" for questions the backend was
-  // actually routing somewhere else entirely.
-  if (selected.length === 0) {
-    selected.push("tavily");
-  }
-
-  return [...new Set(selected)].slice(0, 4);
+  return specialist ? [specialist, "superhighway"] : ["superhighway"];
 }
 
 export function selectSourcesForDisplay(question: string): SourceMeta[] {

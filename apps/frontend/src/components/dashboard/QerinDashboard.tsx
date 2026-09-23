@@ -116,24 +116,23 @@ function buildAnswerData(data: AnswerData): {
   if (data.receipt && data.receipt.length > 0) {
     const tx = data.registryTxHash;
     const isBotChain = data.chainId === 677 || (data.network && data.network.toLowerCase().includes("bot"));
-    const botContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
-    const baseContract = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
+    const sourceTx = data.receipt.find((item) => item.txHash)?.txHash;
     const defaultUrl = data.registryExplorerUrl || (
       isBotChain
-        ? (tx ? `https://scan.botchain.ai/tx/${tx}` : `https://scan.botchain.ai/address/${botContract}`)
-        : (tx ? `https://basescan.org/tx/${tx}` : `https://basescan.org/address/${baseContract}`)
+        ? (tx ? `https://scan.botchain.ai/tx/${tx}` : "")
+        : (tx ? `https://basescan.org/tx/${tx}` : "")
     );
     const sourceNames = data.receipt.map((x) => x.source).join(", ");
     receipt = {
       paid: data.totalPaid + " USDC",
       to: sourceNames || data.receipt[0].source,
       via: data.network || (isBotChain ? "BOT Chain Mainnet" : "Base Mainnet"),
-      txId: tx ? `${tx.slice(0, 8)}...${tx.slice(-6)}` : "Registry submission pending",
-      basescanUrl: defaultUrl,
+      txId: tx || sourceTx || "",
+      basescanUrl: tx ? defaultUrl : data.receipt.find((item) => item.txHash)?.basescanUrl || "",
       success: Boolean(tx),
       sourceCitations: paidSourceCitations,
       registryTxHash: data.registryTxHash,
-      registryContract: data.registryContract || (isBotChain ? botContract : baseContract),
+      registryContract: data.registryContract,
       chainId: data.chainId || (isBotChain ? 677 : 8453),
     };
   }
@@ -319,22 +318,21 @@ function ReceiptCard({
 }) {
   const [showAudit, setShowAudit] = useState(false);
   const isBotChain = receipt.chainId === 677 || (receipt.via && receipt.via.toLowerCase().includes("bot"));
-  const defaultAddress = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45";
   const explorerUrl = receipt.basescanUrl && receipt.basescanUrl !== "#"
     ? receipt.basescanUrl
     : (receipt.registryTxHash
         ? (isBotChain ? `https://scan.botchain.ai/tx/${receipt.registryTxHash}` : `https://basescan.org/tx/${receipt.registryTxHash}`)
-        : (isBotChain ? `https://scan.botchain.ai/address/${defaultAddress}` : `https://basescan.org/address/${defaultAddress}`));
+        : (rawReceipts?.find((r) => r.basescanUrl)?.basescanUrl || ""));
 
   const chainLabel = isBotChain ? "BOT Chain Mainnet (Chain 677)" : "Base Mainnet (Chain 8453)";
-  const explorerName = isBotChain ? "BOT Scan" : "Basescan";
+  const explorerName = receipt.registryTxHash && isBotChain ? "BOT Scan" : "Basescan";
 
   const computedQuestionHash = useMemo(() => {
-    if (!question) return "0x7f4a8b2c1d9e3f5a6b0c2e4d8f1a3b5c7e9d0f2a";
+    if (!question) return "";
     try {
       return keccak256(toBytes(question));
     } catch {
-      return "0x7f4a8b2c1d9e3f5a6b0c2e4d8f1a3b5c7e9d0f2a";
+      return "";
     }
   }, [question]);
 
@@ -343,9 +341,10 @@ function ReceiptCard({
     if (rawReceipts && rawReceipts.length > 0) {
       return rawReceipts.map(r => ({
         name: r.source,
-        cost: r.amountPaid ? `${parseFloat(r.amountPaid).toFixed(3)} USDC` : "0.005 USDC",
+        cost: `${parseFloat(r.amountPaid || "0").toFixed(3)} USDC`,
         protocol: r.source.toLowerCase().includes("node") ? "Consensus Node RPC" : "x402 Protocol (Exact EVM)",
         citation: receipt.sourceCitations?.find(c => c.name.toLowerCase() === r.source.toLowerCase())?.citation,
+        content: r.content,
         txHash: r.txHash,
         explorerUrl: r.basescanUrl,
       }));
@@ -356,7 +355,7 @@ function ReceiptCard({
   })();
 
   const agentWallet = "0x5b2131e9b28a46Ec10D260A14B9DEB34554311F2";
-  const contractAddress = receipt.registryContract || defaultAddress;
+  const contractAddress = receipt.registryContract;
 
   return (
     <div className="qd-receipt-card" style={{ marginTop: 14, padding: "16px", borderRadius: 12, border: "1px solid var(--qd-receipt-border)", background: "var(--qd-receipt-bg)" }}>
@@ -368,10 +367,10 @@ function ReceiptCard({
           </div>
           <div>
             <span style={{ fontSize: 13, fontWeight: 700, color: receipt.success ? "var(--qd-receipt-success)" : "var(--qerin-accent)" }}>
-              {receipt.success ? "Registry Receipt Confirmed" : "Paid Source Settlement Confirmed"}
+              {receipt.success ? "Registry transaction submitted" : "Paid source transaction available"}
             </span>
             <span style={{ fontSize: 11, color: "var(--qd-muted2)", marginLeft: 6 }}>
-              • {receipt.success ? "On-Chain Registry Proof" : "Registry submission pending"}
+              • {receipt.success ? "Check confirmation in explorer" : "Registry transaction not available"}
             </span>
           </div>
         </div>
@@ -429,7 +428,7 @@ function ReceiptCard({
           <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
             <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Your Remaining Balance</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "$2.80 Fuel"}
+              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "Balance unavailable"}
             </div>
           </div>
 
@@ -446,11 +445,11 @@ function ReceiptCard({
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500 }}>Query Hash Digest:</span>
             <span style={{ fontSize: 11, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "var(--qerin-accent)", fontWeight: 600 }}>
-              {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
+              {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "Unavailable"}
             </span>
           </div>
           <span style={{ fontSize: 10.5, color: receipt.success ? "var(--qd-receipt-success)" : "var(--qd-muted2)", fontWeight: 600 }}>
-            {receipt.success ? "✓ Etched into smart contract" : "Registry proof pending"}
+            {receipt.success ? "Registry transaction submitted" : "No registry proof yet"}
           </span>
         </div>
       </div>
@@ -490,6 +489,12 @@ function ReceiptCard({
                   {src.citation}
                 </div>
               )}
+              {src.content != null && <details style={{ fontSize: 11, color: "var(--qerin-text-muted)" }}>
+                <summary style={{ cursor: "pointer", color: "var(--qerin-accent)" }}>View retrieved source data</summary>
+                <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 320, overflowY: "auto", margin: "8px 0 0", padding: 8, borderRadius: 6, background: "var(--qd-input-bg)" }}>
+                  {typeof src.content === "string" ? src.content : JSON.stringify(src.content, null, 2)}
+                </pre>
+              </details>}
             </div>
           ))}
         </div>
@@ -530,7 +535,7 @@ function ReceiptCard({
             flexDirection: "column",
             gap: 8,
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {contractAddress && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Registry Contract</span>
               <a
                 href={isBotChain ? `https://scan.botchain.ai/address/${contractAddress}` : `https://basescan.org/address/${contractAddress}`}
@@ -540,12 +545,12 @@ function ReceiptCard({
               >
                 {shortAddr(contractAddress)} ↗
               </a>
-            </div>
+            </div>}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Autonomous Agent Payer</span>
               <a
-                href={isBotChain ? `https://scan.botchain.ai/address/${agentWallet}` : `https://basescan.org/address/${agentWallet}`}
+                href={`https://basescan.org/address/${agentWallet}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", textDecoration: "none", fontWeight: 600 }}
@@ -564,11 +569,11 @@ function ReceiptCard({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Query Hash (questionHash)</span>
               <span style={{ color: "var(--qerin-accent)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 11, fontWeight: 600 }}>
-                {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "0x7f4a...e12a"}
+                {computedQuestionHash ? `${computedQuestionHash.slice(0, 10)}...${computedQuestionHash.slice(-6)}` : "Unavailable"}
               </span>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {receipt.registryTxHash && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>On-Chain Receipt Tx</span>
               <a
                 href={explorerUrl}
@@ -578,14 +583,14 @@ function ReceiptCard({
               >
                 {receipt.txId} ↗
               </a>
-            </div>
+            </div>}
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {receipt.registryTxHash && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "var(--qd-muted2)", fontWeight: 500 }}>Smart Contract Method</span>
               <span style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 10.5, fontWeight: 500, background: "var(--qerin-surface)", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--qd-receipt-border)" }}>
                 recordReceipt(bytes32,bytes32,uint256,uint256)
               </span>
-            </div>
+            </div>}
 
             <div style={{ marginTop: 4, paddingTop: 8, borderTop: "1px dashed var(--qd-receipt-border)", fontSize: 11, color: "var(--qd-muted2)" }}>
               ✓ Micropayment settled autonomously on your behalf. Publicly verifiable on {explorerName}.
@@ -626,7 +631,11 @@ function ReceiptCard({
 }
 
 function MarkdownContent({ content }: { content: string }) {
-  const boldify = (text: string) => text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const boldify = (text: string) => text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
   let bulletItems: string[] = [];
@@ -723,7 +732,10 @@ function cleanStoredThreads(input: unknown): ChatThread[] {
     .map((thread) => ({
       ...thread,
       messages: Array.isArray(thread.messages)
-        ? thread.messages.filter((message) => message.role === "user" || message.role === "assistant")
+        ? thread.messages.filter((message) => message.role === "user" || message.role === "assistant").map((message) => {
+            const verifiedSource = Array.isArray(message.rawReceipts) && message.rawReceipts.some((item) => /^0x[a-fA-F0-9]{64}$/.test(item?.txHash || ""));
+            return verifiedSource ? message : { ...message, receipt: undefined, rawReceipts: undefined, sourceCitations: undefined };
+          })
         : [],
     }));
 }
@@ -749,12 +761,13 @@ function recoverArchivedDeliveries(threads: ChatThread[], deliveries: unknown): 
     const totalPaid = typeof delivery.totalPaid === "string" ? delivery.totalPaid : "0";
     const createdAt = typeof delivery.createdAt === "string" ? new Date(delivery.createdAt) : new Date();
     const sourceNames = receiptItems.map((item) => item.source).filter(Boolean).join(", ");
-    const receipt = receiptItems.length ? {
+    const sourceTx = receiptItems.find((item) => /^0x[a-fA-F0-9]{64}$/.test(item.txHash || ""));
+    const receipt = sourceTx ? {
       paid: `${totalPaid} USDC`,
       to: sourceNames || "Verified paid source",
       via: network,
-      txId: "Source settlement archived",
-      basescanUrl: "#",
+      txId: sourceTx.txHash || "",
+      basescanUrl: sourceTx.basescanUrl || "",
       success: false,
       sourceCitations: citations,
       chainId: typeof delivery.chainId === "number" ? delivery.chainId : undefined,
@@ -1246,7 +1259,7 @@ export function QerinDashboard() {
       const latencySec = (elapsedMs / 1000).toFixed(1) + "s";
       const nowUtc = new Date();
       const completedAtUtc = `${String(nowUtc.getUTCHours()).padStart(2, "0")}:${String(nowUtc.getUTCMinutes()).padStart(2, "0")} UTC`;
-      const latestSourceRecency = "4 min ago";
+      const latestSourceRecency = result.ok && result.data.receipt?.length ? "Just now" : undefined;
       const dateLabel = formatShortDate(nowUtc);
 
       if (result.ok) {
@@ -1332,6 +1345,7 @@ export function QerinDashboard() {
   };
 
   const handleDownloadDossier = (msg: ChatMessage) => {
+    if (!msg.receipt || !msg.rawReceipts?.some((item) => item.txHash)) return;
     downloadDossierPdf({
       question: msg.question || activeThread.preview || "Qerin Verified Research",
       topic: msg.topic || activeThread.title,
@@ -1339,7 +1353,7 @@ export function QerinDashboard() {
       answer: msg.content,
       personaInsights: msg.personaInsights,
       receipt: msg.rawReceipts,
-      totalPaid: msg.receipt?.paid ? msg.receipt.paid.replace(" USDC", "") : "0.020",
+      totalPaid: msg.receipt.paid.replace(" USDC", ""),
       network: activeThread.network || (selectedNetwork === "botchain" ? "BOT Chain Mainnet" : "Base Mainnet"),
       date: msg.time,
     });
@@ -1353,7 +1367,7 @@ export function QerinDashboard() {
       answer: msg.content,
       personaInsights: msg.personaInsights,
       receipt: msg.rawReceipts,
-      totalPaid: msg.receipt?.paid ? msg.receipt.paid.replace(" USDC", "") : "0.020",
+      totalPaid: msg.receipt?.paid ? msg.receipt.paid.replace(" USDC", "") : "0",
       network: activeThread.network,
     });
     navigator.clipboard.writeText(md);
@@ -1910,19 +1924,16 @@ export function QerinDashboard() {
                       }}
                     >
                       <span style={{ color: "var(--qerin-accent)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        ⚡ {msg.latencySec || "1.2s"} synthesis
+                        ⚡ {msg.latencySec || "—"} {msg.receipt ? "research" : "attempt"}
                       </span>
                       <span style={{ color: "var(--qd-border)" }}>•</span>
                       <span>
-                        Research completed: <strong style={{ color: "var(--qerin-text)" }}>{msg.completedAtUtc || "16:19 UTC"}</strong>
+                        {msg.receipt ? "Research completed:" : "Attempt ended:"} <strong style={{ color: "var(--qerin-text)" }}>{msg.completedAtUtc || msg.time}</strong>
                       </span>
+                      {msg.latestSourceRecency && <><span style={{ color: "var(--qd-border)" }}>•</span><span>Paid source: <strong style={{ color: "var(--qerin-text)" }}>{msg.latestSourceRecency}</strong></span></>}
                       <span style={{ color: "var(--qd-border)" }}>•</span>
-                      <span>
-                        Latest source: <strong style={{ color: "var(--qerin-text)" }}>{msg.latestSourceRecency || "4 min ago"}</strong>
-                      </span>
-                      <span style={{ color: "var(--qd-border)" }}>•</span>
-                      <span style={{ color: "#10b981", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
-                        🛡️ On-Chain Verified
+                      <span style={{ color: msg.receipt ? "var(--qd-receipt-success)" : "var(--qerin-accent)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        {msg.receipt?.registryTxHash ? "🛡️ Registry transaction submitted" : msg.receipt ? "Paid source receipt available" : "No paid source verified · No charge"}
                       </span>
                     </div>
 
@@ -1931,7 +1942,7 @@ export function QerinDashboard() {
                       <div className="qd-summary-box">
                         <div className="qd-summary-header">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7 1L2 7h4l-1 4 5-6H6l1-4Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
-                          <span>Executive Summary (Verified TL;DR)</span>
+                          <span>Research Summary</span>
                         </div>
                         <div className="qd-summary-text">
                           <MarkdownContent content={msg.summary} />
@@ -2022,7 +2033,7 @@ export function QerinDashboard() {
                     )}
 
                     {/* ACTION BAR: EXPORT & PDF DOWNLOAD */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 6 }}>
+                    {msg.receipt && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 6 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button
                           className="qd-export-btn"
@@ -2068,7 +2079,7 @@ export function QerinDashboard() {
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M4 4V2a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H8" stroke="currentColor" strokeWidth="1.2" /></svg>
                         </button>
                       </div>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               );
