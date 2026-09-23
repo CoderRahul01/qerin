@@ -81,6 +81,10 @@ export function TopupModal({
   });
   const [botPrice, setBotPrice] = useState<number>(12.20);
   const [paidSourcesReady, setPaidSourcesReady] = useState<boolean | null>(null);
+  const [depositAddress, setDepositAddress] = useState<string | null>(null);
+  const [addressCopied, setAddressCopied] = useState(false);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [manualTxHash, setManualTxHash] = useState("");
   const [hasWallet, setHasWallet] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null;
     return getInjectedProvider() !== null;
@@ -104,10 +108,22 @@ export function TopupModal({
     let cancelled = false;
     fetch(`/api/network-info?network=${network}`, { cache: "no-store" })
       .then(async (response) => response.ok ? response.json() : null)
-      .then((info) => { if (!cancelled) setPaidSourcesReady(info?.paidSourcesReady === true); })
-      .catch(() => { if (!cancelled) setPaidSourcesReady(false); });
+      .then((info) => {
+        if (cancelled) return;
+        setPaidSourcesReady(info?.paidSourcesReady === true);
+        setDepositAddress(typeof info?.payTo === "string" ? info.payTo : null);
+      })
+      .catch(() => { if (!cancelled) { setPaidSourcesReady(false); setDepositAddress(null); } });
     return () => { cancelled = true; };
   }, [network]);
+
+  const handleCopyAddress = useCallback(() => {
+    if (!depositAddress || typeof navigator === "undefined" || !navigator.clipboard) return;
+    navigator.clipboard.writeText(depositAddress).then(() => {
+      setAddressCopied(true);
+      setTimeout(() => setAddressCopied(false), 2000);
+    }).catch(() => {});
+  }, [depositAddress]);
 
   // Render the Turnstile widget imperatively once the script is loaded and
   // the pass hasn't been claimed — bot-gates the free $1.50 claim so it
@@ -276,6 +292,35 @@ export function TopupModal({
     await runConfirm(txHash, amountUsd, network);
   };
 
+  const handleManualConfirm = async () => {
+    const txHash = manualTxHash.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+      setStep({ kind: "error", message: "Enter a valid transaction hash (starts with 0x)." });
+      return;
+    }
+    if (!walletDiag) {
+      // Confirmation requires a signature from the address that actually sent the
+      // funds — connect it now. It doesn't need to be the wallet connected earlier,
+      // just the one that made this specific transfer.
+      setStep({ kind: "connecting" });
+      try {
+        const addr = await requestWalletConnection();
+        if (!addr) { setStep({ kind: "idle" }); return; }
+        const id = await getOrCreateAccountId(addr);
+        setAccountId(id);
+        const rep = await checkWalletBalances(network);
+        setWalletDiag(rep);
+        if (rep.botPrice) setBotPrice(rep.botPrice);
+      } catch (err) {
+        setStep({ kind: "error", message: err instanceof Error ? err.message : "Could not connect wallet" });
+        return;
+      }
+    }
+    setManualEntryOpen(false);
+    setManualTxHash("");
+    await runConfirm(txHash, 0, network);
+  };
+
   const resetTurnstile = () => {
     const w = window as unknown as { turnstile?: { reset: (id: string) => void } };
     if (turnstileWidgetIdRef.current && w.turnstile) {
@@ -418,11 +463,116 @@ export function TopupModal({
         </div>
 
         <p style={{ fontSize: 12, lineHeight: 1.5, color: "#D1D5DB", margin: "0 0 14px" }}>
-          Connecting your wallet does not spend funds. A gasless signature protects your Qerin balance. A top-up is one wallet transfer to Qerin; research uses that credited balance, never a second charge from your wallet.
+          Every account gets a Qerin deposit address below. Connect a wallet to pay in one click, or copy the address and send from MetaMask, Coinbase Wallet, or any wallet you already hold funds in — a top-up never spends beyond what you send, and research draws down that credited balance only.
         </p>
         {paidSourcesReady === false && <div role="status" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(251,146,60,0.35)", background: "rgba(251,146,60,0.08)", color: "#FCD34D", fontSize: 12 }}>
-          Paid research is temporarily unavailable while Qerin's source wallet is replenished. You can still top up — your deposit funds your balance and helps restore source payments right away.
+          Paid research is temporarily unavailable while Qerin&apos;s source wallet is replenished. You can still top up — your deposit funds your balance and helps restore source payments right away.
         </div>}
+
+        {/* Qerin Deposit Address — fund from any wallet without connecting it here */}
+        {depositAddress && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "12px 14px",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10,
+            }}
+          >
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>
+              Your Qerin deposit address · {activeMeta.name}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontFamily: "monospace",
+                  fontSize: 12.5,
+                  color: "#F3F4F6",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {depositAddress}
+              </span>
+              <button
+                onClick={handleCopyAddress}
+                style={{
+                  flexShrink: 0,
+                  padding: "5px 10px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(234,88,12,0.4)",
+                  background: addressCopied ? "rgba(16,185,129,0.15)" : "rgba(234,88,12,0.1)",
+                  color: addressCopied ? "#34D399" : "#FB923C",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {addressCopied ? "✓ Copied" : "Copy"}
+              </button>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11.5, color: "#6B7280", lineHeight: 1.4 }}>
+              Send {network === "base" ? "USDC" : "BOT or USDT"} here from any wallet or exchange, then confirm the transfer below with the wallet that sent it.
+            </div>
+            <button
+              onClick={() => setManualEntryOpen((v) => !v)}
+              disabled={busy}
+              style={{
+                marginTop: 8,
+                background: "transparent",
+                border: "none",
+                color: "#EA580C",
+                fontSize: 11.5,
+                fontWeight: 600,
+                cursor: busy ? "default" : "pointer",
+                padding: 0,
+              }}
+            >
+              {manualEntryOpen ? "▾ Hide" : "▸"} I already sent a transfer — confirm with tx hash
+            </button>
+            {manualEntryOpen && (
+              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                <input
+                  value={manualTxHash}
+                  onChange={(e) => setManualTxHash(e.target.value)}
+                  placeholder="0x…"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "8px 10px",
+                    borderRadius: 7,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "#09090f",
+                    color: "#F3F4F6",
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                  }}
+                />
+                <button
+                  onClick={handleManualConfirm}
+                  disabled={busy || !manualTxHash.trim()}
+                  style={{
+                    flexShrink: 0,
+                    padding: "8px 12px",
+                    borderRadius: 7,
+                    border: "none",
+                    background: busy || !manualTxHash.trim() ? "rgba(234,88,12,0.15)" : "#EA580C",
+                    color: busy || !manualTxHash.trim() ? "#9CA3AF" : "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: busy || !manualTxHash.trim() ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Confirm
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Wallet Not Detected */}
         {hasWallet === false && step.kind !== "connecting" && (
