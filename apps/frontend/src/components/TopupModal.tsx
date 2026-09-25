@@ -77,6 +77,10 @@ export function TopupModal({
   // machine above, which assumes an EVM wallet throughout.
   const [chainFamily, setChainFamily] = useState<"evm" | "solana">("evm");
   const [solDepositAddress, setSolDepositAddress] = useState<string | null>(null);
+  // Distinct from "still loading" (null address, status "loading") — a
+  // failed fetch or a backend that hasn't provisioned its Solana wallet yet
+  // must not spin forever; it should degrade to a "coming soon" state.
+  const [solInfoStatus, setSolInfoStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [solAddressCopied, setSolAddressCopied] = useState(false);
   const [solTxSig, setSolTxSig] = useState("");
   const [solStep, setSolStep] = useState<
@@ -90,10 +94,16 @@ export function TopupModal({
   useEffect(() => {
     if (chainFamily !== "solana") return;
     let cancelled = false;
+    setSolInfoStatus("loading");
     fetch(`/api/network-info?network=${SOLANA_NETWORK.id}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((info) => { if (!cancelled) setSolDepositAddress(typeof info?.payTo === "string" ? info.payTo : null); })
-      .catch(() => { if (!cancelled) setSolDepositAddress(null); });
+      .then((info) => {
+        if (cancelled) return;
+        const payTo = typeof info?.payTo === "string" ? info.payTo : null;
+        setSolDepositAddress(payTo);
+        setSolInfoStatus(payTo ? "ready" : "unavailable");
+      })
+      .catch(() => { if (!cancelled) { setSolDepositAddress(null); setSolInfoStatus("unavailable"); } });
     return () => { cancelled = true; };
   }, [chainFamily]);
 
@@ -786,6 +796,23 @@ export function TopupModal({
               Solana top-ups are in beta on {SOLANA_NETWORK.name}. Send USDC from any Solana wallet (e.g. Phantom) to the address below, then confirm it here with the same wallet.
             </div>
 
+            {solInfoStatus === "unavailable" ? (
+              <div
+                style={{
+                  marginBottom: 14, padding: "14px 15px", borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 4 }}>
+                  Coming soon
+                </div>
+                <div style={{ fontSize: 12.5, color: "#D1D5DB", lineHeight: 1.5 }}>
+                  Solana top-ups aren&apos;t live on this deployment yet. Use Base or BOT Chain above in the meantime — we&apos;ll flip this on shortly.
+                </div>
+              </div>
+            ) : (
+            <>
             <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>
                 Your Qerin deposit address · {SOLANA_NETWORK.name}
@@ -852,6 +879,8 @@ export function TopupModal({
                 </div>
               )}
             </div>
+            </>
+            )}
           </>
         ) : (
         <>
