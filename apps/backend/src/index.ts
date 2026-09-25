@@ -11,6 +11,9 @@ import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBala
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
+import { getSolanaNetwork, type SupportedSolanaNetwork } from "./solana/network.js";
+import { getQerinSolanaSigner } from "./solana/wallet.js";
+import { verifyAndCreditSolanaDeposit } from "./solana/topup.js";
 import { getPublicAnalytics, getPrivateAnalytics } from "./analytics.js";
 import { getChatHistory, isValidChatVaultId, saveChatHistory } from "./chatHistory.js";
 
@@ -225,6 +228,24 @@ app.put("/v1/history", async (c) => {
 // in two places.
 app.get("/v1/network-info", async (c) => {
   const target = c.req.query("network");
+
+  // Solana is not an EVM chain — getNetwork()/NETWORKS can't represent it
+  // (see apps/backend/src/solana/network.ts), so it's handled as a fully
+  // separate branch rather than forced through the EVM-shaped response below.
+  if (target === "solana_mainnet" || target === "solana_devnet") {
+    const network = getSolanaNetwork(target as SupportedSolanaNetwork);
+    const signer = await getQerinSolanaSigner();
+    return c.json({
+      name: network.name,
+      payTo: signer.address,
+      usdc: network.usdc,
+      currency: "SOL",
+      rpcUrl: network.rpcUrl,
+      cluster: network.cluster,
+      paidSourcesReady: await paidSourcesReady(),
+    });
+  }
+
   const network = getNetwork(target);
   let botPrice: number | null = null;
   if (network.chainId === 677) {
@@ -259,9 +280,28 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const { txHash, signature, network: depositNetwork } = body ?? {};
+  const { txHash, signature, network: depositNetwork, walletPublicKey } = body ?? {};
   if (typeof txHash !== "string" || typeof signature !== "string") {
     return c.json({ error: "txHash and signature are required" }, 400);
+  }
+
+  // Solana verification is ed25519, not ECDSA — the public key can't be
+  // recovered from a (message, signature) pair the way recoverMessageAddress
+  // does for EVM, so the client must send it explicitly.
+  if (depositNetwork === "solana_mainnet" || depositNetwork === "solana_devnet") {
+    if (typeof walletPublicKey !== "string") {
+      return c.json({ error: "walletPublicKey is required for Solana deposits" }, 400);
+    }
+    try {
+      const result = await verifyAndCreditSolanaDeposit(accountId, txHash, walletPublicKey, signature, depositNetwork);
+      if (!result.verified) {
+        return c.json({ error: result.reason ?? "Could not verify this transaction" }, 400);
+      }
+      return c.json({ balance: result.balance });
+    } catch (err) {
+      console.error(err);
+      return c.json({ error: "Internal error" }, 500);
+    }
   }
 
   try {

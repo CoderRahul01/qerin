@@ -14,6 +14,7 @@ import {
   type WalletBalanceReport,
 } from "@/lib/cryptoTopup";
 import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider } from "@/lib/account";
+import { SOLANA_NETWORK, signSolanaTopupConfirmation } from "@/lib/solanaTopup";
 
 const TIERS = [
   { amountUsd: 1,  title: "Explorer Fuel",      desc: "Up to 6 answers", badge: null },
@@ -70,6 +71,58 @@ export function TopupModal({
 }) {
   const [accountId, setAccountId] = useState(initialAccountId);
   const [network, setNetwork] = useState<TopupNetwork>(initialNetwork);
+  // Solana is architecturally distinct enough (no chain-switching, ed25519
+  // signatures, no in-modal send yet — see solanaTopup.ts) that it gets its
+  // own branch rather than being folded into the `network`/`step` state
+  // machine above, which assumes an EVM wallet throughout.
+  const [chainFamily, setChainFamily] = useState<"evm" | "solana">("evm");
+  const [solDepositAddress, setSolDepositAddress] = useState<string | null>(null);
+  const [solAddressCopied, setSolAddressCopied] = useState(false);
+  const [solTxSig, setSolTxSig] = useState("");
+  const [solStep, setSolStep] = useState<
+    | { kind: "idle" }
+    | { kind: "connecting" }
+    | { kind: "confirming" }
+    | { kind: "success"; balance: number }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  useEffect(() => {
+    if (chainFamily !== "solana") return;
+    let cancelled = false;
+    fetch(`/api/network-info?network=${SOLANA_NETWORK.id}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((info) => { if (!cancelled) setSolDepositAddress(typeof info?.payTo === "string" ? info.payTo : null); })
+      .catch(() => { if (!cancelled) setSolDepositAddress(null); });
+    return () => { cancelled = true; };
+  }, [chainFamily]);
+
+  const handleCopySolAddress = useCallback(() => {
+    if (!solDepositAddress || typeof navigator === "undefined" || !navigator.clipboard) return;
+    navigator.clipboard.writeText(solDepositAddress).then(() => {
+      setSolAddressCopied(true);
+      setTimeout(() => setSolAddressCopied(false), 2000);
+    }).catch(() => {});
+  }, [solDepositAddress]);
+
+  const handleConfirmSolanaDeposit = useCallback(async () => {
+    const txSig = solTxSig.trim();
+    if (!txSig) {
+      setSolStep({ kind: "error", message: "Paste the transaction signature you received after sending." });
+      return;
+    }
+    setSolStep({ kind: "connecting" });
+    try {
+      const { signature, publicKey } = await signSolanaTopupConfirmation(accountId, txSig);
+      setSolStep({ kind: "confirming" });
+      const balance = await confirmCryptoTopup(accountId, txSig, signature, SOLANA_NETWORK.id, publicKey);
+      setSolTxSig("");
+      setSolStep({ kind: "success", balance });
+      onCredited(balance);
+    } catch (err) {
+      setSolStep({ kind: "error", message: err instanceof Error ? err.message : "Could not confirm this deposit" });
+    }
+  }, [accountId, solTxSig, onCredited]);
   const [step, setStep] = useState<Step>({ kind: "idle" });
   const [walletDiag, setWalletDiag] = useState<WalletBalanceReport | null>(null);
   const [watchAssetSuccess, setWatchAssetSuccess] = useState<boolean | null>(null);
@@ -692,8 +745,116 @@ export function TopupModal({
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#EA580C", display: "inline-block" }} />
             BOT Chain
           </button>
+          <button
+            onClick={() => setChainFamily("solana")}
+            style={{
+              flex: 1,
+              padding: "7px 10px",
+              borderRadius: 7,
+              border: "none",
+              background: chainFamily === "solana" ? "rgba(153,69,255,0.2)" : "transparent",
+              color: chainFamily === "solana" ? "#C084FC" : "#6B7280",
+              fontWeight: chainFamily === "solana" ? 700 : 500,
+              fontSize: 12,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#9945FF", display: "inline-block" }} />
+            Solana (Beta)
+          </button>
         </div>
 
+        {chainFamily === "solana" ? (
+          <>
+            <div
+              style={{
+                marginBottom: 14,
+                padding: "10px 12px",
+                borderRadius: 9,
+                border: "1px solid rgba(153,69,255,0.35)",
+                background: "rgba(153,69,255,0.08)",
+                color: "#D8B4FE",
+                fontSize: 11.5,
+                lineHeight: 1.5,
+              }}
+            >
+              Solana top-ups are in beta on {SOLANA_NETWORK.name}. Send USDC from any Solana wallet (e.g. Phantom) to the address below, then confirm it here with the same wallet.
+            </div>
+
+            <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>
+                Your Qerin deposit address · {SOLANA_NETWORK.name}
+              </div>
+              {solDepositAddress ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontFamily: "monospace", fontSize: 12.5, color: "#F3F4F6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {solDepositAddress}
+                  </span>
+                  <button
+                    onClick={handleCopySolAddress}
+                    style={{
+                      flexShrink: 0, padding: "5px 10px", borderRadius: 7,
+                      border: "1px solid rgba(153,69,255,0.4)",
+                      background: solAddressCopied ? "rgba(16,185,129,0.15)" : "rgba(153,69,255,0.1)",
+                      color: solAddressCopied ? "#34D399" : "#C084FC",
+                      fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+                    }}
+                  >
+                    {solAddressCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#6B7280" }}>Loading deposit address…</div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", marginBottom: 6 }}>
+                Already sent? Confirm with the transaction signature
+              </div>
+              <input
+                value={solTxSig}
+                onChange={(e) => setSolTxSig(e.target.value)}
+                placeholder="Transaction signature"
+                disabled={solStep.kind === "connecting" || solStep.kind === "confirming"}
+                style={{
+                  width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.12)", background: "#09090f", color: "#F3F4F6",
+                  fontSize: 12, fontFamily: "monospace", marginBottom: 8,
+                }}
+              />
+              <button
+                onClick={handleConfirmSolanaDeposit}
+                disabled={solStep.kind === "connecting" || solStep.kind === "confirming" || !solTxSig.trim()}
+                style={{
+                  width: "100%", padding: "9px 14px", borderRadius: 8, border: "none",
+                  background: solStep.kind === "connecting" || solStep.kind === "confirming" || !solTxSig.trim() ? "rgba(153,69,255,0.15)" : "#9945FF",
+                  color: solStep.kind === "connecting" || solStep.kind === "confirming" || !solTxSig.trim() ? "#9CA3AF" : "#fff",
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                {solStep.kind === "connecting" ? "Awaiting wallet approval…" : solStep.kind === "confirming" ? "Verifying on-chain…" : "Connect Phantom & Confirm"}
+              </button>
+              {solStep.kind === "error" && (
+                <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 9, background: "rgba(239,68,68,0.09)", border: "1px solid rgba(239,68,68,0.28)", fontSize: 12.5, color: "#FCA5A5" }}>
+                  {solStep.message}
+                </div>
+              )}
+              {solStep.kind === "success" && (
+                <div style={{ marginTop: 10, textAlign: "center", padding: "12px 0" }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>Treasury Funded</div>
+                  <div style={{ marginTop: 4, fontSize: 13, color: "#34D399" }}>Balance: ${solStep.balance.toFixed(2)} Fuel</div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+        <>
         {/* Connected Wallet Balances */}
         {walletDiag && (
           <div
@@ -1076,6 +1237,8 @@ export function TopupModal({
               {shortHash(step.txHash)} — View on Explorer ↗
             </a>
           </div>
+        )}
+        </>
         )}
 
         {/* Dismiss Button */}

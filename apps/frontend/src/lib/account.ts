@@ -223,12 +223,13 @@ export async function confirmCryptoTopup(
   accountId: string,
   txHash: string,
   signature: string,
-  network?: string
+  network?: string,
+  walletPublicKey?: string
 ): Promise<number> {
   const res = await fetch("/api/account/topup/crypto-confirm", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
-    body: JSON.stringify({ txHash, signature, network }),
+    body: JSON.stringify({ txHash, signature, network, walletPublicKey }),
   });
   const json = await res.json();
   if (!res.ok) {

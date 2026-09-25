@@ -7,6 +7,13 @@
 # /v1/paid/answer (payToConfig in src/index.ts uses this account's address).
 QERIN_WALLET_PRIVATE_KEY=0x...
 
+# Solana ed25519 keypair (base58-encoded 64-byte secret key), used only for
+# the Solana devnet deposit path in solana/topup.ts — see solana/wallet.ts.
+# Devnet-only for now; do not point QERIN_SOLANA_NETWORK at mainnet until
+# this has been exercised end-to-end with a real deposit.
+QERIN_SOLANA_WALLET_SECRET_KEY=
+QERIN_SOLANA_NETWORK=solana_devnet
+
 # CDP API key, used to authenticate with the CDP x402 facilitator on both the
 # buyer side (paying sources, via paidFetch.ts's facilitator sync) and the
 # seller side (accepting developer payments to /v1/paid/answer). Create at
