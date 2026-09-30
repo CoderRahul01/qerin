@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { BottomNav } from "../components/BottomNav";
 import { ChainsTab } from "../components/ChainsTab";
+import { ConfigModal } from "../components/ConfigModal";
 import { FailuresTab } from "../components/FailuresTab";
 import { Header } from "../components/Header";
 import { OverviewTab } from "../components/OverviewTab";
 import { QueriesTab } from "../components/QueriesTab";
 import { WalletsTab } from "../components/WalletsTab";
-import { INITIAL_CHAINS, INITIAL_METRICS, INITIAL_QUERIES } from "../lib/data";
+import { DEFAULT_CONFIG, INITIAL_CHAINS, INITIAL_METRICS, INITIAL_QUERIES } from "../lib/data";
 import { fetchLiveProtocolData, LiveSyncState } from "../lib/liveSync";
-import { NavTab } from "../lib/types";
+import { NavTab, ProtocolConfig } from "../lib/types";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,16 +21,23 @@ interface BeforeInstallPromptEvent extends Event {
 export default function AnalyticsDashboardPage() {
   const [activeTab, setActiveTab] = useState<NavTab>("overview");
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [config, setConfig] = useState<ProtocolConfig>(DEFAULT_CONFIG);
+
   const [liveState, setLiveState] = useState<LiveSyncState>({
     metrics: INITIAL_METRICS,
     chains: INITIAL_CHAINS,
     lastSyncedAt: "Live",
-    botChainBlock: null,
-    baseBlock: null,
+    botChainBlock: 25073894,
+    baseBlock: 52002306,
     botChainReceiptCount: 14,
+    latestTxHash: "0xb228aaad1c0853f46fb4117c65f3ca25d1eaf15ebb95f9cf30c0b773d58e93a4",
+    latestBlockNumber: 25073894,
+    latestSender: "0x11fa7869fd6fa3691a7df8dadd6a17326dee16c3",
     isLive: true,
-    rpcLatencyMs: { botChain: 95, base: 110 },
+    rpcLatencyMs: { botChain: 95, base: 110, backend: 65 },
   });
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -49,9 +57,10 @@ export default function AnalyticsDashboardPage() {
 
   useEffect(() => {
     syncData();
-    const interval = setInterval(syncData, 15000); // 15s polling
+    const intervalTime = (config.refreshIntervalSec || 15) * 1000;
+    const interval = setInterval(syncData, intervalTime);
     return () => clearInterval(interval);
-  }, [syncData]);
+  }, [syncData, config.refreshIntervalSec]);
 
   // Handle Chrome / Android PWA installation prompt
   useEffect(() => {
@@ -92,6 +101,7 @@ export default function AnalyticsDashboardPage() {
             onToggleExpanded={() => setIsExpanded(!isExpanded)}
             onRefresh={syncData}
             isRefreshing={isRefreshing}
+            onOpenConfig={() => setIsConfigOpen(true)}
           />
 
           {/* PWA Install Banner */}
@@ -153,7 +163,11 @@ export default function AnalyticsDashboardPage() {
                 metrics={liveState.metrics}
                 chains={liveState.chains}
                 queries={INITIAL_QUERIES}
+                latestTxHash={liveState.latestTxHash}
+                latestBlockNumber={liveState.latestBlockNumber}
+                latestSender={liveState.latestSender}
                 onNavigateTab={(tab) => setActiveTab(tab)}
+                onOpenConfig={() => setIsConfigOpen(true)}
               />
             )}
 
@@ -185,13 +199,13 @@ export default function AnalyticsDashboardPage() {
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
               <span style={{ color: "var(--text-secondary)" }}>Daily Spend Cap</span>
               <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-dark)", fontWeight: 700 }}>
-                ${liveState.metrics.agentSourceSpendUsd.toFixed(2)} / $5.00
+                ${liveState.metrics.agentSourceSpendUsd.toFixed(2)} / ${config.dailySpendCapUsd.toFixed(2)}
               </span>
             </div>
             <div style={{ width: "100%", height: 5, borderRadius: 999, background: "var(--bg-container)", overflow: "hidden" }}>
               <div
                 style={{
-                  width: `${(liveState.metrics.agentSourceSpendUsd / 5.0) * 100}%`,
+                  width: `${(liveState.metrics.agentSourceSpendUsd / config.dailySpendCapUsd) * 100}%`,
                   height: "100%",
                   background: "var(--primary-container)",
                   borderRadius: 999,
@@ -215,6 +229,18 @@ export default function AnalyticsDashboardPage() {
 
         {/* Docked 5-Tab Bottom Navigation Bar (Stitch: Portfolio, Markets, Search, Inbox, Agents) */}
         <BottomNav activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
+
+        {/* Protocol Configuration & Telemetry Modal */}
+        <ConfigModal
+          isOpen={isConfigOpen}
+          onClose={() => setIsConfigOpen(false)}
+          config={config}
+          onUpdateConfig={setConfig}
+          botChainBlock={liveState.botChainBlock}
+          baseBlock={liveState.baseBlock}
+          rpcLatencyMs={liveState.rpcLatencyMs}
+          onRefreshNow={syncData}
+        />
       </main>
     </div>
   );

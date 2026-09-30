@@ -6,9 +6,10 @@ import { Timeframe } from "../lib/types";
 
 interface ChartSectionProps {
   currentRevenue: number;
+  onOpenSettings?: () => void;
 }
 
-export function ChartSection({ currentRevenue }: ChartSectionProps) {
+export function ChartSection({ currentRevenue, onOpenSettings }: ChartSectionProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>("24H");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -182,8 +183,8 @@ export function ChartSection({ currentRevenue }: ChartSectionProps) {
             type="button"
             className="header-icon-btn"
             style={{ width: 28, height: 28 }}
-            title="Chart Display Settings"
-            onClick={() => alert("Chart timescale synced live with on-chain block receipts.")}
+            title="Protocol Configuration & Settings"
+            onClick={onOpenSettings}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               settings

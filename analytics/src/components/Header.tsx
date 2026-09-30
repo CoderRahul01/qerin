@@ -9,6 +9,7 @@ interface HeaderProps {
   onToggleExpanded: () => void;
   onRefresh: () => void;
   isRefreshing: boolean;
+  onOpenConfig?: () => void;
 }
 
 export function Header({
@@ -18,6 +19,7 @@ export function Header({
   onToggleExpanded,
   onRefresh,
   isRefreshing,
+  onOpenConfig,
 }: HeaderProps) {
   const [timeStr, setTimeStr] = useState("9:41");
   const [isDark, setIsDark] = useState(false);
@@ -149,6 +151,15 @@ export function Header({
               refresh
             </span>
           </button>
+
+          {/* Configuration & Settings */}
+          {onOpenConfig && (
+            <button className="header-icon-btn" onClick={onOpenConfig} title="Protocol Configuration">
+              <span className="material-symbols-outlined" style={{ fontSize: "17px" }}>
+                tune
+              </span>
+            </button>
+          )}
 
           {/* Desktop Frame Toggle */}
           <button

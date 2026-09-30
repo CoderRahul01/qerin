@@ -18,71 +18,73 @@ export function ChainsTab({
   const maxChain = chains.find((c) => c.isMaxChain) || chains[0];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.03em" }}>Multi-Chain Execution</h2>
-        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-          Live comparative analysis of EVM and SVM settlement rails.
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "4px 16px 20px 16px" }}>
+      <div>
+        <h2 style={{ fontFamily: "var(--font-headline)", fontSize: 20, fontWeight: 700, color: "var(--text-dark)" }}>
+          Multi-Chain Markets
+        </h2>
+        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+          Live comparative settlement throughput across EVM and SVM rails.
         </p>
       </div>
 
       {/* Maximum Transactions Chain Banner */}
       <div
         style={{
-          background: "linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(244, 91, 0, 0.12) 100%)",
-          border: "1px solid rgba(139, 92, 246, 0.4)",
+          background: "linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%)",
+          border: "1px solid rgba(139, 92, 246, 0.3)",
           borderRadius: 16,
-          padding: 18,
-          marginBottom: 16,
+          padding: 16,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 22 }}>🏆</span>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#c084fc", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                MAXIMUM TRANSACTION ACTIVITY
+              <div style={{ fontSize: 10, fontWeight: 800, color: "var(--accent-purple)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                MAX TRANSACTION ACTIVITY
               </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", marginTop: 2 }}>
+              <div style={{ fontFamily: "var(--font-headline)", fontSize: 17, fontWeight: 700, color: "var(--text-dark)", marginTop: 2 }}>
                 {maxChain.name}
               </div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#c084fc", fontFamily: "var(--font-mono)" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent-purple)", fontFamily: "var(--font-mono)" }}>
               {maxChain.txSharePct}%
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>of all settlements</div>
+            <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>of total traffic</div>
           </div>
         </div>
 
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", fontSize: 11 }}>
           <div>
-            <span style={{ color: "var(--text-muted)" }}>Total Txs: </span>
-            <strong style={{ color: "var(--text-primary)" }}>{maxChain.totalTransactions}</strong>
+            <span style={{ color: "var(--text-secondary)" }}>Total Txs: </span>
+            <strong style={{ color: "var(--text-dark)" }}>{maxChain.totalTransactions}</strong>
           </div>
           <div>
-            <span style={{ color: "var(--text-muted)" }}>Avg Gas Fee: </span>
-            <strong style={{ color: "#34d399" }}>${maxChain.avgGasCostUsd}</strong>
+            <span style={{ color: "var(--text-secondary)" }}>Avg Gas: </span>
+            <strong style={{ color: "var(--primary-pill-text)" }}>${maxChain.avgGasCostUsd}</strong>
           </div>
           <div>
-            <span style={{ color: "var(--text-muted)" }}>Block Time: </span>
-            <strong style={{ color: "var(--text-primary)" }}>{maxChain.avgBlockTimeSec}s</strong>
+            <span style={{ color: "var(--text-secondary)" }}>Block Time: </span>
+            <strong style={{ color: "var(--text-dark)" }}>{maxChain.avgBlockTimeSec}s</strong>
           </div>
         </div>
       </div>
 
-      {/* Comparative Share Bar */}
-      <div className="content-section-card" style={{ marginTop: 0 }}>
-        <div className="section-title-row">
-          <div className="section-title">
-            <span>Transaction Share Breakdown</span>
-          </div>
-          <span className="section-badge">Live Split</span>
+      {/* Comparative Transaction Share Bar */}
+      <div className="settlement-receipt-card" style={{ padding: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ fontFamily: "var(--font-headline)", fontSize: 13, fontWeight: 700, color: "var(--text-dark)" }}>
+            Transaction Share Split
+          </span>
+          <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--primary-pill-text)", fontWeight: 700 }}>
+            Live Split
+          </span>
         </div>
 
-        {/* Stacked Bar */}
-        <div style={{ height: 12, borderRadius: 6, overflow: "hidden", display: "flex", background: "rgba(255, 255, 255, 0.08)", margin: "14px 0 10px" }}>
+        <div style={{ height: 10, borderRadius: 999, overflow: "hidden", display: "flex", background: "var(--bg-container)", margin: "8px 0" }}>
           {chains.map((chain) => (
             <div
               key={chain.chainId}
@@ -96,64 +98,64 @@ export function ChainsTab({
           ))}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, fontSize: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6, fontSize: 11, marginTop: 4 }}>
           {chains.map((chain) => (
-            <div key={chain.chainId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div key={chain.chainId} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: chain.color }} />
               <span style={{ color: "var(--text-secondary)" }}>{chain.name.split(" ")[0]}:</span>
-              <strong style={{ color: "var(--text-primary)" }}>{chain.txSharePct}%</strong>
+              <strong style={{ color: "var(--text-dark)" }}>{chain.txSharePct}%</strong>
             </div>
           ))}
         </div>
       </div>
 
       {/* Deep-Dive Cards per Chain */}
-      <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {chains.map((chain) => (
-          <div key={chain.chainId} className={`chain-row-card ${chain.isMaxChain ? "highlight-max" : ""}`} style={{ marginBottom: 12 }}>
+          <div key={chain.chainId} className="settlement-receipt-card" style={{ padding: 14 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span className="chain-bullet" style={{ background: chain.color, width: 12, height: 12 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ background: chain.color, width: 10, height: 10, borderRadius: "50%" }} />
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <strong style={{ fontSize: 15, color: "var(--text-primary)" }}>{chain.name}</strong>
-                    <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: "rgba(255, 255, 255, 0.08)", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                    <strong style={{ fontSize: 14, color: "var(--text-dark)" }}>{chain.name}</strong>
+                    <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "var(--bg-container)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                       ID {chain.chainId}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                    Native Currency: {chain.symbol}
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Asset: {chain.symbol} • Latency: {chain.chainId === 677 ? `${rpcLatencyMs.botChain}ms` : `${rpcLatencyMs.base}ms`}
                   </div>
                 </div>
               </div>
 
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                  {chain.totalTransactions}
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-dark)" }}>
+                  {chain.totalTransactions} txs
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Total Transactions</div>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Volume: ${chain.volumeUsd.toFixed(2)}</div>
               </div>
             </div>
 
-            {/* Performance Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
-              <div style={{ background: "rgba(0, 0, 0, 0.25)", padding: 8, borderRadius: 8 }}>
-                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>Gas Cost</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#34d399", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+            {/* Performance Mini Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ background: "var(--bg-card-subtle)", padding: 6, borderRadius: 6, textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Gas Fee</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary-container)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
                   ${chain.avgGasCostUsd}
                 </div>
               </div>
 
-              <div style={{ background: "rgba(0, 0, 0, 0.25)", padding: 8, borderRadius: 8 }}>
-                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>Block Time</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+              <div style={{ background: "var(--bg-card-subtle)", padding: 6, borderRadius: 6, textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Block Time</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dark)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
                   {chain.avgBlockTimeSec}s
                 </div>
               </div>
 
-              <div style={{ background: "rgba(0, 0, 0, 0.25)", padding: 8, borderRadius: 8 }}>
-                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>Live RPC Block</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent-orange-bright)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+              <div style={{ background: "var(--bg-card-subtle)", padding: 6, borderRadius: 6, textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Live Block</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
                   {chain.chainId === 677
                     ? botChainBlock ? `#${botChainBlock}` : "Live"
                     : chain.chainId === 8453
@@ -163,25 +165,25 @@ export function ChainsTab({
               </div>
             </div>
 
-            {/* Contract & Explorer Link */}
-            <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
-              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                Contract: {chain.contractAddress.slice(0, 8)}...{chain.contractAddress.slice(-6)}
+            {/* Explorer Link */}
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
+              <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
+                {chain.contractAddress.slice(0, 10)}...{chain.contractAddress.slice(-6)}
               </span>
               <a
                 href={`${chain.explorerUrl}/address/${chain.contractAddress}`}
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  color: "var(--accent-orange)",
+                  color: "var(--primary)",
                   fontWeight: 700,
                   textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 3,
+                  gap: 2,
                 }}
               >
-                Inspect Explorer ↗
+                Explorer ↗
               </a>
             </div>
           </div>

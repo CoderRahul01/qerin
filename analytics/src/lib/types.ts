@@ -61,20 +61,20 @@ export interface FailurePoint {
 
 export interface WalletUserItem {
   address: string;
-  label?: string;
-  type: "Operator" | "Active Research" | "Funded Account" | "New Visitor";
+  label: string;
   queriesCount: number;
   totalSpentUsd: number;
-  primaryChain: string;
-  firstSeen: string;
   lastActive: string;
+  type: "Research User" | "Operator" | "Active Research";
+  primaryChain: string;
 }
 
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-      isMetaMask?: boolean;
-    };
-  }
+export interface ProtocolConfig {
+  botChainRpc: string;
+  baseRpc: string;
+  registryAddress: string;
+  reownProjectId: string;
+  backendAnalyticsUrl: string;
+  refreshIntervalSec: number;
+  dailySpendCapUsd: number;
 }

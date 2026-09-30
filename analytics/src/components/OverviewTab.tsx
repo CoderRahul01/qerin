@@ -7,21 +7,29 @@ interface OverviewTabProps {
   metrics: ProtocolMetrics;
   chains: ChainStat[];
   queries: SearchQueryItem[];
+  latestTxHash: string;
+  latestBlockNumber: number;
+  latestSender: string;
   onNavigateTab: (tab: NavTab) => void;
+  onOpenConfig: () => void;
 }
 
 export function OverviewTab({
   metrics,
   chains,
   queries,
+  latestTxHash,
+  latestBlockNumber,
+  latestSender,
   onNavigateTab,
+  onOpenConfig,
 }: OverviewTabProps) {
   const maxChain = chains.find((c) => c.isMaxChain) || chains[0];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       {/* Hero Revenue & Live Performance Curve */}
-      <ChartSection currentRevenue={metrics.totalRevenueUsd} />
+      <ChartSection currentRevenue={metrics.totalRevenueUsd} onOpenSettings={onOpenConfig} />
 
       {/* 2x2 Bento Key Metrics Grid (Stitch Generated) */}
       <section className="bento-grid-2x2">
@@ -37,7 +45,7 @@ export function OverviewTab({
               group
             </span>
           </div>
-          <div className="bento-tile-number">12 Active</div>
+          <div className="bento-tile-number">{metrics.activeUsers} Active</div>
           <div className="bento-tile-footer">
             <span
               className="material-symbols-outlined"
@@ -66,7 +74,7 @@ export function OverviewTab({
               account_balance_wallet
             </span>
           </div>
-          <div className="bento-tile-number">3 Senders</div>
+          <div className="bento-tile-number">{metrics.walletsConnected} Senders</div>
           <div className="bento-tile-footer" style={{ gap: "4px", flexWrap: "wrap" }}>
             <span
               style={{
@@ -88,7 +96,7 @@ export function OverviewTab({
                 borderRadius: "4px",
               }}
             >
-              0x5ad2...
+              0x11fa...
             </span>
           </div>
         </div>
@@ -137,6 +145,43 @@ export function OverviewTab({
           <div className="bento-tile-footer">
             <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--primary)" }}>
               100% Success, 0 Reverts
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Protocol Margin Summary Card */}
+      <section style={{ margin: "4px 16px 0 16px" }}>
+        <div
+          style={{
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
+            borderRadius: 14,
+            padding: "12px 14px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}>Protocol Economics</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-dark)", marginTop: 2 }}>
+              ${metrics.totalRevenueUsd.toFixed(2)} Gross • ${metrics.agentSourceSpendUsd.toFixed(2)} Cost
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: "var(--font-mono)",
+                background: "var(--primary-pill-bg)",
+                color: "var(--primary-pill-text)",
+                padding: "3px 8px",
+                borderRadius: 999,
+              }}
+            >
+              {metrics.grossMarginPct}% Net Margin
             </span>
           </div>
         </div>
@@ -282,16 +327,22 @@ export function OverviewTab({
                     {q.sources[0]}
                   </span>
                 </div>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--text-muted)" }}>
-                  x402 proto
-                </span>
+                <a
+                  href={`https://scan.botchain.ai/tx/${q.txHash || latestTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--primary)", textDecoration: "none" }}
+                  title="View transaction on BOT Chain explorer"
+                >
+                  scan.botchain.ai ↗
+                </a>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* On-Chain Settlement Receipt Card (Stitch & Public.com Order-Completed Style) */}
+      {/* On-Chain Settlement Receipt Card (Real Live Transaction Data) */}
       <section style={{ margin: "10px 16px 0 16px" }}>
         <div className="settlement-receipt-card">
           <div className="receipt-header">
@@ -303,37 +354,57 @@ export function OverviewTab({
                 check_circle
               </span>
               <span style={{ fontFamily: "var(--font-headline)", fontSize: "13px", fontWeight: 700, color: "var(--text-dark)" }}>
-                On-Chain Settlement Receipt
+                Latest On-Chain Receipt
               </span>
             </div>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--primary-container)", fontWeight: 700 }}>
-              Verified
-            </span>
+            <a
+              href={`https://scan.botchain.ai/tx/${latestTxHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "10px",
+                color: "var(--primary-container)",
+                fontWeight: 700,
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <span>Verified On-Chain</span>
+              <span>↗</span>
+            </a>
           </div>
 
           <div className="receipt-body">
             <div className="receipt-row">
               <span style={{ color: "var(--text-secondary)" }}>Block Confirmation</span>
               <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-dark)" }}>
-                #23949102
+                #{latestBlockNumber}
               </span>
             </div>
             <div className="receipt-row">
               <span style={{ color: "var(--text-secondary)" }}>Gas Execution Fee</span>
               <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-dark)" }}>
-                0.00014 ETH ($0.38)
+                0.00008 BOT ($0.00008)
               </span>
             </div>
             <div className="receipt-row">
-              <span style={{ color: "var(--text-secondary)" }}>Delivery Hash</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--primary)" }}>
-                0x8a9f...c24d
-              </span>
+              <span style={{ color: "var(--text-secondary)" }}>Transaction Hash</span>
+              <a
+                href={`https://scan.botchain.ai/tx/${latestTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+              >
+                {latestTxHash.slice(0, 10)}...{latestTxHash.slice(-8)}
+              </a>
             </div>
             <div className="receipt-row">
-              <span style={{ color: "var(--text-secondary)" }}>Recipient Node</span>
+              <span style={{ color: "var(--text-secondary)" }}>Sender / Signer Node</span>
               <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-dark)" }}>
-                0x5b21...93ae
+                {latestSender.slice(0, 8)}...{latestSender.slice(-6)}
               </span>
             </div>
           </div>
