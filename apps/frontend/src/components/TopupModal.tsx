@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import Script from "next/script";
+import { useEffect, useState, useCallback } from "react";
 import {
   sendCryptoDeposit,
   signTopupConfirmation,
@@ -13,7 +12,7 @@ import {
   type TopupNetwork,
   type WalletBalanceReport,
 } from "@/lib/cryptoTopup";
-import { confirmCryptoTopup, claimDemoFuel, fetchAccountInfo, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider } from "@/lib/account";
+import { confirmCryptoTopup, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider, connectWalletConnect, hasWalletConnect } from "@/lib/account";
 import { SOLANA_NETWORK, signSolanaTopupConfirmation } from "@/lib/solanaTopup";
 
 const TIERS = [
@@ -22,17 +21,12 @@ const TIERS = [
   { amountUsd: 20, title: "Research Fuel Plus", desc: "Up to 133 answers", badge: null },
 ];
 
-// Public sitekey — pairs with the secret held only by the deployed
-// siteverify Worker (see apps/frontend/src/app/api/account/topup/demo-claim/route.ts).
-const TURNSTILE_SITEKEY = "0x4AAAAAAEwCEYi80lvHdDWk";
-
 const NOT_MINED_REASON = "not found on-chain yet";
 const CONFIRM_RETRY_INTERVAL_MS = 3000;
 const CONFIRM_MAX_ATTEMPTS = 10;
 
 type Step =
   | { kind: "idle" }
-  | { kind: "claiming" }
   | { kind: "connecting" }
   | { kind: "sending"; amountUsd: number; network: TopupNetwork; paymentMethod: "token" | "native" }
   | { kind: "confirming"; txHash: string; amountUsd: number; attempt: number; network: TopupNetwork }
@@ -94,7 +88,6 @@ export function TopupModal({
   useEffect(() => {
     if (chainFamily !== "solana") return;
     let cancelled = false;
-    setSolInfoStatus("loading");
     fetch(`/api/network-info?network=${SOLANA_NETWORK.id}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((info) => {
@@ -136,15 +129,11 @@ export function TopupModal({
   const [step, setStep] = useState<Step>({ kind: "idle" });
   const [walletDiag, setWalletDiag] = useState<WalletBalanceReport | null>(null);
   const [watchAssetSuccess, setWatchAssetSuccess] = useState<boolean | null>(null);
-  const [passClaimed, setPassClaimed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return window.localStorage.getItem(`qerin_pass_claimed_${initialAccountId}`) === "true";
-    }
-    return false;
-  });
   const [botPrice, setBotPrice] = useState<number>(12.20);
-  const [paidSourcesReady, setPaidSourcesReady] = useState<boolean | null>(null);
   const [depositAddress, setDepositAddress] = useState<string | null>(null);
+  // True when the deposit address is this user's own Qerin agent wallet
+  // (Base, connected wallet) rather than Qerin's shared deposit wallet.
+  const [personalWallet, setPersonalWallet] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualTxHash, setManualTxHash] = useState("");
@@ -158,33 +147,28 @@ export function TopupModal({
     if (typeof window === "undefined") return null;
     return getInjectedProvider() !== null;
   });
+  const [walletConnectAvailable] = useState(hasWalletConnect);
+  // Keep optional chains out of the launch UI until their treasury and x402
+  // settlement paths are configured. BOT Chain is the launch priority.
+  const solanaEnabled = process.env.NEXT_PUBLIC_ENABLE_SOLANA_TOPUPS === "true";
   const [paymentMethod, setPaymentMethod] = useState<"token" | "native">(
     initialNetwork === "botchain" ? "native" : "token"
   );
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileReady, setTurnstileReady] = useState(() => {
-    if (typeof window !== "undefined" && (window as unknown as { turnstile?: unknown }).turnstile) {
-      return true;
-    }
-    return false;
-  });
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetIdRef = useRef<string | null>(null);
 
   const activeMeta = TOPUP_NETWORKS[network];
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/network-info?network=${network}`, { cache: "no-store" })
+    fetch(`/api/network-info?network=${network}&account=${encodeURIComponent(accountId)}`, { cache: "no-store" })
       .then(async (response) => response.ok ? response.json() : null)
       .then((info) => {
         if (cancelled) return;
-        setPaidSourcesReady(info?.paidSourcesReady === true);
         setDepositAddress(typeof info?.payTo === "string" ? info.payTo : null);
+        setPersonalWallet(info?.personalWallet === true);
       })
-      .catch(() => { if (!cancelled) { setPaidSourcesReady(false); setDepositAddress(null); } });
+      .catch(() => { if (!cancelled) { setDepositAddress(null); setPersonalWallet(false); } });
     return () => { cancelled = true; };
-  }, [network]);
+  }, [network, accountId]);
 
   const handleCopyAddress = useCallback(() => {
     if (!depositAddress || typeof navigator === "undefined" || !navigator.clipboard) return;
@@ -193,35 +177,6 @@ export function TopupModal({
       setTimeout(() => setAddressCopied(false), 2000);
     }).catch(() => {});
   }, [depositAddress]);
-
-  // Render the Turnstile widget imperatively once the script is loaded and
-  // the pass hasn't been claimed — bot-gates the free $1.50 claim so it
-  // can't be farmed by scripting requests directly at the API route.
-  useEffect(() => {
-    if (!turnstileReady || passClaimed || !turnstileContainerRef.current) return;
-    const w = window as unknown as {
-      turnstile?: {
-        render: (el: Element, opts: Record<string, unknown>) => string;
-        remove: (id: string) => void;
-        reset: (id: string) => void;
-      };
-    };
-    if (!w.turnstile) return;
-    const id = w.turnstile.render(turnstileContainerRef.current, {
-      sitekey: TURNSTILE_SITEKEY,
-      action: "turnstile-spin-v1",
-      callback: (token: string) => setTurnstileToken(token),
-      "expired-callback": () => setTurnstileToken(""),
-      "error-callback": () => setTurnstileToken(""),
-    });
-    turnstileWidgetIdRef.current = id;
-    return () => {
-      try {
-        w.turnstile?.remove(id);
-      } catch {}
-      turnstileWidgetIdRef.current = null;
-    };
-  }, [turnstileReady, passClaimed]);
 
   // Detect wallet after mount if injected asynchronously
   useEffect(() => {
@@ -232,8 +187,18 @@ export function TopupModal({
   }, []);
 
   const handleSelectNetwork = useCallback((net: TopupNetwork) => {
+    // A network click must also leave the Solana branch. Without this, a
+    // user could choose Base/BOT after viewing Solana and still see Solana's
+    // payment form while the selected EVM network silently changed.
+    setChainFamily("evm");
     setNetwork(net);
     setPaymentMethod(net === "botchain" ? "native" : "token");
+    setStep({ kind: "idle" });
+  }, []);
+
+  const handleSelectSolana = useCallback(() => {
+    setSolInfoStatus("loading");
+    setChainFamily("solana");
     setStep({ kind: "idle" });
   }, []);
 
@@ -243,26 +208,6 @@ export function TopupModal({
       fetchBotPrice().then(setBotPrice).catch(() => setBotPrice(12.20));
     }
   }, [network]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkAccountPass() {
-      if (!accountId) return;
-      try {
-        const info = await fetchAccountInfo(accountId);
-        if (!cancelled && info.passClaimed) {
-          setPassClaimed(true);
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
-          }
-        }
-      } catch {}
-    }
-    checkAccountPass();
-
-    return () => { cancelled = true; };
-  }, [accountId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -282,7 +227,7 @@ export function TopupModal({
     return () => { cancelled = true; };
   }, [network, hasWallet]);
 
-  const busy = step.kind === "sending" || step.kind === "confirming" || step.kind === "claiming" || step.kind === "connecting";
+  const busy = step.kind === "sending" || step.kind === "confirming" || step.kind === "connecting";
 
   const runConfirm = useCallback(async (txHash: string, amountUsd: number, net: TopupNetwork) => {
     let signature: string;
@@ -346,6 +291,28 @@ export function TopupModal({
     }
   };
 
+  const handleWalletConnect = async () => {
+    setStep({ kind: "connecting" });
+    try {
+      const addr = await connectWalletConnect();
+      if (!addr) throw new Error("No wallet account was returned. Approve the connection in BO Wallet and try again.");
+      const id = await getOrCreateAccountId(addr);
+      setAccountId(id);
+      const b = await fetchBalance(id);
+      onAccountCreated?.(id, b);
+      setHasWallet(true);
+      const rep = await checkWalletBalances(network);
+      setWalletDiag(rep);
+      if (rep.botPrice) setBotPrice(rep.botPrice);
+      setStep({ kind: "idle" });
+    } catch (err) {
+      setStep({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Could not connect with WalletConnect",
+      });
+    }
+  };
+
   const handleWalletDeposit = async (amountUsd: number) => {
     setStep({ kind: "sending", amountUsd, network, paymentMethod });
     let txHash: string;
@@ -390,51 +357,6 @@ export function TopupModal({
     await runConfirm(txHash, 0, network);
   };
 
-  const resetTurnstile = () => {
-    const w = window as unknown as { turnstile?: { reset: (id: string) => void } };
-    if (turnstileWidgetIdRef.current && w.turnstile) {
-      try {
-        w.turnstile.reset(turnstileWidgetIdRef.current);
-      } catch {}
-    }
-    setTurnstileToken("");
-  };
-
-  const handleClaimDemoFuel = async () => {
-    if (passClaimed) {
-      setStep({
-        kind: "error",
-        message: "Ecosystem Review Pass has already been claimed for this account.",
-      });
-      return;
-    }
-    if (!turnstileToken) {
-      setStep({ kind: "error", message: "Complete the verification challenge above to claim the pass." });
-      return;
-    }
-
-    setStep({ kind: "claiming" });
-    try {
-      const balance = await claimDemoFuel(accountId, turnstileToken);
-      setPassClaimed(true);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
-      }
-      setStep({ kind: "success", balance, message: "Ecosystem Review Pass activated — $1.50 Research Fuel credited." });
-      onCredited(balance);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not activate review pass";
-      if (msg.toLowerCase().includes("already been claimed")) {
-        setPassClaimed(true);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(`qerin_pass_claimed_${accountId}`, "true");
-        }
-      }
-      resetTurnstile();
-      setStep({ kind: "error", message: msg });
-    }
-  };
-
   const handleRegisterToken = async () => {
     const ok = await registerAssetInWallet(network);
     setWatchAssetSuccess(ok);
@@ -451,11 +373,6 @@ export function TopupModal({
 
   return (
     <>
-    <Script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      strategy="afterInteractive"
-      onLoad={() => setTurnstileReady(true)}
-    />
     <div
       style={{
         position: "fixed",
@@ -472,6 +389,7 @@ export function TopupModal({
       onClick={canDismiss ? onClose : undefined}
     >
       <div
+        className="qerin-topup-dialog"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
@@ -515,6 +433,7 @@ export function TopupModal({
           {canDismiss && (
             <button
               onClick={onClose}
+              aria-label="Close top-up"
               style={{
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -534,10 +453,6 @@ export function TopupModal({
         <p style={{ fontSize: 12, lineHeight: 1.5, color: "#D1D5DB", margin: "0 0 14px" }}>
           Fund your Qerin balance, then spend it on research — never a second charge from your wallet.
         </p>
-        {paidSourcesReady === false && <div role="status" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(251,146,60,0.35)", background: "rgba(251,146,60,0.08)", color: "#FCD34D", fontSize: 12 }}>
-          Paid research is temporarily unavailable while Qerin&apos;s source wallet is replenished. You can still top up — your deposit funds your balance and helps restore source payments right away.
-        </div>}
-
         {/* Qerin Deposit Address — fund from any wallet without connecting it here */}
         {depositAddress && (
           <div
@@ -565,7 +480,7 @@ export function TopupModal({
             >
               <span style={{ fontSize: 11.5, fontWeight: 700, color: depositPanelOpen ? "#9CA3AF" : "#FB923C", textTransform: depositPanelOpen ? "uppercase" : "none", letterSpacing: depositPanelOpen ? "0.04em" : "normal" }}>
                 {depositPanelOpen
-                  ? `Your Qerin deposit address · ${activeMeta.name}`
+                  ? `${personalWallet ? "Your personal Qerin wallet" : "Your Qerin deposit address"} · ${activeMeta.name}`
                   : hasWallet === false
                     ? "No browser wallet? Pay from any wallet or exchange instead →"
                     : "Or pay from a different wallet or exchange →"}
@@ -607,9 +522,11 @@ export function TopupModal({
               </button>
             </div>
             <div style={{ marginTop: 6, fontSize: 11.5, color: "#6B7280", lineHeight: 1.4 }}>
-              Send {network === "base" ? "USDC" : "BOT or USDT"} here from any wallet or exchange, then confirm the transfer below with the wallet that sent it.
+              {personalWallet
+                ? "Send USDC on Base here from any wallet or exchange. Your agent pays sources from this wallet."
+                : `Send ${network === "base" ? "USDC" : "BOT or USDT"} here from any wallet or exchange, then confirm the transfer below with the wallet that sent it.`}
             </div>
-            <button
+            {!personalWallet && <button
               onClick={() => setManualEntryOpen((v) => !v)}
               disabled={busy}
               style={{
@@ -624,8 +541,8 @@ export function TopupModal({
               }}
             >
               {manualEntryOpen ? "▾ Hide" : "▸"} I already sent a transfer — confirm with tx hash
-            </button>
-            {manualEntryOpen && (
+            </button>}
+            {!personalWallet && manualEntryOpen && (
               <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                 <input
                   value={manualTxHash}
@@ -692,6 +609,32 @@ export function TopupModal({
           </button>
         )}
 
+        {!walletDiag && walletConnectAvailable && step.kind !== "connecting" && (
+          <button
+            type="button"
+            onClick={handleWalletConnect}
+            style={{
+              width: "100%",
+              marginBottom: 14,
+              minHeight: 44,
+              padding: "11px 16px",
+              background: "linear-gradient(135deg, rgba(234,88,12,0.28) 0%, rgba(194,65,12,0.16) 100%)",
+              border: "1px solid rgba(251,146,60,0.62)",
+              borderRadius: 10,
+              color: "#FED7AA",
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            <span aria-hidden="true">▣</span> Connect BO Wallet with QR
+          </button>
+        )}
+
         {/* Connecting state */}
         {step.kind === "connecting" && (
           <div style={{ textAlign: "center", padding: "14px 0 18px", fontSize: 13.5, color: "#FB923C", fontWeight: 600 }}>
@@ -755,8 +698,8 @@ export function TopupModal({
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#EA580C", display: "inline-block" }} />
             BOT Chain
           </button>
-          <button
-            onClick={() => setChainFamily("solana")}
+          {solanaEnabled && <button
+            onClick={handleSelectSolana}
             style={{
               flex: 1,
               padding: "7px 10px",
@@ -775,11 +718,11 @@ export function TopupModal({
             }}
           >
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#9945FF", display: "inline-block" }} />
-            Solana (Beta)
-          </button>
+            Solana (USDC)
+          </button>}
         </div>
 
-        {chainFamily === "solana" ? (
+        {solanaEnabled && chainFamily === "solana" ? (
           <>
             <div
               style={{
@@ -911,11 +854,9 @@ export function TopupModal({
               <span style={{ color: Number(walletDiag.nativeBalance) > 0 ? "#34D399" : "#F87171", fontWeight: 600 }}>
                 {walletDiag.nativeBalance} {activeMeta.currency}
               </span>
-              {network === "base" && (
-                <span style={{ color: Number(walletDiag.tokenBalance) > 0 ? "#60A5FA" : "#F87171" }}>
-                  {walletDiag.tokenBalance} USDC
-                </span>
-              )}
+              <span style={{ color: Number(walletDiag.tokenBalance) > 0 ? "#60A5FA" : "#F87171" }}>
+                {walletDiag.tokenBalance} {activeMeta.tokenSymbol}
+              </span>
             </div>
           </div>
         )}
@@ -987,58 +928,6 @@ export function TopupModal({
                 {step.message}
               </div>
             )}
-
-            {/* Free Beta Tester & Ecosystem Pass */}
-            <div
-              style={{
-                marginBottom: 12,
-                padding: "13px 15px",
-                background: passClaimed
-                  ? "rgba(255,255,255,0.03)"
-                  : "linear-gradient(135deg, rgba(20,184,166,0.18) 0%, rgba(13,148,136,0.09) 100%)",
-                border: passClaimed
-                  ? "1px solid rgba(255,255,255,0.08)"
-                  : "1px solid rgba(20,184,166,0.45)",
-                borderRadius: 11,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                opacity: passClaimed ? 0.7 : 1,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: passClaimed ? "#9CA3AF" : "#2DD4BF", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>{passClaimed ? "✓" : "⚡"}</span>
-                  Beta Tester Pass {passClaimed ? "(Claimed)" : "(Free — $1.50)"}
-                </div>
-                <div style={{ marginTop: 3, fontSize: 11.5, color: passClaimed ? "#4B5563" : "#99F6E4", lineHeight: 1.4 }}>
-                  {passClaimed ? "Already activated for this account." : "One-time credit for beta testing autonomous on-chain research."}
-                </div>
-                {!passClaimed && (
-                  <div ref={turnstileContainerRef} style={{ marginTop: 8 }} />
-                )}
-              </div>
-              <button
-                onClick={handleClaimDemoFuel}
-                disabled={passClaimed || busy}
-                style={{
-                  background: passClaimed ? "rgba(255,255,255,0.05)" : (turnstileToken ? "#0D9488" : "rgba(20,184,166,0.25)"),
-                  border: passClaimed ? "1px solid rgba(255,255,255,0.1)" : (turnstileToken ? "none" : "1px solid rgba(20,184,166,0.5)"),
-                  color: passClaimed ? "#6B7280" : (turnstileToken ? "#fff" : "#2DD4BF"),
-                  fontWeight: 700,
-                  fontSize: 12,
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  cursor: passClaimed ? "default" : "pointer",
-                  boxShadow: turnstileToken ? "0 0 14px rgba(20,184,166,0.4)" : "none",
-                  flexShrink: 0,
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {passClaimed ? "✓ Claimed" : busy ? "Activating…" : "Claim $1.50 Pass"}
-              </button>
-            </div>
 
             {/* Tier Cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -1124,7 +1013,7 @@ export function TopupModal({
             </div>
 
             {/* Token Register Helper */}
-            {walletDiag && network === "base" && (
+            {walletDiag && (
               <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
                 <button
                   onClick={handleRegisterToken}
@@ -1140,7 +1029,7 @@ export function TopupModal({
                     padding: 0,
                   }}
                 >
-                  <span>🦊</span> Add USDC to wallet
+                  <span>🦊</span> Add {activeMeta.tokenSymbol} to wallet
                   {watchAssetSuccess !== null && (
                     <span style={{ color: watchAssetSuccess ? "#34D399" : "#F87171", marginLeft: 4 }}>
                       {watchAssetSuccess ? "✓ Added" : "✗ Failed"}
@@ -1150,14 +1039,6 @@ export function TopupModal({
               </div>
             )}
           </>
-        )}
-
-        {/* Claiming State */}
-        {step.kind === "claiming" && (
-          <div style={{ marginTop: 20, textAlign: "center", padding: "14px 0" }}>
-            <div style={{ fontSize: 26, marginBottom: 8 }}>⚡</div>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>Activating Research Fuel…</div>
-          </div>
         )}
 
         {/* Sending State */}

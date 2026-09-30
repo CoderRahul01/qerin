@@ -1831,7 +1831,7 @@ export function QerinDashboard() {
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <span>⚡ Beta Tester Pass: Claim $1.50 Free Research Fuel</span>
+                    <span>⚡ Fund your Qerin balance to start research</span>
                     <span style={{ fontSize: 14 }}>→</span>
                   </button>
                 )}

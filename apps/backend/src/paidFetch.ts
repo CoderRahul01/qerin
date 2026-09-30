@@ -1,5 +1,6 @@
 import { x402Client, x402HTTPClient, wrapFetchWithPayment } from "@x402/fetch";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
+import type { ClientEvmSigner } from "@x402/evm";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 
@@ -20,8 +21,10 @@ export interface PaidResult {
 
 // Lazily built on first paySource() call — the wallet and network config it
 // depends on both read process.env, which is only populated once a request
-// is being handled on Workers (see wallet.ts).
-function getPaymentClient(expectedPriceUsd: string) {
+// is being handled on Workers (see wallet.ts). `signer` is the user's own
+// agent wallet when they have one (see agentWallet.ts); Qerin's shared wallet
+// is only the fallback for balances funded before agent wallets existed.
+function getPaymentClient(expectedPriceUsd: string, signer: ClientEvmSigner = getQerinAccount()) {
   const maxAtomic = BigInt(Math.round(Math.min(Number(expectedPriceUsd), MAX_SOURCE_USDC) * 1_000_000));
   const network = getNetwork();
   let quotedAtomic: string | null = null;
@@ -43,7 +46,7 @@ function getPaymentClient(expectedPriceUsd: string) {
       ?? (selected as unknown as { maxAmountRequired?: string }).maxAmountRequired ?? null;
     return selected;
   });
-  registerExactEvmScheme(client, { signer: getQerinAccount(), networks: [network.caip2] });
+  registerExactEvmScheme(client, { signer, networks: [network.caip2] });
   return { fetchWithPayment: wrapFetchWithPayment(fetch, client), httpClient: new x402HTTPClient(client), getQuotedAtomic: () => quotedAtomic };
 }
 
@@ -59,9 +62,10 @@ export async function paySource(
   sourceName: string,
   url: string,
   expectedPriceUsd: string,
-  init: RequestInit = { method: "GET" }
+  init: RequestInit = { method: "GET" },
+  signer?: ClientEvmSigner
 ): Promise<PaidResult> {
-  const { fetchWithPayment, httpClient, getQuotedAtomic } = getPaymentClient(expectedPriceUsd);
+  const { fetchWithPayment, httpClient, getQuotedAtomic } = getPaymentClient(expectedPriceUsd, signer);
   const response = await fetchWithPayment(url, { ...init, signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS) });
 
   if (!response.ok) {

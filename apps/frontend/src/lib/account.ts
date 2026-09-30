@@ -43,6 +43,55 @@ export interface EthereumProvider {
   isTokenPocket?: boolean;
 }
 
+// WalletConnect is an EIP-1193 provider just like an injected extension.
+// Keeping it behind this module means the payment, signature, and receipt
+// code can work identically for BO Wallet QR sessions and browser wallets.
+let walletConnectProvider: EthereumProvider | null = null;
+
+// A Reown project ID is a public client identifier, not a wallet secret. The
+// environment variable lets deployments use their own project; this fallback
+// is Qerin's project registered for the production domain.
+const REOWN_PROJECT_ID = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID || "beccbc473190c8b06eb5471223604fdf";
+
+export function hasWalletConnect(): boolean {
+  return Boolean(REOWN_PROJECT_ID);
+}
+
+/** Open the WalletConnect QR modal (including BO Wallet) and retain its
+ * EIP-1193 provider as the active signer for this browser session. */
+export async function connectWalletConnect(): Promise<string | null> {
+  if (typeof window === "undefined") throw new Error("WalletConnect is only available in the browser.");
+  if (!REOWN_PROJECT_ID) throw new Error("WalletConnect is not configured for this deployment.");
+
+  // This package accesses browser APIs at import time, so keep it dynamic for
+  // Next.js SSR. BO Wallet scans the modal's WalletConnect URI from mobile.
+  const { EthereumProvider: WalletConnectProvider } = await import("@walletconnect/ethereum-provider");
+  const provider = await WalletConnectProvider.init({
+    projectId: REOWN_PROJECT_ID,
+    optionalChains: [677, 8453],
+    showQrModal: true,
+    rpcMap: {
+      677: "https://rpc.botchain.ai",
+      8453: "https://mainnet.base.org",
+    },
+    metadata: {
+      name: "Qerin",
+      description: "Verifiable on-chain research payments",
+      url: "https://qerin.vercel.app",
+      icons: ["https://qerin.vercel.app/qerin-app-icon-1024.png"],
+    },
+  });
+
+  provider.on("disconnect", () => {
+    walletConnectProvider = null;
+  });
+  await provider.connect({ optionalChains: [677, 8453] });
+  walletConnectProvider = provider as unknown as EthereumProvider;
+  const accounts = (await walletConnectProvider.request({ method: "eth_accounts" })) as string[];
+  const wallet = accounts?.[0];
+  return wallet?.startsWith("0x") ? wallet.toLowerCase() : null;
+}
+
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
@@ -86,10 +135,10 @@ export function getInjectedProvider(): EthereumProvider | null {
 }
 
 export function getProvider(): EthereumProvider {
-  const provider = getInjectedProvider();
+  const provider = walletConnectProvider ?? getInjectedProvider();
   if (!provider) {
     throw new Error(
-      "No wallet found. Please install MetaMask, OKX Wallet, Bitget Wallet, or TokenPocket, or open in a Web3 browser."
+      "No wallet found. Connect BO Wallet by QR, install a browser wallet, or open Qerin in your wallet's DApp browser."
     );
   }
   return provider;
@@ -98,7 +147,7 @@ export function getProvider(): EthereumProvider {
 // ── Wallet Connection ────────────────────────────────────────────────────────
 
 export async function getConnectedWalletAddress(): Promise<string | null> {
-  const provider = getInjectedProvider();
+  const provider = walletConnectProvider ?? getInjectedProvider();
   if (!provider) return null;
   try {
     const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
@@ -110,10 +159,10 @@ export async function getConnectedWalletAddress(): Promise<string | null> {
 }
 
 export async function requestWalletConnection(): Promise<string | null> {
-  const provider = getInjectedProvider();
+  const provider = walletConnectProvider ?? getInjectedProvider();
   if (!provider) {
     throw new Error(
-      "No Web3 wallet detected. Install MetaMask, OKX Wallet, Bitget Wallet, or TokenPocket and refresh."
+      "No Web3 wallet detected. Connect BO Wallet by QR, install a browser wallet, or open Qerin in your wallet's DApp browser."
     );
   }
   try {
@@ -173,27 +222,6 @@ export async function getOrCreateAccountId(walletAddr?: string | null): Promise<
 
 // ── Balance & Account Info ────────────────────────────────────────────────────
 
-export interface AccountInfo {
-  balance: number;
-  passClaimed: boolean;
-}
-
-export async function fetchAccountInfo(accountId: string): Promise<AccountInfo> {
-  try {
-    const res = await fetch("/api/account/balance", {
-      headers: { "X-Qerin-Account-Id": accountId },
-    });
-    const json = await res.json();
-    if (res.ok && typeof json.balance === "number") {
-      return {
-        balance: json.balance as number,
-        passClaimed: Boolean(json.passClaimed),
-      };
-    }
-  } catch {}
-  return { balance: 0, passClaimed: false };
-}
-
 export async function fetchBalance(accountId: string): Promise<number> {
   try {
     const res = await fetch("/api/account/balance", {
@@ -236,29 +264,4 @@ export async function confirmCryptoTopup(
     throw new Error(json?.error || "Could not confirm top-up");
   }
   return json.balance as number;
-}
-
-export async function claimDemoFuel(accountId: string, turnstileToken: string): Promise<number> {
-  let targetId = accountId;
-  if (!targetId || targetId.startsWith("local-")) {
-    targetId = await getOrCreateAccountId();
-  }
-
-  const proof = await getAccountProof(targetId);
-  const res = await fetch("/api/account/topup/demo-claim", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": targetId, "X-Qerin-Account-Proof": proof },
-    body: JSON.stringify({ turnstileToken }),
-  });
-  const json = await res.json();
-
-  if (res.ok && typeof json.balance === "number") {
-    return json.balance as number;
-  }
-
-  if (res.status === 409 || json?.alreadyClaimed) {
-    throw new Error(json?.error || "Ecosystem Review Pass has already been claimed for this account. Pass is strictly one-time per user.");
-  }
-
-  throw new Error(json?.error || "Could not activate ecosystem review pass");
 }

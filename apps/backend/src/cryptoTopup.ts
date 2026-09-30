@@ -1,7 +1,8 @@
 import { recoverMessageAddress } from "viem";
 import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
-import { recordDeposit } from "./accounts.js";
+import { getBalance, recordDeposit } from "./accounts.js";
+import { agentWalletsEnabled, findAgentWallet, getBaseUsdcBalance } from "./agentWallet.js";
 
 // Direct on-chain top-up — verifies any of:
 //   1. ERC-20 token (USDC on Base, USDT on BOT Chain) transfer to Qerin's wallet
@@ -197,16 +198,30 @@ export async function verifyAndCreditCryptoDeposit(
   // ── 2. Check ERC-20 token transfer (USDC / USDT) ────────────────────────
   if (transferredUsd === 0) {
     const tokenAddress = (network.usdc ?? network.usdt ?? "").toLowerCase();
+    // A Base deposit normally goes to the depositor's own agent wallet (see
+    // agentWallet.ts). Those funds are already theirs on-chain, so there is
+    // nothing to credit — the balance is simply read back from the chain.
+    const agentWallet =
+      network.chainId === 8453 && agentWalletsEnabled()
+        ? (await findAgentWallet(accountId).catch(() => null))?.toLowerCase() ?? null
+        : null;
     let transferredAtomic = 0n;
+    let agentWalletAtomic = 0n;
     for (const log of receipt.logs) {
       if (!tokenAddress || log.address.toLowerCase() !== tokenAddress) continue;
       if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC0) continue;
-      const to = `0x${log.topics[2]?.slice(-40)}`;
-      if (to.toLowerCase() !== qerinAddress) continue;
-      transferredAtomic += BigInt(log.data);
+      const to = `0x${log.topics[2]?.slice(-40)}`.toLowerCase();
+      if (to === qerinAddress) transferredAtomic += BigInt(log.data);
+      else if (agentWallet && to === agentWallet) agentWalletAtomic += BigInt(log.data);
     }
     if (transferredAtomic > 0n) {
       transferredUsd = Number(transferredAtomic) / ERC20_DECIMALS;
+    } else if (agentWallet && agentWalletAtomic > 0n) {
+      const [ledger, onChain] = await Promise.all([
+        getBalance(accountId).catch(() => null),
+        getBaseUsdcBalance(agentWallet),
+      ]);
+      return { verified: true, balance: (ledger ?? 0) + (onChain ?? Number(agentWalletAtomic) / ERC20_DECIMALS) };
     }
   }
 

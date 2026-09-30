@@ -22,6 +22,12 @@ QERIN_SOLANA_NETWORK=solana_devnet
 CDP_API_KEY_ID=
 CDP_API_KEY_SECRET=
 
+# CDP Wallet Secret. When set alongside the API key above, every connected
+# user gets their own CDP-held agent wallet on Base and their x402 source
+# payments are signed by it (see agentWallet.ts). Leave unset to keep paying
+# sources from QERIN_WALLET_PRIVATE_KEY.
+CDP_WALLET_SECRET=
+
 # Free API key from https://build.nvidia.com (NVIDIA Developer Program, no
 # credit card) — used for answer synthesis via NVIDIA NIM.
 NVIDIA_API_KEY=

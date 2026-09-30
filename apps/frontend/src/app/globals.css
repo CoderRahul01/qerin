@@ -106,6 +106,14 @@ a:hover {
   outline-offset: 2px;
 }
 
+/* The wallet top-up dialog contains several primary payment actions. Keep a
+   visible, high-contrast keyboard focus treatment regardless of wallet or OS. */
+.qerin-topup-dialog button:focus-visible,
+.qerin-topup-dialog input:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+
 @keyframes qerin-stamp {
   0% {
     transform: scale(0.3);
@@ -1051,4 +1059,3 @@ a:hover {
     color: #000 !important;
   }
 }
-

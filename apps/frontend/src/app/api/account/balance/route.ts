@@ -20,6 +20,6 @@ export async function GET(req: Request) {
     return Response.json(data, { status: res.status });
   } catch {
     // Graceful fallback for offline dev or temporary connectivity drops
-    return Response.json({ balance: 0, passClaimed: false, offline: true }, { status: 200 });
+    return Response.json({ balance: 0, offline: true }, { status: 200 });
   }
 }

@@ -286,7 +286,7 @@ export async function sendCryptoDeposit(
   const meta = TOPUP_NETWORKS[network];
 
   // Fetch destination settlement address + network info
-  const infoRes = await fetch(`/api/network-info?network=${network}`);
+  const infoRes = await fetch(`/api/network-info?network=${network}&account=${encodeURIComponent(accountId)}`);
   const info = await infoRes.json().catch(() => ({}));
   if (!infoRes.ok || !isAddress(info.payTo || "")) {
     throw new Error("Qerin could not verify its deposit address. No wallet transaction was requested.");

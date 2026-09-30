@@ -203,6 +203,10 @@ export function QerinApp() {
           reason={topupReason}
           onClose={() => setShowTopup(false)}
           onCredited={(newBalance) => setBalance(newBalance)}
+          onAccountCreated={(id, newBalance) => {
+            setAccountId(id);
+            setBalance(newBalance);
+          }}
         />
       )}
     </PhoneFrame>

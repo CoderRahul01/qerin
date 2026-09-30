@@ -5,6 +5,7 @@ import { checkSpendLimit, recordSpend, markSpendDelivered, ANSWER_PRICE_USD } fr
 import { getNetwork, getRegistryAddress } from "./networks.js";
 import { recordReceiptOnChain } from "./recordReceipt.js";
 import { archivePaidDelivery } from "./chatHistory.js";
+import type { ClientEvmSigner } from "@x402/evm";
 
 export type { OnProgress } from "./orchestrator.js";
 
@@ -18,14 +19,17 @@ export interface AnswerResult {
 // difference between the two routes is how the caller pays. `accountId`
 // is passed through to the answer_requests record for attribution when
 // called from the balance-gated path; index.ts owns debiting/refunding
-// that balance around this call.
+// that balance around this call. When `sourceSigner` is given, sources are
+// paid from that user's own agent wallet and the user is charged exactly
+// what the sources cost — there is no ledger debit to account for.
 export async function answerHandler(
   question: string,
   accountId: string | null = null,
   targetNetwork?: string,
   onProgress?: OnProgress,
   chatVaultId: string | null = null,
-  keepBackgroundAlive?: (task: Promise<unknown>) => void
+  keepBackgroundAlive?: (task: Promise<unknown>) => void,
+  sourceSigner?: ClientEvmSigner
 ): Promise<AnswerResult> {
   const sourceKeys = selectSources(question);
   const estimatedCost = estimateCost(sourceKeys);
@@ -40,7 +44,7 @@ export async function answerHandler(
     };
   }
 
-  const gatheredResults = await gatherSources(question, sourceKeys, targetNetwork, onProgress);
+  const gatheredResults = await gatherSources(question, sourceKeys, targetNetwork, onProgress, sourceSigner);
   const paidResults = gatheredResults.filter((result) => result.settlement === "x402");
 
   if (paidResults.length === 0) {
@@ -54,7 +58,12 @@ export async function answerHandler(
   }
 
   const totalPaidNum = paidResults.reduce((sum, r) => sum + parseFloat(r.amountPaid || "0"), 0);
-  const spendLogId = await recordSpend(totalPaidNum, paidResults.length, accountId, accountId ? ANSWER_PRICE_USD : null);
+  const spendLogId = await recordSpend(
+    totalPaidNum,
+    paidResults.length,
+    accountId,
+    sourceSigner ? totalPaidNum : accountId ? ANSWER_PRICE_USD : null
+  );
 
   onProgress?.({ type: "synthesizing" });
   const synthesized = await synthesizeAnswer(question, gatheredResults);
