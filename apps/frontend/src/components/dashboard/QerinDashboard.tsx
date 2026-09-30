@@ -240,31 +240,33 @@ function ThinkingBubble({ events }: { events?: AnswerProgressEvent[] }) {
 
   const isSynthesizing = (events ?? []).some((e) => e.type === "synthesizing");
 
-  const phaseLabel = isSynthesizing
-    ? "Synthesizing verified research dossier"
-    : selected.length > 0
-      ? `Settling payments across ${selected.length} verified sources`
-      : "Routing query to intelligence sources";
-  const phaseIcon = isSynthesizing ? "🧠" : selected.length > 0 ? "🔗" : "⚡";
+  const paidCount = selected.filter((src) => settled.get(src.name)?.success).length;
+  const steps: { label: string; state: "done" | "active" | "pending" }[] = [
+    { label: "Choosing sources", state: selected.length > 0 ? "done" : "active" },
+    {
+      label: selected.length > 0 ? `Paying sources · ${paidCount}/${selected.length}` : "Paying sources",
+      state: isSynthesizing ? "done" : selected.length > 0 ? "active" : "pending",
+    },
+    { label: "Writing your answer", state: isSynthesizing ? "active" : "pending" },
+  ];
 
   return (
     <div className="qd-ai-msg qd-msg-enter">
       <QerinAvatar />
       <div className="qd-ai-content">
-        <div className="qd-ai-bubble" style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 280 }}>
-          {/* Phase indicator */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "flex", gap: 4 }}>
-              <span className="qd-thinking-dot" />
-              <span className="qd-thinking-dot" />
-              <span className="qd-thinking-dot" />
-            </div>
-            <span style={{ fontSize: 12.5, color: "var(--qd-muted2)", fontWeight: 500 }}>
-              {phaseIcon} {phaseLabel}
-            </span>
+        <div className="qd-ai-bubble qd-think" role="status" aria-live="polite">
+          <div className="qd-think-bar" aria-hidden="true" />
+          {/* Live pipeline steps — each flips exactly when the backend reports it */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {steps.map((step, i) => (
+              <div key={i} className={`qd-think-step qd-think-${step.state}`}>
+                <span className="qd-think-icon" aria-hidden="true">{step.state === "done" ? "✓" : ""}</span>
+                <span>{step.label}</span>
+              </div>
+            ))}
           </div>
           {/* Real per-source settlement status — pending, paid, or unavailable */}
-          {selected.length > 0 && !isSynthesizing && (
+          {selected.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {selected.map((src) => {
                 const state = settled.get(src.name);
@@ -280,9 +282,9 @@ function ThinkingBubble({ events }: { events?: AnswerProgressEvent[] }) {
                       display: "inline-block", flexShrink: 0,
                       animation: !state ? "qd-pulse 1s ease-in-out infinite" : undefined,
                     }} />
-                    <span style={{ color: "var(--qd-muted2)", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{src.name}</span>
-                    <span style={{ color: state?.success ? "#22C55E" : "var(--qd-muted2)", fontSize: 10.5, fontWeight: 600 }}>
-                      {!state ? "…" : state.success ? `paid $${state.amountPaid ?? src.priceUsd}` : "unavailable · not charged"}
+                    <span style={{ color: "var(--qd-muted2)", fontFamily: "monospace", fontSize: 11, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{src.name}</span>
+                    <span style={{ color: state?.success ? "#22C55E" : "var(--qd-muted2)", fontSize: 10.5, fontWeight: 600, flexShrink: 0 }}>
+                      {!state ? "paying…" : state.success ? `paid $${state.amountPaid ?? src.priceUsd}` : "skipped · not charged"}
                     </span>
                   </div>
                 );
@@ -858,6 +860,11 @@ export function QerinDashboard() {
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [showConnectMenu, setShowConnectMenu] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  // Bumped each time a disconnected user tries to act, to replay the highlight
+  // on the connect controls so they can see where to connect.
+  const [connectNudge, setConnectNudge] = useState(0);
+  const [hasInjected, setHasInjected] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
@@ -1096,9 +1103,32 @@ export function QerinDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    // Wallet extensions inject after first paint; detect once mounted.
+    const timer = setTimeout(() => setHasInjected(getInjectedProvider() !== null), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Funds can arrive while the user is away in their wallet or exchange —
+  // re-read the balance whenever they come back to this tab.
+  useEffect(() => {
+    if (!accountId) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") fetchBalance(accountId).then(setBalance).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [accountId]);
+
   const handleConnectWallet = async (method: "auto" | "qr" = "auto") => {
+    if (isConnecting) return;
     setShowConnectMenu(false);
     setConnectError(null);
+    setIsConnecting(true);
     try {
       const addr = method === "qr" ? await connectWalletConnect() : await requestWalletConnection();
       if (addr) {
@@ -1110,7 +1140,13 @@ export function QerinDashboard() {
       }
     } catch (err) {
       console.error("Wallet connection error:", err);
-      setConnectError(err instanceof Error ? err.message : "Could not connect wallet");
+      const message = err instanceof Error ? err.message : "";
+      // Closing the wallet prompt is a choice, not a failure — stay quiet.
+      if (!/reject|reset|denied|cancel|closed/i.test(message)) {
+        setConnectError("Could not connect. Please try again.");
+      }
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -1220,6 +1256,10 @@ export function QerinDashboard() {
   const handleSubmit = async () => {
     const q = inputValue.trim();
     if (!q || isSubmitting) return;
+    if (!connectedWallet) {
+      setConnectNudge((n) => n + 1);
+      return;
+    }
     if (balance !== null && balance < ANSWER_PRICE_USD) {
       setTopupReason("Your Agent Settlement Fuel is depleted. Fund your treasury to fuel autonomous research queries.");
       setShowTopup(true);
@@ -1280,7 +1320,7 @@ export function QerinDashboard() {
         // This is the user's Qerin query charge, not the agent's separate
         // downstream x402 spend. Keeping them distinct makes the fuel ledger
         // reconcile with the account balance.
-        const costDebited = ANSWER_PRICE_USD;
+        const costDebited = result.data.paidFrom ? Number(result.data.totalPaid) || 0 : ANSWER_PRICE_USD;
 
         updateThread(threadId, t => ({
           ...t,
@@ -1586,6 +1626,8 @@ export function QerinDashboard() {
                   else handleConnectWallet("qr");
                 }}
                 aria-expanded={showConnectMenu}
+                className={connectNudge ? "qd-connect-pulse" : undefined}
+                key={connectNudge}
                 style={{
                   background: "rgba(255, 107, 0, 0.12)",
                   border: "1px solid rgba(255, 107, 0, 0.35)",
@@ -1668,7 +1710,7 @@ export function QerinDashboard() {
             <div style={{ flex: 1 }} />
 
             {/* Network Selector & Actions */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <div className="qd-header-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
               {/* Always-visible fuel gauge — the sidebar's copy is hidden on
                   mobile until the menu opens, so this is the one guaranteed
                   spot showing remaining balance + usage at every width. */}
@@ -1695,6 +1737,7 @@ export function QerinDashboard() {
                 type="button"
                 onClick={() => setShowTransparencyModal(true)}
                 title="View your personal on-chain transparency & settlement ledger"
+                className="qd-glass-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1716,6 +1759,7 @@ export function QerinDashboard() {
               <Link
                 href="/"
                 title="View Protocol Architecture & Overview"
+                className="qd-glass-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1735,6 +1779,7 @@ export function QerinDashboard() {
               <Link
                 href="/developers"
                 title="Developer & MCP Hub"
+                className="qd-glass-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1754,6 +1799,7 @@ export function QerinDashboard() {
               <Link
                 href="/rewards"
                 title="Rewards & Referral Program"
+                className="qd-glass-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1809,6 +1855,7 @@ export function QerinDashboard() {
                 href="https://dune.com/qerin26/qerin-protocol-autonomous-ai-agent-analytics-bot-chain-hub"
                 target="_blank"
                 rel="noreferrer"
+                className="qd-glass-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1846,6 +1893,7 @@ export function QerinDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowTopup(true)}
+                    className="qd-glass-btn"
                     style={{
                       cursor: "pointer",
                       display: "inline-flex",
@@ -1880,6 +1928,7 @@ export function QerinDashboard() {
                         setInputValue(promptText);
                         inputRef.current?.focus();
                       }}
+                      className="qd-glass-btn"
                       style={{
                         padding: "7px 12px",
                         borderRadius: 8,
@@ -2121,6 +2170,30 @@ export function QerinDashboard() {
 
           {/* Input Area */}
           <div className="qd-input-area">
+            {!connectedWallet && (
+              <div key={connectNudge} className={"qd-connect-bar" + (connectNudge ? " qd-connect-nudge" : "")}>
+                <span className="qd-connect-bar-label">
+                  <span className="qd-connect-dot" aria-hidden="true" />
+                  Connect a wallet to ask
+                </span>
+                <div className="qd-connect-bar-actions">
+                  {hasInjected && (
+                    <button type="button" className="qd-connect-cta" disabled={isConnecting} onClick={() => handleConnectWallet("auto")}>
+                      {isConnecting ? "Connecting…" : "Connect wallet"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={hasInjected ? "qd-connect-cta qd-connect-cta-alt" : "qd-connect-cta"}
+                    disabled={isConnecting}
+                    onClick={() => handleConnectWallet("qr")}
+                  >
+                    {hasInjected ? "Scan QR" : isConnecting ? "Connecting…" : "Connect wallet"}
+                  </button>
+                </div>
+                {connectError && <div role="alert" className="qd-connect-bar-error">{connectError}</div>}
+              </div>
+            )}
             <div className="qd-input-wrapper">
               <button className="qd-icon-btn" aria-label="Attach" style={{ width: 28, height: 28, border: "none", flexShrink: 0 }}>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.5 6.5L6.5 12.5a3.5 3.5 0 0 1-5-5L7 2a2 2 0 0 1 3 3L4 11a.5.5 0 0 1-.7-.7L9.5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -2184,7 +2257,10 @@ export function QerinDashboard() {
           accountId={accountId}
           initialNetwork={selectedNetwork}
           reason={topupReason}
-          onClose={() => setShowTopup(false)}
+          onClose={() => {
+            setShowTopup(false);
+            if (accountId) fetchBalance(accountId).then(setBalance).catch(() => {});
+          }}
           onCredited={(b) => setBalance(b)}
           onAccountCreated={(id, b) => {
             setAccountId(id);

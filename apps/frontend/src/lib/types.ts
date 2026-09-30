@@ -67,4 +67,6 @@ export interface AnswerData {
   network?: string;
   chainId?: number;
   deliveryId?: string;
+  /** Set when the sources were paid from the user's own agent wallet. */
+  paidFrom?: string;
 }

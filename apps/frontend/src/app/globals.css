@@ -505,9 +505,16 @@ a:hover {
   --qd-online-dot: #22c55e;
   --qd-thinking-dot: #f45b00;
   --qd-new-chat-hover: #e05000;
+  /* Glass surface for pills and secondary buttons */
+  --qd-surface: rgba(255, 255, 255, 0.62);
+  --qd-border: rgba(15, 23, 42, 0.1);
+  --qd-glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 :root[data-theme="dark"] {
+  --qd-surface: rgba(255, 255, 255, 0.05);
+  --qd-border: rgba(255, 255, 255, 0.1);
+  --qd-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --qd-sidebar-bg: #111318;
   --qd-sidebar-border: #1e2130;
   --qd-sidebar-item-hover: #1a1e29;
@@ -895,6 +902,208 @@ a:hover {
   .qd-sidebar-overlay.visible {
     display: block;
   }
+}
+
+/* Glass buttons — shared feel for pills, chips and secondary actions */
+.qd-glass-btn,
+.qd-export-btn,
+.qd-icon-btn,
+.qd-connect-option,
+.qd-network-badge {
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: var(--qd-glass-shadow);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.qd-glass-btn:hover,
+.qd-export-btn:hover,
+.qd-icon-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(244, 91, 0, 0.12), var(--qd-glass-shadow);
+}
+.qd-glass-btn:active,
+.qd-export-btn:active,
+.qd-icon-btn:active,
+.qd-connect-option:active {
+  transform: scale(0.97);
+}
+.qd-glass-btn:focus-visible,
+.qd-export-btn:focus-visible,
+.qd-icon-btn:focus-visible,
+.qd-send-btn:focus-visible,
+.qd-new-chat-btn:focus-visible,
+.qd-connect-cta:focus-visible {
+  outline: 2px solid var(--qerin-accent);
+  outline-offset: 2px;
+}
+
+/* Connect prompt above the chat input — shown only while disconnected */
+.qd-connect-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 91, 0, 0.3);
+  background: rgba(244, 91, 0, 0.06);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.qd-connect-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--qerin-text);
+}
+.qd-connect-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--qerin-accent);
+  animation: qd-pulse 1.4s ease-in-out infinite;
+}
+.qd-connect-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+.qd-connect-cta {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: var(--qerin-accent);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease;
+}
+.qd-connect-cta:hover { background: var(--qd-new-chat-hover); transform: translateY(-1px); }
+.qd-connect-cta:active { transform: scale(0.97); }
+.qd-connect-cta:disabled { opacity: 0.6; cursor: default; transform: none; }
+.qd-connect-cta-alt {
+  background: var(--qd-surface);
+  border-color: var(--qd-border);
+  color: var(--qerin-text);
+}
+.qd-connect-cta-alt:hover { background: var(--qd-surface); border-color: var(--qerin-accent); }
+.qd-connect-bar-error {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--qerin-danger);
+}
+
+@keyframes qd-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+@keyframes qd-nudge {
+  0% { box-shadow: 0 0 0 0 rgba(244, 91, 0, 0.55); }
+  100% { box-shadow: 0 0 0 12px rgba(244, 91, 0, 0); }
+}
+.qd-connect-nudge,
+.qd-connect-pulse {
+  animation: qd-nudge 0.9s ease-out 3;
+}
+
+/* Live thinking card */
+.qd-think {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: min(280px, 100%);
+  overflow: hidden;
+}
+.qd-think-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--qerin-accent), transparent);
+  animation: qd-think-slide 1.4s ease-in-out infinite;
+}
+@keyframes qd-think-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+.qd-think-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--qd-muted2);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+.qd-think-pending { opacity: 0.5; }
+.qd-think-active { color: var(--qerin-text); font-weight: 600; }
+.qd-think-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--qd-input-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.qd-think-active .qd-think-icon {
+  border-color: rgba(244, 91, 0, 0.25);
+  border-top-color: var(--qerin-accent);
+  animation: qerin-spin 0.8s linear infinite;
+}
+.qd-think-done .qd-think-icon {
+  border-color: #22c55e;
+  background: #22c55e;
+  color: #fff;
+}
+
+/* Phones: comfortable touch targets, no zoom-on-focus, scrollable header row */
+@media (max-width: 767px) {
+  .qd-header {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    row-gap: 8px;
+  }
+  .qd-header-actions {
+    width: 100%;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .qd-header-actions::-webkit-scrollbar { display: none; }
+  .qd-header-actions > * { flex-shrink: 0; white-space: nowrap; }
+  .qd-messages { padding: 14px 12px; gap: 18px; }
+  .qd-input-area { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  /* 16px stops iOS Safari zooming the page when the field is focused */
+  .qd-input { font-size: 16px; }
+  .qd-send-btn { width: 40px; height: 40px; }
+  .qd-icon-btn { min-width: 36px; min-height: 36px; }
+  .qd-connect-bar-actions { width: 100%; }
+  .qd-connect-cta { flex: 1; min-height: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qd-connect-dot,
+  .qd-connect-nudge,
+  .qd-connect-pulse,
+  .qd-think-bar,
+  .qd-think-active .qd-think-icon { animation: none; }
+  .qd-glass-btn:hover,
+  .qd-export-btn:hover,
+  .qd-icon-btn:hover,
+  .qd-connect-cta:hover { transform: none; }
 }
 
 /* Smooth message appear */
