@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { NavTab } from "../lib/types";
 
 interface HeaderProps {
   isLive: boolean;
@@ -10,6 +11,10 @@ interface HeaderProps {
   onRefresh: () => void;
   isRefreshing: boolean;
   onOpenConfig?: () => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
+  activeTab?: NavTab;
+  onSelectTab?: (tab: NavTab) => void;
 }
 
 export function Header({
@@ -20,21 +25,12 @@ export function Header({
   onRefresh,
   isRefreshing,
   onOpenConfig,
+  unreadNotificationsCount = 0,
+  onOpenNotifications,
+  activeTab = "overview",
+  onSelectTab,
 }: HeaderProps) {
-  const [timeStr, setTimeStr] = useState("9:41");
   const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeStr(
-        now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const toggleDarkMode = () => {
     const next = !isDark;
@@ -57,6 +53,15 @@ export function Header({
       alert("Link copied to clipboard!");
     }
   };
+
+  const desktopTabs: Array<{ id: NavTab; label: string; icon: string }> = [
+    { id: "overview", label: "Portfolio", icon: "pie_chart" },
+    { id: "growth", label: "Founder Growth", icon: "trending_up" },
+    { id: "queries", label: "Live Queries", icon: "search" },
+    { id: "chains", label: "Markets", icon: "alt_route" },
+    { id: "wallets", label: "Wallets", icon: "account_balance_wallet" },
+    { id: "failures", label: "Diagnostics", icon: "health_and_safety" },
+  ];
 
   return (
     <>
@@ -93,32 +98,74 @@ export function Header({
         </svg>
       </div>
 
-      {/* iOS Top Status Bar Simulation */}
-      <div className="mobile-status-bar">
-        <span>{timeStr}</span>
-        <div className="status-bar-icons">
-          <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-            signal_cellular_alt
-          </span>
-          <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-            wifi
-          </span>
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-            battery_full
-          </span>
-        </div>
-      </div>
-
       {/* Main Top App Header (Public.com Style) */}
       <header className="app-header">
-        <button className="header-back-pill" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-            arrow_back
-          </span>
-          <span>QERIN</span>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            className="header-back-pill"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: "20px", color: "var(--primary-container)" }}
+            >
+              hub
+            </span>
+            <span style={{ fontWeight: 800, letterSpacing: "-0.02em" }}>QERIN</span>
+          </button>
+
+          {/* Desktop Navigation Tabs (Visible on Laptop / Desktop screens) */}
+          {onSelectTab && (
+            <nav className="desktop-nav-tabs">
+              {desktopTabs.map((t) => {
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`desktop-tab-btn ${isActive ? "active" : ""}`}
+                    onClick={() => onSelectTab(t.id)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+                      {t.icon}
+                    </span>
+                    <span>{t.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+        </div>
 
         <div className="header-action-group">
+          {/* Notifications Bell with unread badge */}
+          {onOpenNotifications && (
+            <button
+              className="header-icon-btn"
+              onClick={onOpenNotifications}
+              title="Protocol Notifications"
+              style={{ position: "relative" }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
+                notifications
+              </span>
+              {unreadNotificationsCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#ef4444",
+                    border: "2px solid var(--bg-card)",
+                  }}
+                />
+              )}
+            </button>
+          )}
+
           {/* Share */}
           <button className="header-icon-btn" onClick={handleShare} title="Share Analytics">
             <span className="material-symbols-outlined" style={{ fontSize: "17px" }}>
@@ -126,7 +173,7 @@ export function Header({
             </span>
           </button>
 
-          {/* Dark / Light Toggle (Public.com inspired) */}
+          {/* Dark / Light Toggle */}
           <button className="header-icon-btn" onClick={toggleDarkMode} title="Toggle Theme">
             <span className="material-symbols-outlined" style={{ fontSize: "17px" }}>
               {isDark ? "light_mode" : "dark_mode"}
@@ -152,7 +199,7 @@ export function Header({
             </span>
           </button>
 
-          {/* Configuration & Settings */}
+          {/* Protocol Configuration & Settings */}
           {onOpenConfig && (
             <button className="header-icon-btn" onClick={onOpenConfig} title="Protocol Configuration">
               <span className="material-symbols-outlined" style={{ fontSize: "17px" }}>
@@ -163,9 +210,9 @@ export function Header({
 
           {/* Desktop Frame Toggle */}
           <button
-            className="header-icon-btn"
+            className="header-icon-btn desktop-only-btn"
             onClick={onToggleExpanded}
-            title={isExpanded ? "Mobile chassis mode" : "Full width mode"}
+            title={isExpanded ? "Standard Mode" : "Full Screen Mode"}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "17px" }}>
               {isExpanded ? "smartphone" : "fit_screen"}

@@ -1,6 +1,29 @@
 export type Timeframe = "24H" | "7D" | "30D" | "ALL";
 
-export type NavTab = "overview" | "queries" | "chains" | "failures" | "wallets";
+export type NavTab = "overview" | "growth" | "queries" | "chains" | "failures" | "wallets";
+
+export interface ProtocolNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: "milestone" | "grant" | "guard" | "system" | "web3";
+  timestamp: string;
+  isRead: boolean;
+  link?: string;
+  linkText?: string;
+  badge?: string;
+}
+
+export interface FounderChatInsight {
+  id: string;
+  topic: string;
+  userQuery: string;
+  queryCount: number;
+  category: string;
+  viralScore: number;
+  founderAction: string;
+  draftPost: string;
+}
 
 export interface ProtocolMetrics {
   totalRevenueUsd: number;

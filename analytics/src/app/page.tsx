@@ -5,13 +5,21 @@ import { BottomNav } from "../components/BottomNav";
 import { ChainsTab } from "../components/ChainsTab";
 import { ConfigModal } from "../components/ConfigModal";
 import { FailuresTab } from "../components/FailuresTab";
+import { GrowthTab } from "../components/GrowthTab";
 import { Header } from "../components/Header";
+import { NotificationDrawer } from "../components/NotificationDrawer";
 import { OverviewTab } from "../components/OverviewTab";
 import { QueriesTab } from "../components/QueriesTab";
 import { WalletsTab } from "../components/WalletsTab";
-import { DEFAULT_CONFIG, INITIAL_CHAINS, INITIAL_METRICS, INITIAL_QUERIES } from "../lib/data";
+import {
+  DEFAULT_CONFIG,
+  INITIAL_CHAINS,
+  INITIAL_METRICS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_QUERIES,
+} from "../lib/data";
 import { fetchLiveProtocolData, LiveSyncState } from "../lib/liveSync";
-import { NavTab, ProtocolConfig } from "../lib/types";
+import { NavTab, ProtocolConfig, ProtocolNotification } from "../lib/types";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,6 +30,8 @@ export default function AnalyticsDashboardPage() {
   const [activeTab, setActiveTab] = useState<NavTab>("overview");
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<ProtocolNotification[]>(INITIAL_NOTIFICATIONS);
   const [config, setConfig] = useState<ProtocolConfig>(DEFAULT_CONFIG);
 
   const [liveState, setLiveState] = useState<LiveSyncState>({
@@ -83,17 +93,23 @@ export default function AnalyticsDashboardPage() {
     setInstallPrompt(null);
   };
 
+  const handleMarkAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
   return (
     <div className={`app-viewport-wrapper ${isExpanded ? "expanded-mode" : "preview-mode"}`}>
       <main className="mobile-device-chassis">
-        {/* Dynamic Island on Desktop Phone chassis */}
-        <div className="dynamic-island">
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#1c1c1e" }} />
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#2c2c2e" }} />
-        </div>
-
         <div className="app-screen-body">
-          {/* Header & Status Bar (Public.com style from Stitch) */}
+          {/* Header (Public.com style from Stitch with desktop tabs and notification bell) */}
           <Header
             isLive={liveState.isLive}
             lastSyncedAt={liveState.lastSyncedAt}
@@ -102,6 +118,10 @@ export default function AnalyticsDashboardPage() {
             onRefresh={syncData}
             isRefreshing={isRefreshing}
             onOpenConfig={() => setIsConfigOpen(true)}
+            unreadNotificationsCount={unreadCount}
+            onOpenNotifications={() => setIsNotificationsOpen(true)}
+            activeTab={activeTab}
+            onSelectTab={(tab) => setActiveTab(tab)}
           />
 
           {/* PWA Install Banner */}
@@ -125,7 +145,7 @@ export default function AnalyticsDashboardPage() {
                 </span>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dark)" }}>Install Mobile App</div>
-                  <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Add to Home Screen for fast access</div>
+                  <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Add to Home Screen for fast native access</div>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -156,8 +176,42 @@ export default function AnalyticsDashboardPage() {
             </div>
           )}
 
+          {/* Floating Sticky Action Bar (Stitch Screen 47e2968666704549babdb9b4d1e66830 Blueprint) */}
+          <div className="sticky-action-pill-bar">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
+                <span style={{ color: "var(--text-secondary)" }}>Daily Spend Cap</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-dark)", fontWeight: 700 }}>
+                  ${liveState.metrics.agentSourceSpendUsd.toFixed(2)} / ${config.dailySpendCapUsd.toFixed(2)}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 5, borderRadius: 999, background: "var(--bg-container)", overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(liveState.metrics.agentSourceSpendUsd / config.dailySpendCapUsd) * 100}%`,
+                    height: "100%",
+                    background: "var(--primary-container)",
+                    borderRadius: 999,
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="sticky-connect-btn"
+              onClick={() => setActiveTab("wallets")}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
+                account_balance_wallet
+              </span>
+              <span>Connect Wallet</span>
+            </button>
+          </div>
+
           {/* Tab Screen Routing */}
-          <div style={{ flex: 1, paddingBottom: 16 }}>
+          <div style={{ flex: 1 }}>
             {activeTab === "overview" && (
               <OverviewTab
                 metrics={liveState.metrics}
@@ -168,6 +222,13 @@ export default function AnalyticsDashboardPage() {
                 latestSender={liveState.latestSender}
                 onNavigateTab={(tab) => setActiveTab(tab)}
                 onOpenConfig={() => setIsConfigOpen(true)}
+              />
+            )}
+
+            {activeTab === "growth" && (
+              <GrowthTab
+                metrics={liveState.metrics}
+                onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
               />
             )}
 
@@ -193,42 +254,17 @@ export default function AnalyticsDashboardPage() {
           </div>
         </div>
 
-        {/* Floating Sticky Action Bar (Stitch Screen 47e2968666704549babdb9b4d1e66830 Blueprint) */}
-        <div className="sticky-action-pill-bar">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
-              <span style={{ color: "var(--text-secondary)" }}>Daily Spend Cap</span>
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-dark)", fontWeight: 700 }}>
-                ${liveState.metrics.agentSourceSpendUsd.toFixed(2)} / ${config.dailySpendCapUsd.toFixed(2)}
-              </span>
-            </div>
-            <div style={{ width: "100%", height: 5, borderRadius: 999, background: "var(--bg-container)", overflow: "hidden" }}>
-              <div
-                style={{
-                  width: `${(liveState.metrics.agentSourceSpendUsd / config.dailySpendCapUsd) * 100}%`,
-                  height: "100%",
-                  background: "var(--primary-container)",
-                  borderRadius: 999,
-                  transition: "width 0.4s ease",
-                }}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="sticky-connect-btn"
-            onClick={() => setActiveTab("wallets")}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
-              account_balance_wallet
-            </span>
-            <span>Connect Wallet</span>
-          </button>
-        </div>
-
-        {/* Docked 5-Tab Bottom Navigation Bar (Stitch: Portfolio, Markets, Search, Inbox, Agents) */}
+        {/* Docked 6-Tab Bottom Navigation Bar (Mobile) */}
         <BottomNav activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
+
+        {/* Protocol Notifications Drawer */}
+        <NotificationDrawer
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          notifications={notifications}
+          onMarkAsRead={handleMarkAsRead}
+          onMarkAllAsRead={handleMarkAllAsRead}
+        />
 
         {/* Protocol Configuration & Telemetry Modal */}
         <ConfigModal

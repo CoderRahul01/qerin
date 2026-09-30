@@ -1,4 +1,14 @@
-import { ChainStat, FailurePoint, ProtocolConfig, ProtocolMetrics, SearchQueryItem, Timeframe, WalletUserItem } from "./types";
+import {
+  ChainStat,
+  FailurePoint,
+  FounderChatInsight,
+  ProtocolConfig,
+  ProtocolMetrics,
+  ProtocolNotification,
+  SearchQueryItem,
+  Timeframe,
+  WalletUserItem,
+} from "./types";
 
 export const DEFAULT_CONFIG: ProtocolConfig = {
   botChainRpc: "https://rpc.botchain.ai",
@@ -25,6 +35,109 @@ export const INITIAL_METRICS: ProtocolMetrics = {
   avgLatencyMs: 1240,
   systemSuccessRatePct: 100.0,
 };
+
+export const INITIAL_NOTIFICATIONS: ProtocolNotification[] = [
+  {
+    id: "notif-1",
+    title: "KPI 6 Verified On-Chain (14 Txs)",
+    message: "14 transactions across 3 unique sender wallets confirmed on BOT Chain contract 0xb35788922a5b9c8938de8aedf725b88d26eeea45. All validator conditions verified 100%.",
+    type: "milestone",
+    timestamp: "10 mins ago",
+    isRead: false,
+    link: "https://scan.botchain.ai/address/0xb35788922a5b9c8938de8aedf725b88d26eeea45",
+    linkText: "BOTScan Explorer",
+    badge: "100% COMPLETE",
+  },
+  {
+    id: "notif-2",
+    title: "Grant Evaluation In Review",
+    message: "Contract address and transaction telemetry submitted to Jainish (BOT Chain Ecosystem Growth Manager) for developer grant evaluation.",
+    type: "grant",
+    timestamp: "45 mins ago",
+    isRead: false,
+    badge: "ECOSYSTEM GRANT",
+  },
+  {
+    id: "notif-3",
+    title: "Spend Guard Normal ($0.52 / $5.00)",
+    message: "Daily spend is only $0.52 of the $5.00 safety limit. Protocol net margin is 92.1% with $6.08 retained profit from $6.60 user inflow.",
+    type: "guard",
+    timestamp: "Live",
+    isRead: true,
+    badge: "92.1% MARGIN",
+  },
+  {
+    id: "notif-4",
+    title: "Zero Contract Reverts Record",
+    message: "100% execution success across all 30 research queries. Zero smart contract reverts or dropped receipts recorded.",
+    type: "system",
+    timestamp: "Live",
+    isRead: true,
+    badge: "0 REVERTS",
+  },
+  {
+    id: "notif-5",
+    title: "Reown Web3 Cloud Connected",
+    message: "Project ID beccbc473190c8b06eb5471223604fdf synced for multi-chain wallet authentication across 300+ Web3 wallets.",
+    type: "web3",
+    timestamp: "Active",
+    isRead: true,
+    badge: "REOWN CLOUD",
+  },
+];
+
+export const INITIAL_FOUNDER_INSIGHTS: FounderChatInsight[] = [
+  {
+    id: "ins-1",
+    topic: "BOT Chain Gas Subsidies & ERC-4337",
+    userQuery: "What are the latest BOT Chain EVM gas subsidies and ERC-4337 bundler specs?",
+    queryCount: 14,
+    category: "EVM Gas",
+    viralScore: 96,
+    founderAction: "Write technical tutorial & post on X/Telegram about sub-cent gas execution.",
+    draftPost: "Why we route 59.1% of @QerinProtocol research settlements to @BOTChainAI: $0.00008 avg gas vs $0.00065 on Base. In high-frequency autonomous AI agent loops, this 8x fee compression changes unit economics completely. 🤖⚡",
+  },
+  {
+    id: "ins-2",
+    topic: "DeepSeek R1 Economics & Distillation",
+    userQuery: "Analyze DeepSeek R1 distillation techniques and token unit economics vs Claude 3.5 Sonnet",
+    queryCount: 9,
+    category: "AI & Infra",
+    viralScore: 92,
+    founderAction: "Publish benchmark teardown comparing local reasoning models with cloud frontier APIs.",
+    draftPost: "What 12 crypto research accounts asked Qerin this week: Why DeepSeek R1 distillation changes autonomous agent economics forever compared to Claude 3.5 Sonnet. Here is the unit breakdown: 🧵👇",
+  },
+  {
+    id: "ins-3",
+    topic: "Llama 3.3 Latency & KV Cache Optimization",
+    userQuery: "Llama 3.3 Latency & KV Cache Optimization for autonomous agent multi-step loops",
+    queryCount: 4,
+    category: "AI & Infra",
+    viralScore: 84,
+    founderAction: "Share NVIDIA NIM setup snippet for low-latency agent inference pipelines.",
+    draftPost: "Optimizing NVIDIA NIM inference for autonomous research: Llama 3.3 KV cache tricks reduced our agent latency down to 980ms while retaining citation accuracy. 🏎️💨",
+  },
+  {
+    id: "ins-4",
+    topic: "x402 Cross-Chain Settlement Latency",
+    userQuery: "Compare cross-chain settlement latency for x402 protocol across Base and Solana Devnet",
+    queryCount: 2,
+    category: "Cross-Chain",
+    viralScore: 78,
+    founderAction: "Publish latency comparison chart for multi-chain HTTP 402 payment headers.",
+    draftPost: "Cross-chain AI micropayments benchmark: Base vs Solana vs BOT Chain. How x402 headers settle sub-cent research queries across L1 & L2 rails seamlessly. 🌐",
+  },
+  {
+    id: "ins-5",
+    topic: "ZK Proof Verification on Base L2",
+    userQuery: "ZK Proof Verification cost curves and rollup compression benchmarks on Base L2",
+    queryCount: 1,
+    category: "DeFi",
+    viralScore: 71,
+    founderAction: "Detail rollup calldata costs for verifiable agent research attestation.",
+    draftPost: "Rollup compression & ZK proof costs on Base: How autonomous agents can verify research integrity on-chain without prohibitive calldata overhead. 📊",
+  },
+];
 
 export const INITIAL_CHAINS: ChainStat[] = [
   {
@@ -152,7 +265,7 @@ export const INITIAL_WALLETS: WalletUserItem[] = [
     address: "0x5b2131e9b28a46ec10d260a14b9deb34554311f2",
     label: "Active Research Signer #1",
     queriesCount: 14,
-    totalSpentUsd: 2.10,
+    totalSpentUsd: 3.08,
     lastActive: "14 mins ago",
     type: "Active Research",
     primaryChain: "BOT Chain (677)",
@@ -161,7 +274,7 @@ export const INITIAL_WALLETS: WalletUserItem[] = [
     address: "0x5ad2ab59ad7fed120efc8160de64631c062d3495",
     label: "Active Research Signer #2",
     queriesCount: 10,
-    totalSpentUsd: 1.50,
+    totalSpentUsd: 2.20,
     lastActive: "32 mins ago",
     type: "Active Research",
     primaryChain: "BOT Chain (677) & Base (8453)",
@@ -170,7 +283,7 @@ export const INITIAL_WALLETS: WalletUserItem[] = [
     address: "0x11fa7869fd6fa3691a7df8dadd6a17326dee16c3",
     label: "On-Chain Registry Operator",
     queriesCount: 6,
-    totalSpentUsd: 0.90,
+    totalSpentUsd: 1.32,
     lastActive: "2 mins ago",
     type: "Operator",
     primaryChain: "BOT Chain (677)",

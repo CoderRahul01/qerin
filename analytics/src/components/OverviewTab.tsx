@@ -150,39 +150,70 @@ export function OverviewTab({
         </div>
       </section>
 
-      {/* Protocol Margin Summary Card */}
+      {/* Real User Money Inflow & Economics */}
       <section style={{ margin: "4px 16px 0 16px" }}>
         <div
           style={{
             background: "var(--bg-card)",
             border: "1px solid var(--border-card)",
             borderRadius: 14,
-            padding: "12px 14px",
+            padding: "14px",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            flexDirection: "column",
+            gap: "10px",
           }}
         >
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}>Protocol Economics</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-dark)", marginTop: 2 }}>
-              ${metrics.totalRevenueUsd.toFixed(2)} Gross • ${metrics.agentSourceSpendUsd.toFixed(2)} Cost
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "var(--primary-container)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                LIVE USER MONEY INFLOW
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--text-dark)", marginTop: 2 }}>
+                ${metrics.totalRevenueUsd.toFixed(2)} USD Deposited
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-mono)",
+                  background: "var(--primary-pill-bg)",
+                  color: "var(--primary-pill-text)",
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                }}
+              >
+                {metrics.grossMarginPct}% Net Profit
+              </span>
+              <div style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 3 }}>
+                ${(metrics.totalRevenueUsd - metrics.agentSourceSpendUsd).toFixed(2)} Retained
+              </div>
             </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <span
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: "1px solid var(--border-subtle)", fontSize: 11 }}>
+            <span style={{ color: "var(--text-secondary)" }}>
+              {metrics.totalQueries} settlements • $0.22/query avg
+            </span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab("growth")}
               style={{
-                fontSize: 12,
+                background: "none",
+                border: "none",
+                color: "var(--primary)",
                 fontWeight: 700,
-                fontFamily: "var(--font-mono)",
-                background: "var(--primary-pill-bg)",
-                color: "var(--primary-pill-text)",
-                padding: "3px 8px",
-                borderRadius: 999,
+                fontSize: 11,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
               }}
             >
-              {metrics.grossMarginPct}% Net Margin
-            </span>
+              <span>Founder Growth Hub</span>
+              <span>→</span>
+            </button>
           </div>
         </div>
       </section>
