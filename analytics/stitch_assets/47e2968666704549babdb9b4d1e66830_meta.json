@@ -1,0 +1,341 @@
+{
+  "screenshot": {
+    "name": "projects/7087913385106986199/files/c823a0730114440c9eba33f15a5af081",
+    "downloadUrl": "https://lh3.googleusercontent.com/aida/AEtjO1WPKwpLdDFWKj0jdKMHHNUoY1MO93kkJhDMvIFnwPnJV3S3xGmGaSdnfKbTZAhDidezrFT3LLhIBp4wHFlDY9x4l6EkVT3vHm5V_ornrkvTljsAyG3uSrfRt4eB483Jj9XKOyEGXqGcA4BYsNOXmwvrPYEpDR4ENwwiyurc6gS4srVVXZeP2IXOWABJ_uHarrDXaaAn1Q_ojy1u-hwEnaSyG736iHjW1haOomhSOoBtIr4e3rQ9KRbtww"
+  },
+  "htmlCode": {
+    "name": "projects/7087913385106986199/files/3ec4a8b06a98475ea0d77d64aeffcc42",
+    "downloadUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sX2FlNTAzODZlYTI3ODQxZDQ5MTAxN2M4MDZjY2ZlYTg1EgsSBxDYrOOj1R4YAZIBIwoKcHJvamVjdF9pZBIVQhM3MDg3OTEzMzg1MTA2OTg2MTk5&filename=&opi=96797242",
+    "mimeType": "text/html"
+  },
+  "id": "47e2968666704549babdb9b4d1e66830",
+  "generatedBy": "figaro_agent",
+  "width": "780",
+  "height": "3218",
+  "title": "Qerin Protocol Analytics (Public.com Style)",
+  "prompt": "Design a mobile fintech and crypto protocol analytics screen for \"Qerin Protocol\" styled after Public.com's clean, modern light mode app interface.\n\nLayout and exact details:\n1. Status Bar & Header Background:\n   - iOS status bar: \"9:41\", signal bars, WiFi, battery icon.\n   - Subtle background watermark of delicate circuit board traces / network graph vector pattern behind the header.\n\n2. Navigation Bar:\n   - Left: Back link \"< QERIN\" in bold crisp typography.\n   - Right: Action icons in rounded soft icon buttons: Share / Copy link, Star (favorite / watch), Three dots menu.\n\n3. Asset Identity Header:\n   - Circular Qerin protocol logo badge with stylized quantum/node network emblem.\n   - Title \"Qerin Protocol\" with blue/teal verified check badge.\n   - Subtitle \"Autonomous Research Settlement Network\" in muted slate text.\n   - Live network status pill: green pulsing dot with \"MAINNET ACTIVE\".\n\n4. Hero Metric Section:\n   - Super bold financial typography: \"$6.60\" (Gross Protocol Revenue / Yield).\n   - Return / Growth pill: \"\u2197 +$0.52 (100% On-Chain) today\" in crisp green badge (#E8F8EE bg, #00C805 or #059669 text).\n\n5. Interactive Performance Chart:\n   - Public.com style line chart: Crisp vibrant neon emerald green line (#00C805) with soft gradient fill under the curve.\n   - Dashed horizontal baseline (#E5E7EB) and subtle active hover scrub dot with vertical indicator line.\n   - Timeframe filter pill selector: [24H] (selected in soft light-green filled pill with dark text), 1W, 1M, 3M, 6M, YTD, 1Y, and a settings gear icon.\n\n6. Key Metrics Grid (2x2 rounded clean white cards with subtle border and crisp number hierarchy):\n   - Card 1: Active Users -> \"12 Active\" (Reown Cloud beccbc473190c8b06eb5471223604fdf).\n   - Card 2: Wallets Connected -> \"3 Senders\" with monospace on-chain addresses pill (0x5b21..., 0x5ad2..., 0x11fa...).\n   - Card 3: Total Queries -> \"30 Executed\" with 100% throughput indicator.\n   - Card 4: Successful Deliveries -> \"30 Verified\" (100% Success, 0 Reverts).\n\n7. Multi-Chain Traffic Leader Callout:\n   - Clean card with segmented distribution bar and chain list:\n     * BOT Chain Mainnet: 59.1% (Leader tag, highest volume)\n     * Base Mainnet: 36.4%\n     * Solana: 4.5%\n   - Visual progress bar showing proportion of routes.\n\n8. Live Research Queries Feed:\n   - Section heading \"Live Query Settlements\" with live pulse counter.\n   - Query cards:\n     * Card 1: \"DeepSeek R1 Architecture Benchmarks\" | Tag: \"AI Research\" | Source: \"ArXiv / Semantic Scholar\" | Settlement badge: \"0.05 BOTS\" (x402 protocol).\n     * Card 2: \"Llama 3.3 Latency & KV Cache Optimization\" | Tag: \"Model Inference\" | Source: \"HuggingFace Papers\" | Settlement badge: \"0.03 BOTS\".\n     * Card 3: \"ZK Proof Verification on Base L2\" | Tag: \"Cryptography\" | Source: \"IACR ePrint\" | Settlement badge: \"0.04 BOTS\".\n\n9. Order Completed Style Execution Receipt:\n   - Clean white receipt-styled card with subtle dashed tear-line:\n     * Header: \"On-Chain Settlement Receipt\" with green checkmark.\n     * Details table: Block #23949102, Gas Fee: 0.00014 ETH ($0.38), Delivery Hash: 0x8a9f...c24d, Recipient: 0x5b21...93ae.\n\n10. Floating Sticky Action Bar:\n    - Floating translucent pill above the nav: \"Daily Spend Cap: $5.00 ($0.52 used)\" with a progress bar and sleek black \"Connect Wallet\" CTA button.\n\n11. Docked Floating Bottom Navigation:\n    - Translucent frosted glass tab bar with 5 icons and labels: Portfolio, Markets, Search, Inbox, Agents. \"Portfolio\" active with accent indicator dot.\n\nColor palette: Pure white (#FFFFFF), slate neutral background (#F8F9FA), deep dark text (#111827), secondary text (#6B7280), emerald green accent (#00C805 / #10B981), subtle borders (#E5E7EB). Strict Public.com clean, high-density, legible mobile aesthetic.",
+  "name": "projects/7087913385106986199/screens/47e2968666704549babdb9b4d1e66830",
+  "theme": {
+    "colorMode": "LIGHT",
+    "font": "SORA",
+    "roundness": "ROUND_EIGHT",
+    "customColor": "#10b981",
+    "headlineFont": "SORA",
+    "bodyFont": "INTER",
+    "labelFont": "INTER",
+    "namedColors": {
+      "surface_tint": "#006c49",
+      "on_primary": "#ffffff",
+      "on_primary_container": "#00422b",
+      "on_background": "#191c1d",
+      "on_primary_fixed_variant": "#005236",
+      "background": "#f8f9fa",
+      "primary_fixed": "#6ffbbe",
+      "on_secondary_container": "#5c6274",
+      "surface_container_highest": "#e1e3e4",
+      "surface": "#f8f9fa",
+      "error_container": "#ffdad6",
+      "primary_container": "#10b981",
+      "on_secondary": "#ffffff",
+      "on_surface": "#191c1d",
+      "outline": "#6c7a71",
+      "primary": "#006c49",
+      "on_tertiary_fixed": "#410004",
+      "surface_dim": "#d9dadb",
+      "outline_variant": "#bbcabf",
+      "secondary_container": "#d9dff5",
+      "surface_container": "#edeeef",
+      "inverse_on_surface": "#f0f1f2",
+      "surface_container_low": "#f3f4f5",
+      "surface_bright": "#f8f9fa",
+      "on_secondary_fixed": "#141b2b",
+      "primary_fixed_dim": "#4edea3",
+      "on_error": "#ffffff",
+      "on_primary_fixed": "#002113",
+      "error": "#ba1a1a",
+      "tertiary_fixed": "#ffdad7",
+      "tertiary_fixed_dim": "#ffb3ad",
+      "inverse_surface": "#2e3132",
+      "on_tertiary_fixed_variant": "#930013",
+      "tertiary": "#b91a24",
+      "surface_container_lowest": "#ffffff",
+      "on_tertiary": "#ffffff",
+      "on_surface_variant": "#3c4a42",
+      "surface_container_high": "#e7e8e9",
+      "tertiary_container": "#ff7a73",
+      "secondary": "#575e70",
+      "on_tertiary_container": "#79000e",
+      "surface_variant": "#e1e3e4",
+      "inverse_primary": "#4edea3",
+      "on_secondary_fixed_variant": "#404758",
+      "on_error_container": "#93000a",
+      "secondary_fixed_dim": "#c0c6db",
+      "secondary_fixed": "#dce2f7"
+    },
+    "colorVariant": "FIDELITY",
+    "overridePrimaryColor": "#10b981",
+    "overrideSecondaryColor": "#111827",
+    "overrideTertiaryColor": "#ef4444",
+    "overrideNeutralColor": "#f8f9fa",
+    "spacingScale": 2,
+    "typography": {
+      "body-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "lineHeight": "18px"
+      },
+      "body-md": {
+        "fontFamily": "Inter",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "20px"
+      },
+      "metric-num": {
+        "fontFamily": "Sora",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "lineHeight": "20px",
+        "letterSpacing": "-0.02em"
+      },
+      "headline-sm": {
+        "fontFamily": "Sora",
+        "fontSize": "20px",
+        "fontWeight": "600",
+        "lineHeight": "28px",
+        "letterSpacing": "-0.01em"
+      },
+      "label-md": {
+        "fontFamily": "Inter",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "lineHeight": "18px",
+        "letterSpacing": "0.01em"
+      },
+      "body-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "15px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      "headline-lg": {
+        "fontFamily": "Sora",
+        "fontSize": "26px",
+        "fontWeight": "600",
+        "lineHeight": "34px",
+        "letterSpacing": "-0.02em"
+      },
+      "title-md": {
+        "fontFamily": "Inter",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "lineHeight": "24px",
+        "letterSpacing": "-0.01em"
+      },
+      "headline-xl-mobile": {
+        "fontFamily": "Sora",
+        "fontSize": "30px",
+        "fontWeight": "600",
+        "lineHeight": "38px",
+        "letterSpacing": "-0.02em"
+      },
+      "label-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "11px",
+        "fontWeight": "600",
+        "lineHeight": "16px",
+        "letterSpacing": "0.04em"
+      },
+      "headline-xl": {
+        "fontFamily": "Sora",
+        "fontSize": "36px",
+        "fontWeight": "600",
+        "lineHeight": "44px",
+        "letterSpacing": "-0.03em"
+      }
+    },
+    "spacing": {
+      "margin-tablet": "1.5rem",
+      "gutter": "0.75rem",
+      "space-sm": "0.5rem",
+      "space-md": "0.75rem",
+      "gutter-tablet": "1rem",
+      "space-lg": "1rem",
+      "space-xs": "0.25rem",
+      "space-xl": "1.5rem",
+      "margin": "1rem"
+    },
+    "headlineFontFamily": "Sora",
+    "bodyFontFamily": "Inter",
+    "labelFontFamily": "Inter"
+  },
+  "deviceType": "MOBILE",
+  "screenType": "DESIGN",
+  "screenMetadata": {
+    "agentType": "PRO_AGENT",
+    "status": "COMPLETE"
+  },
+  "designSystem": {
+    "name": "assets/f5e90c10bf61433e8c22d1ebfeac92a3",
+    "designSystem": {
+      "displayName": "Protocol Precision",
+      "styleGuidelines": "## Brand & Style\nThis design system marries modern fintech precision with institutional protocol analytics. Designed for mobile-first analytical confidence, it merges clean architectural minimalism with crisp editorial utility.\n\nThe aesthetic projects clarity, technical authority, and transparency. Surfaces remain pure and breathable, balancing dense financial metrics with high-contrast legibility. Translucent glass details introduce subtle modern depth without distracting from charts, order books, and real-time execution flows.\n\n## Layout & Spacing\nThe layout adheres to a 4px/8px incremental rhythm tuned for high information density on handheld displays:\n\n- **Mobile Viewport**: 4-column fluid layout with `16px` outer screen margins and `12px` gutters.\n- **Tablet / Expanded**: Scales to 8 columns with `24px` outer margins and `16px` gutters.\n- Metric clusters inside cards enforce tight inner padding (`12px` to `16px`) to ensure full chart spans and token pairs remain above the fold.\n\n## Elevation & Depth\nDepth is generated through crisp tonal layer transitions and frosted translucent surfaces rather than heavy shadows:\n\n- **Base Layer**: Neutral canvas (`#F8F9FA`).\n- **Card Surfaces**: Pure white (`#FFFFFF`) with a `1px` stroke in `#E5E7EB` and subtle ambient depth (`0 1px 3px rgba(17, 24, 39, 0.04), 0 1px 2px rgba(17, 24, 39, 0.02)`).\n- **Floating Controls & Bottom Bar**: Frosted glass (`rgba(255, 255, 255, 0.82)`) coupled with `backdrop-filter: blur(16px)` and a subtle bottom-pinned border (`1px solid rgba(229, 231, 235, 0.8)`).\n- **Modals & Drawers**: Pure `#FFFFFF` surface elevated over an ambient backdrop scrim (`rgba(17, 24, 39, 0.3)`), accented with soft elevation (`0 20px 25px -5px rgba(17, 24, 39, 0.08)`).\n\n## Components\n\n### Buttons\n- **Primary**: Deep charcoal (`#111827`) fill with white text, `12px` corner radius, `44px` height on mobile. Pressed states scale down slightly (`scale(0.98)`).\n- **Success / Execute**: Emerald `#10B981` background, `#FFFFFF` text, applied to trade execution and yield compounding actions.\n- **Secondary / Ghost**: Pure `#FFFFFF` background with `1px solid #E5E7EB`, text in `#111827`.\n\n### Cards & Metric Modules\n- Base card: `#FFFFFF` background, `1px solid #E5E7EB`, `16px` border-radius.\n- Internal card headers combine the protocol icon (28px circle), asset pair, and right-aligned 24h change pill tag.\n\n### Chips & Pill Tags\n- Delta pills: `px-2 py-0.5 rounded-full text-xs font-semibold`. Gains render in `#ECFDF5` background with `#047857` text. Losses render in `#FEF2F2` background with `#B91C1C` text.\n- Filter chips: `#F3F4F6` background, `#374151` text; active state toggles to `#111827` background with `#FFFFFF` text.\n\n### Inputs & Sliders\n- Input fields: `#FFFFFF` fill with `1px solid #E5E7EB` border, `12px` border-radius, `48px` minimum height. Focus transitions to `1.5px solid #111827`. Includes embedded quick-allocation buttons (`25%`, `50%`, `MAX`) styled as subtle neutral pills.\n\n### Floating Navigation & Protocol Controls\n- Fixed bottom dock featuring a frosted glass shell (`rgba(255, 255, 255, 0.82)`, `backdrop-blur-md`), elevated with a hairline top border (`#E5E7EB`).\n- Navigation icons use `2px` stroke weight, transitioning from `#6B7280` when inactive to `#111827` with a subtle emerald base pip when active.\n\n### List Items & Transaction Rows\n- Compact `56px` height. Asset icon on the left, primary identifier and network tag in the center column, real-time value and colored percentage delta aligned to the right edge. Separated by hairline `#F3F4F6` dividers.",
+      "theme": {
+        "colorMode": "LIGHT",
+        "font": "SORA",
+        "roundness": "ROUND_EIGHT",
+        "customColor": "#10b981",
+        "headlineFont": "SORA",
+        "bodyFont": "INTER",
+        "labelFont": "INTER",
+        "namedColors": {
+          "surface_tint": "#006c49",
+          "secondary": "#575e70",
+          "tertiary": "#b91a24",
+          "surface_bright": "#f8f9fa",
+          "on_primary": "#ffffff",
+          "on_error": "#ffffff",
+          "background": "#f8f9fa",
+          "error_container": "#ffdad6",
+          "tertiary_fixed_dim": "#ffb3ad",
+          "primary_fixed_dim": "#4edea3",
+          "surface_dim": "#d9dadb",
+          "on_tertiary_fixed_variant": "#930013",
+          "tertiary_fixed": "#ffdad7",
+          "on_surface": "#191c1d",
+          "on_secondary_fixed": "#141b2b",
+          "on_secondary": "#ffffff",
+          "primary_fixed": "#6ffbbe",
+          "surface_container_lowest": "#ffffff",
+          "on_secondary_fixed_variant": "#404758",
+          "error": "#ba1a1a",
+          "secondary_fixed_dim": "#c0c6db",
+          "on_error_container": "#93000a",
+          "on_tertiary_container": "#79000e",
+          "on_primary_fixed": "#002113",
+          "tertiary_container": "#ff7a73",
+          "on_background": "#191c1d",
+          "surface_container_high": "#e7e8e9",
+          "outline_variant": "#bbcabf",
+          "on_surface_variant": "#3c4a42",
+          "primary_container": "#10b981",
+          "outline": "#6c7a71",
+          "inverse_surface": "#2e3132",
+          "primary": "#006c49",
+          "on_secondary_container": "#5c6274",
+          "surface_container_highest": "#e1e3e4",
+          "on_primary_container": "#00422b",
+          "surface_variant": "#e1e3e4",
+          "inverse_primary": "#4edea3",
+          "secondary_fixed": "#dce2f7",
+          "surface_container_low": "#f3f4f5",
+          "surface_container": "#edeeef",
+          "on_tertiary": "#ffffff",
+          "inverse_on_surface": "#f0f1f2",
+          "secondary_container": "#d9dff5",
+          "on_primary_fixed_variant": "#005236",
+          "on_tertiary_fixed": "#410004",
+          "surface": "#f8f9fa"
+        },
+        "designMd": "---\nname: Protocol Precision\ncolors:\n  surface: '#f8f9fa'\n  surface-dim: '#d9dadb'\n  surface-bright: '#f8f9fa'\n  surface-container-lowest: '#ffffff'\n  surface-container-low: '#f3f4f5'\n  surface-container: '#edeeef'\n  surface-container-high: '#e7e8e9'\n  surface-container-highest: '#e1e3e4'\n  on-surface: '#191c1d'\n  on-surface-variant: '#3c4a42'\n  inverse-surface: '#2e3132'\n  inverse-on-surface: '#f0f1f2'\n  outline: '#6c7a71'\n  outline-variant: '#bbcabf'\n  surface-tint: '#006c49'\n  primary: '#006c49'\n  on-primary: '#ffffff'\n  primary-container: '#10b981'\n  on-primary-container: '#00422b'\n  inverse-primary: '#4edea3'\n  secondary: '#575e70'\n  on-secondary: '#ffffff'\n  secondary-container: '#d9dff5'\n  on-secondary-container: '#5c6274'\n  tertiary: '#b91a24'\n  on-tertiary: '#ffffff'\n  tertiary-container: '#ff7a73'\n  on-tertiary-container: '#79000e'\n  error: '#ba1a1a'\n  on-error: '#ffffff'\n  error-container: '#ffdad6'\n  on-error-container: '#93000a'\n  primary-fixed: '#6ffbbe'\n  primary-fixed-dim: '#4edea3'\n  on-primary-fixed: '#002113'\n  on-primary-fixed-variant: '#005236'\n  secondary-fixed: '#dce2f7'\n  secondary-fixed-dim: '#c0c6db'\n  on-secondary-fixed: '#141b2b'\n  on-secondary-fixed-variant: '#404758'\n  tertiary-fixed: '#ffdad7'\n  tertiary-fixed-dim: '#ffb3ad'\n  on-tertiary-fixed: '#410004'\n  on-tertiary-fixed-variant: '#930013'\n  background: '#f8f9fa'\n  on-background: '#191c1d'\n  surface-variant: '#e1e3e4'\ntypography:\n  headline-xl:\n    fontFamily: Sora\n    fontSize: 36px\n    fontWeight: '600'\n    lineHeight: 44px\n    letterSpacing: -0.03em\n  headline-xl-mobile:\n    fontFamily: Sora\n    fontSize: 30px\n    fontWeight: '600'\n    lineHeight: 38px\n    letterSpacing: -0.02em\n  headline-lg:\n    fontFamily: Sora\n    fontSize: 26px\n    fontWeight: '600'\n    lineHeight: 34px\n    letterSpacing: -0.02em\n  headline-sm:\n    fontFamily: Sora\n    fontSize: 20px\n    fontWeight: '600'\n    lineHeight: 28px\n    letterSpacing: -0.01em\n  title-md:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '600'\n    lineHeight: 24px\n    letterSpacing: -0.01em\n  body-lg:\n    fontFamily: Inter\n    fontSize: 15px\n    fontWeight: '400'\n    lineHeight: 22px\n  body-md:\n    fontFamily: Inter\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: 20px\n  body-sm:\n    fontFamily: Inter\n    fontSize: 12px\n    fontWeight: '400'\n    lineHeight: 18px\n  label-md:\n    fontFamily: Inter\n    fontSize: 13px\n    fontWeight: '500'\n    lineHeight: 18px\n    letterSpacing: 0.01em\n  label-sm:\n    fontFamily: Inter\n    fontSize: 11px\n    fontWeight: '600'\n    lineHeight: 16px\n    letterSpacing: 0.04em\n  metric-num:\n    fontFamily: Sora\n    fontSize: 16px\n    fontWeight: '600'\n    lineHeight: 20px\n    letterSpacing: -0.02em\nrounded:\n  sm: 0.25rem\n  DEFAULT: 0.5rem\n  md: 0.75rem\n  lg: 1rem\n  xl: 1.5rem\n  full: 9999px\nspacing:\n  gutter: 0.75rem\n  gutter-tablet: 1rem\n  margin: 1rem\n  margin-tablet: 1.5rem\n  space-xs: 0.25rem\n  space-sm: 0.5rem\n  space-md: 0.75rem\n  space-lg: 1rem\n  space-xl: 1.5rem\n---\n\n## Brand & Style\nThis design system marries modern fintech precision with institutional protocol analytics. Designed for mobile-first analytical confidence, it merges clean architectural minimalism with crisp editorial utility.\n\nThe aesthetic projects clarity, technical authority, and transparency. Surfaces remain pure and breathable, balancing dense financial metrics with high-contrast legibility. Translucent glass details introduce subtle modern depth without distracting from charts, order books, and real-time execution flows.\n\n## Colors\nThe palette uses crisp light values to highlight critical data changes:\n\n- **Primary (`#10B981`)**: The vital green accent denoting positive delta, liquidity depth, confirmed state, and key action triggers. Paired with a soft emerald wash (`#ECFDF5`) for badge and metric backings.\n- **Secondary (`#111827`)**: Deep charcoal black used for core structural elements, primary actions, high-emphasis metrics, and crisp iconography.\n- **Tertiary (`#EF4444`)**: Definitive protocol red reserved strictly for negative variance, liquidation thresholds, and critical validation alerts. Supported by a light tint (`#FEF2F2`).\n- **Neutral (`#F8F9FA`)**: Cool neutral canvas that separates content from elevated `#FFFFFF` card layers. Borders strictly utilize `#E5E7EB` for standard containment and `#F3F4F6` for inner dividers.\n\n## Typography\nTypographic scale balances geometric clarity and compact data-density:\n\n- **Sora** delivers geometric authority to portfolio balances, asset tickers, headlines, and critical telemetry data points.\n- **Inter** handles high-volume tabular figures, metadata labels, inputs, and analytical lists.\n- Numeric displays utilize tabular lining (`tnum`) across tables and charts to prevent jitter during high-frequency balance ticks.\n\n## Layout & Spacing\nThe layout adheres to a 4px/8px incremental rhythm tuned for high information density on handheld displays:\n\n- **Mobile Viewport**: 4-column fluid layout with `16px` outer screen margins and `12px` gutters.\n- **Tablet / Expanded**: Scales to 8 columns with `24px` outer margins and `16px` gutters.\n- Metric clusters inside cards enforce tight inner padding (`12px` to `16px`) to ensure full chart spans and token pairs remain above the fold.\n\n## Elevation & Depth\nDepth is generated through crisp tonal layer transitions and frosted translucent surfaces rather than heavy shadows:\n\n- **Base Layer**: Neutral canvas (`#F8F9FA`).\n- **Card Surfaces**: Pure white (`#FFFFFF`) with a `1px` stroke in `#E5E7EB` and subtle ambient depth (`0 1px 3px rgba(17, 24, 39, 0.04), 0 1px 2px rgba(17, 24, 39, 0.02)`).\n- **Floating Controls & Bottom Bar**: Frosted glass (`rgba(255, 255, 255, 0.82)`) coupled with `backdrop-filter: blur(16px)` and a subtle bottom-pinned border (`1px solid rgba(229, 231, 235, 0.8)`).\n- **Modals & Drawers**: Pure `#FFFFFF` surface elevated over an ambient backdrop scrim (`rgba(17, 24, 39, 0.3)`), accented with soft elevation (`0 20px 25px -5px rgba(17, 24, 39, 0.08)`).\n\n## Shapes\nGeometry uses clean, structured curves:\n\n- **Cards and Modals**: Styled with modern `rounded-2xl` (`16px`), offering a friendly yet structured enclosure.\n- **Pills and Badges**: Fully rounded `rounded-full` (`9999px`) to frame tickers, protocol badges, slippage tags, and status signals.\n- **Form Controls & Inputs**: Formatted with `rounded-xl` (`12px`) for balanced ergonomic touch targets.\n\n## Components\n\n### Buttons\n- **Primary**: Deep charcoal (`#111827`) fill with white text, `12px` corner radius, `44px` height on mobile. Pressed states scale down slightly (`scale(0.98)`).\n- **Success / Execute**: Emerald `#10B981` background, `#FFFFFF` text, applied to trade execution and yield compounding actions.\n- **Secondary / Ghost**: Pure `#FFFFFF` background with `1px solid #E5E7EB`, text in `#111827`.\n\n### Cards & Metric Modules\n- Base card: `#FFFFFF` background, `1px solid #E5E7EB`, `16px` border-radius.\n- Internal card headers combine the protocol icon (28px circle), asset pair, and right-aligned 24h change pill tag.\n\n### Chips & Pill Tags\n- Delta pills: `px-2 py-0.5 rounded-full text-xs font-semibold`. Gains render in `#ECFDF5` background with `#047857` text. Losses render in `#FEF2F2` background with `#B91C1C` text.\n- Filter chips: `#F3F4F6` background, `#374151` text; active state toggles to `#111827` background with `#FFFFFF` text.\n\n### Inputs & Sliders\n- Input fields: `#FFFFFF` fill with `1px solid #E5E7EB` border, `12px` border-radius, `48px` minimum height. Focus transitions to `1.5px solid #111827`. Includes embedded quick-allocation buttons (`25%`, `50%`, `MAX`) styled as subtle neutral pills.\n\n### Floating Navigation & Protocol Controls\n- Fixed bottom dock featuring a frosted glass shell (`rgba(255, 255, 255, 0.82)`, `backdrop-blur-md`), elevated with a hairline top border (`#E5E7EB`).\n- Navigation icons use `2px` stroke weight, transitioning from `#6B7280` when inactive to `#111827` with a subtle emerald base pip when active.\n\n### List Items & Transaction Rows\n- Compact `56px` height. Asset icon on the left, primary identifier and network tag in the center column, real-time value and colored percentage delta aligned to the right edge. Separated by hairline `#F3F4F6` dividers.",
+        "colorVariant": "FIDELITY",
+        "overridePrimaryColor": "#10b981",
+        "overrideSecondaryColor": "#111827",
+        "overrideTertiaryColor": "#ef4444",
+        "overrideNeutralColor": "#f8f9fa",
+        "spacingScale": 2,
+        "typography": {
+          "headline-xl-mobile": {
+            "fontFamily": "Sora",
+            "fontSize": "30px",
+            "fontWeight": "600",
+            "lineHeight": "38px",
+            "letterSpacing": "-0.02em"
+          },
+          "headline-sm": {
+            "fontFamily": "Sora",
+            "fontSize": "20px",
+            "fontWeight": "600",
+            "lineHeight": "28px",
+            "letterSpacing": "-0.01em"
+          },
+          "body-md": {
+            "fontFamily": "Inter",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "lineHeight": "20px"
+          },
+          "body-sm": {
+            "fontFamily": "Inter",
+            "fontSize": "12px",
+            "fontWeight": "400",
+            "lineHeight": "18px"
+          },
+          "headline-xl": {
+            "fontFamily": "Sora",
+            "fontSize": "36px",
+            "fontWeight": "600",
+            "lineHeight": "44px",
+            "letterSpacing": "-0.03em"
+          },
+          "metric-num": {
+            "fontFamily": "Sora",
+            "fontSize": "16px",
+            "fontWeight": "600",
+            "lineHeight": "20px",
+            "letterSpacing": "-0.02em"
+          },
+          "label-md": {
+            "fontFamily": "Inter",
+            "fontSize": "13px",
+            "fontWeight": "500",
+            "lineHeight": "18px",
+            "letterSpacing": "0.01em"
+          },
+          "body-lg": {
+            "fontFamily": "Inter",
+            "fontSize": "15px",
+            "fontWeight": "400",
+            "lineHeight": "22px"
+          },
+          "label-sm": {
+            "fontFamily": "Inter",
+            "fontSize": "11px",
+            "fontWeight": "600",
+            "lineHeight": "16px",
+            "letterSpacing": "0.04em"
+          },
+          "headline-lg": {
+            "fontFamily": "Sora",
+            "fontSize": "26px",
+            "fontWeight": "600",
+            "lineHeight": "34px",
+            "letterSpacing": "-0.02em"
+          },
+          "title-md": {
+            "fontFamily": "Inter",
+            "fontSize": "16px",
+            "fontWeight": "600",
+            "lineHeight": "24px",
+            "letterSpacing": "-0.01em"
+          }
+        },
+        "spacing": {
+          "gutter-tablet": "1rem",
+          "space-md": "0.75rem",
+          "margin": "1rem",
+          "space-sm": "0.5rem",
+          "gutter": "0.75rem",
+          "space-lg": "1rem",
+          "margin-tablet": "1.5rem",
+          "space-xl": "1.5rem",
+          "space-xs": "0.25rem"
+        },
+        "headlineFontFamily": "Sora",
+        "bodyFontFamily": "Inter",
+        "labelFontFamily": "Inter"
+      }
+    },
+    "version": "1"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "Qerin Protocol Analytics",
+  "short_name": "Qerin Analytics",
+  "description": "Real-time on-chain metrics, live queries, multi-chain transactions, revenue, and system diagnostics for Qerin Protocol.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0b0d",
+  "theme_color": "#f45b00",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192 512x512 1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180 512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["finance", "crypto", "analytics", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Live Queries",
+      "url": "/?tab=queries",
+      "description": "View live search queries and micropayment settlements"
+    },
+    {
+      "name": "Chains Breakdown",
+      "url": "/?tab=chains",
+      "description": "Compare Base vs BOT Chain transaction share"
+    },
+    {
+      "name": "System Health",
+      "url": "/?tab=failures",
+      "description": "Inspect RPC and protocol failure points"
+    }
+  ]
+}
