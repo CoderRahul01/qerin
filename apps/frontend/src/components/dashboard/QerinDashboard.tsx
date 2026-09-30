@@ -9,7 +9,7 @@ import { TopupModal } from "@/components/TopupModal";
 import { UserTransparencyModal } from "@/components/UserTransparencyModal";
 import { ProofCardModal } from "@/components/ProofCardModal";
 import { keccak256, toBytes } from "viem";
-import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection } from "@/lib/account";
+import { getOrCreateAccountId, fetchBalance, getConnectedWalletAddress, requestWalletConnection, connectWalletConnect, getInjectedProvider, WALLET_CHANGED_EVENT } from "@/lib/account";
 import { getOrCreateChatVaultId, loadChatHistory, saveChatHistory, type RemoteChatHistory } from "@/lib/chatHistory";
 import { useQerinAnswer } from "@/lib/useQerinAnswer";
 import type { AnswerData, AnswerProgressEvent, PersonaInsights, ReceiptItem, SourceCitation } from "@/lib/types";
@@ -856,6 +856,8 @@ export function QerinDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [showConnectMenu, setShowConnectMenu] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [showTopup, setShowTopup] = useState(false);
@@ -1079,8 +1081,13 @@ export function QerinDashboard() {
       ethereum.on("accountsChanged", handleAccountsChanged);
     }
 
+    // QR (WalletConnect) sessions don't go through window.ethereum.
+    const handleWalletChanged = () => { initAccount(); };
+    window.addEventListener(WALLET_CHANGED_EVENT, handleWalletChanged);
+
     return () => {
       isMounted = false;
+      window.removeEventListener(WALLET_CHANGED_EVENT, handleWalletChanged);
       channel.removeEventListener("message", handleAccountSync);
       channel.close();
       if (ethereum?.removeListener) {
@@ -1089,9 +1096,11 @@ export function QerinDashboard() {
     };
   }, []);
 
-  const handleConnectWallet = async () => {
+  const handleConnectWallet = async (method: "auto" | "qr" = "auto") => {
+    setShowConnectMenu(false);
+    setConnectError(null);
     try {
-      const addr = await requestWalletConnection();
+      const addr = method === "qr" ? await connectWalletConnect() : await requestWalletConnection();
       if (addr) {
         setConnectedWallet(addr);
         const id = await getOrCreateAccountId(addr);
@@ -1101,6 +1110,7 @@ export function QerinDashboard() {
       }
     } catch (err) {
       console.error("Wallet connection error:", err);
+      setConnectError(err instanceof Error ? err.message : "Could not connect wallet");
     }
   };
 
@@ -1522,6 +1532,23 @@ export function QerinDashboard() {
               <FuelMeter balance={balance} usedTotal={totalUsed} compact />
             </div>
           )}
+          {!connectedWallet && (showConnectMenu || connectError) && (
+            <div style={{ padding: "8px 12px", borderTop: "1px solid var(--qd-sidebar-border)", display: "flex", flexDirection: "column", gap: 6 }}>
+              {showConnectMenu && (
+                <>
+                  <button type="button" className="qd-connect-option" onClick={() => handleConnectWallet("auto")}>
+                    Browser wallet
+                  </button>
+                  <button type="button" className="qd-connect-option" onClick={() => handleConnectWallet("qr")}>
+                    BO Wallet / mobile (QR)
+                  </button>
+                </>
+              )}
+              {connectError && (
+                <div role="alert" style={{ fontSize: 11, lineHeight: 1.4, color: "var(--qerin-danger)" }}>{connectError}</div>
+              )}
+            </div>
+          )}
           <div className="qd-user-bar" onClick={() => { setTopupReason(null); setShowTopup(true); }}>
             <div style={{ position: "relative" }}>
               <Avatar letter={connectedWallet ? "W" : "U"} size={30} />
@@ -1553,8 +1580,12 @@ export function QerinDashboard() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleConnectWallet();
+                  // With a browser wallet present, let the user pick it or a
+                  // mobile wallet; without one, QR is the only way in.
+                  if (getInjectedProvider()) setShowConnectMenu((v) => !v);
+                  else handleConnectWallet("qr");
                 }}
+                aria-expanded={showConnectMenu}
                 style={{
                   background: "rgba(255, 107, 0, 0.12)",
                   border: "1px solid rgba(255, 107, 0, 0.35)",
@@ -2158,6 +2189,7 @@ export function QerinDashboard() {
           onAccountCreated={(id, b) => {
             setAccountId(id);
             setBalance(b);
+            if (id.startsWith("0x")) setConnectedWallet(id);
           }}
         />
       )}

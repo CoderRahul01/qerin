@@ -12,7 +12,7 @@ import {
   type TopupNetwork,
   type WalletBalanceReport,
 } from "@/lib/cryptoTopup";
-import { confirmCryptoTopup, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider, connectWalletConnect, hasWalletConnect } from "@/lib/account";
+import { confirmCryptoTopup, requestWalletConnection, getOrCreateAccountId, fetchBalance, getInjectedProvider, connectWalletConnect, hasWalletConnect, hasActiveWallet } from "@/lib/account";
 import { SOLANA_NETWORK, signSolanaTopupConfirmation } from "@/lib/solanaTopup";
 
 const TIERS = [
@@ -145,7 +145,7 @@ export function TopupModal({
   });
   const [hasWallet, setHasWallet] = useState<boolean | null>(() => {
     if (typeof window === "undefined") return null;
-    return getInjectedProvider() !== null;
+    return hasActiveWallet();
   });
   const [walletConnectAvailable] = useState(hasWalletConnect);
   // Keep optional chains out of the launch UI until their treasury and x402
@@ -181,7 +181,7 @@ export function TopupModal({
   // Detect wallet after mount if injected asynchronously
   useEffect(() => {
     const timer = setTimeout(() => {
-      setHasWallet(getInjectedProvider() !== null);
+      setHasWallet(hasActiveWallet());
     }, 50);
     return () => clearTimeout(timer);
   }, []);
