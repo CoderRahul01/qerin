@@ -32,7 +32,7 @@ export default function DevelopersPage() {
         <section style={{ background: "var(--qerin-surface)", border: "1px solid var(--qerin-border)", borderRadius: 16, padding: 28, marginBottom: 40 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 10px" }}>Developer access</h2>
           <p style={{ fontSize: 14, color: "var(--qerin-text-muted)", lineHeight: 1.6, margin: 0 }}>
-            Direct API billing is paused while we finish automatic refunds for failed answers. API keys and MCP paid queries are also unavailable. The web app is open for early-access research using a personal Qerin balance.
+            Direct API billing is paused while we finish automatic refunds for failed answers. API keys and MCP paid queries are also unavailable. The web app is open for early-access research: each user funds their own Qerin wallet, and their Qerin agent pays sources from it within limits they sign.
           </p>
           <a href="/app" style={{ display: "inline-block", marginTop: 16, color: "var(--qerin-accent)", fontWeight: 600 }}>Open Qerin app →</a>
         </section>
@@ -48,7 +48,7 @@ export default function DevelopersPage() {
             <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Multi-Chain Technical Matrix</h2>
           </div>
           <p style={{ fontSize: 14, color: "var(--qerin-text-muted)", margin: "0 0 20px" }}>
-            Users can top up on supported rails. Paid source requests currently settle in Base USDC.
+            Each user&apos;s Qerin wallet holds USDC on Base and Solana; paid sources settle on whichever rail the user&apos;s agent pays from. Qerin receipts are recorded on Base or BOT Chain.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
@@ -75,7 +75,7 @@ export default function DevelopersPage() {
               <div style={{ fontSize: 13, color: "var(--qerin-text-muted)", lineHeight: 1.8, fontFamily: "var(--font-ibm-plex-mono)" }}>
                 <div>RPC: <span style={{ color: "var(--qerin-text)" }}>https://rpc.botchain.ai</span></div>
                 <div>Contract: <span style={{ color: "var(--qerin-text)" }}>0xb357...Ea45</span></div>
-                <div>Currency: <span style={{ color: "var(--qerin-text)" }}>BOT (Native) / USDT</span></div>
+                <div>Role: <span style={{ color: "var(--qerin-text)" }}>Receipt registry</span></div>
                 <div>Explorer: <a href="https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45" target="_blank" rel="noreferrer" style={{ color: "var(--qerin-accent)" }}>View contract</a></div>
               </div>
             </div>

@@ -23,9 +23,17 @@ compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 #   wrangler secret put QERIN_INTERNAL_SECRET
 #   wrangler secret put CDP_API_KEY_ID
 #   wrangler secret put CDP_API_KEY_SECRET
-#   wrangler secret put CDP_WALLET_SECRET          <- enables per-user agent wallets (agentWallet.ts)
+#   wrangler secret put CDP_WALLET_SECRET          <- enables per-user Qerin wallets (Base + Solana)
+#
+# Qerin wallets: every user gets their own wallet per rail; their Qerin agent
+# pays sources and Qerin's fee from it. Qerin never funds a shared wallet.
+# The treasuries below only RECEIVE the per-question service fee:
+#   QERIN_TREASURY_ADDRESS          <- EVM address for fees on Base
+#   QERIN_SOLANA_TREASURY_ADDRESS   <- Solana address (must hold a USDC account)
 [vars]
 QERIN_NETWORK = "mainnet"
+# "mainnet" (Base + Solana mainnet) or "testnet" (Base Sepolia + Solana devnet).
+QERIN_WALLET_ENV = "mainnet"
 QERIN_LLM_MODEL = "meta/llama-3.3-70b-instruct"
 QERIN_REGISTRY_ADDRESS_BOTCHAIN = "0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45"
 

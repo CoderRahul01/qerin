@@ -7,7 +7,7 @@ import {
 } from "./sources.js";
 import { getNetwork } from "./networks.js";
 import { withTimeout } from "./withTimeout.js";
-import type { ClientEvmSigner } from "@x402/evm";
+import type { AgentPayer } from "./agentPayer.js";
 
 // Real, backend-driven progress events — not decorative. Each event fires
 // exactly when the thing it describes actually happens, so a client
@@ -89,9 +89,9 @@ export async function gatherOnChainTelemetry(targetNetwork?: string): Promise<Pa
 export async function gatherSources(
   question: string,
   sourceKeys: string[],
-  targetNetwork?: string,
-  onProgress?: OnProgress,
-  sourceSigner?: ClientEvmSigner
+  targetNetwork: string | undefined,
+  onProgress: OnProgress | undefined,
+  payer: AgentPayer
 ): Promise<PaidResult[]> {
   const selected = sourceKeys.map((key) => SOURCES[key]).filter((s): s is NonNullable<typeof s> => Boolean(s));
 
@@ -115,7 +115,7 @@ export async function gatherSources(
       selected.map(async (source) => {
         try {
           const request = await source.buildRequest(question);
-          const result = await paySource(source.name, request.url, source.priceUsd, request.init, sourceSigner);
+          const result = await paySource(source.name, request.url, source.priceUsd, payer, request.init);
           onProgress?.({ type: "source_settled", name: source.name, success: true, amountPaid: result.amountPaid });
           return result;
         } catch (err) {

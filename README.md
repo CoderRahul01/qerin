@@ -34,6 +34,26 @@ Every query delivers:
 
 ---
 
+## Qerin Wallet: Every User Funds Their Own Agent
+
+Qerin never fronts money from a shared wallet. Each user gets their own **Qerin wallet** on every supported rail, and their own **Qerin agent** spends from it.
+
+1. **Connect** MetaMask, BO Wallet (QR), or Coinbase Wallet. One gasless signature creates the user's Qerin wallet on **Base** and **Solana** (keys held in Coinbase CDP's enclave, never by Qerin).
+2. **Fund** it: USDC on Base straight from the connected wallet, or USDC on Solana from Phantom / MetaMask (Solana) via a Solana Pay link. Balances are read from chain.
+3. **Set limits.** Per-question max, daily max, or pause. The agent checks them before every question. Changes need a fresh owner signature.
+4. **Ask.** The agent picks a funded rail, pays each x402 source, then pays Qerin's **$0.08 service fee**, all from the user's wallet. Fees and withdrawals settle gaslessly through the x402 facilitator, so the Qerin wallet never needs ETH or SOL.
+5. **Withdraw** anytime with an owner signature. Base withdrawals only return to the owner's own address.
+
+| Setting | Effect |
+|---|---|
+| `QERIN_WALLET_ENV=mainnet` | Base + Solana mainnet (real USDC) |
+| `QERIN_WALLET_ENV=testnet` | Base Sepolia + Solana devnet (test USDC) |
+| `QERIN_TREASURY_ADDRESS` / `QERIN_SOLANA_TREASURY_ADDRESS` | Receive-only fee addresses |
+
+New chains plug in through `apps/backend/src/rails.ts` plus a signer for their chain family.
+
+---
+
 ## Smart Contracts & Multi-Chain Architecture
 
 Qerin operates natively on EVM networks:
@@ -55,7 +75,13 @@ qerin/
 ├── apps/
 │   ├── backend/         # Cloudflare Workers monolithic API (Hono, x402, Firebase Firestore REST)
 │   │   ├── src/
-│   │   │   ├── accounts.ts       # Balance management & atomic credit/debit
+│   │   │   ├── rails.ts          # Payment rails (Base, Solana), mainnet/testnet switch
+│   │   │   ├── qerinWallet.ts    # Per-user Qerin wallets: provision, balances, withdrawals
+│   │   │   ├── agentPayer.ts     # Agent signing + gasless fee/withdraw transfers
+│   │   │   ├── agentPolicy.ts    # Owner-set spend limits enforced per question
+│   │   │   ├── ownerIntents.ts   # Single-use owner signatures for limits & withdrawals
+│   │   │   ├── walletRoutes.ts   # /v1/wallet API
+│   │   │   ├── accounts.ts       # Legacy prepaid credit ledger
 │   │   │   ├── answerHandler.ts  # Orchestrates payments, synthesis & receipt generation
 │   │   │   ├── apiKeys.ts        # SHA-256 hashed B2B API keys
 │   │   │   ├── db.ts             # Zero-dependency, edge-native Firestore client

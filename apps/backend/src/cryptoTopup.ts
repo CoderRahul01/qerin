@@ -3,6 +3,7 @@ import { getQerinAccount } from "./wallet.js";
 import { getNetwork } from "./networks.js";
 import { getBalance, recordDeposit } from "./accounts.js";
 import { agentWalletsEnabled, findAgentWallet, getBaseUsdcBalance } from "./agentWallet.js";
+import { getRail } from "./rails.js";
 
 // Direct on-chain top-up — verifies any of:
 //   1. ERC-20 token (USDC on Base, USDT on BOT Chain) transfer to Qerin's wallet
@@ -138,7 +139,9 @@ export async function verifyAndCreditCryptoDeposit(
   networkName?: string
 ): Promise<CryptoDepositResult> {
   const network = getNetwork(networkName);
-  const qerinAddress = getQerinAccount().address.toLowerCase();
+  // Qerin's shared address only matters for legacy deposits; a deployment
+  // with no shared key still confirms deposits into personal Qerin wallets.
+  const qerinAddress = process.env.QERIN_WALLET_PRIVATE_KEY ? getQerinAccount().address.toLowerCase() : null;
   const isBotChain = network.chainId === 677;
 
   const message = buildTopupSignMessage(accountId, txHash);
@@ -180,7 +183,7 @@ export async function verifyAndCreditCryptoDeposit(
   // ── 1. Check native coin transfer (BOT or ETH) ──────────────────────────
   const txTo = tx.to?.toLowerCase() ?? "";
   const nativeValue = BigInt(tx.value || "0x0");
-  if (txTo === qerinAddress && nativeValue > 0n) {
+  if (qerinAddress && txTo === qerinAddress && nativeValue > 0n) {
     const nativeAmount = Number(nativeValue) / NATIVE_DECIMALS;
     try {
       if (isBotChain) {
@@ -202,7 +205,7 @@ export async function verifyAndCreditCryptoDeposit(
     // agentWallet.ts). Those funds are already theirs on-chain, so there is
     // nothing to credit — the balance is simply read back from the chain.
     const agentWallet =
-      network.chainId === 8453 && agentWalletsEnabled()
+      network.caip2 === getRail("base")?.caip2 && agentWalletsEnabled()
         ? (await findAgentWallet(accountId).catch(() => null))?.toLowerCase() ?? null
         : null;
     let transferredAtomic = 0n;
@@ -211,7 +214,7 @@ export async function verifyAndCreditCryptoDeposit(
       if (!tokenAddress || log.address.toLowerCase() !== tokenAddress) continue;
       if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC0) continue;
       const to = `0x${log.topics[2]?.slice(-40)}`.toLowerCase();
-      if (to === qerinAddress) transferredAtomic += BigInt(log.data);
+      if (qerinAddress && to === qerinAddress) transferredAtomic += BigInt(log.data);
       else if (agentWallet && to === agentWallet) agentWalletAtomic += BigInt(log.data);
     }
     if (transferredAtomic > 0n) {

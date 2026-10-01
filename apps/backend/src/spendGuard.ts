@@ -11,11 +11,9 @@ const MAX_DAILY_USDC = 5.0;
 // entire shared daily budget alone and lock out every other user.
 const MAX_ACCOUNT_DAILY_USDC = 1.0;
 
-// $0.15 = $0.07 sources + $0.08 fee, matching DeveloperScreen.tsx's pricing
-// breakdown. Both paywalls charge exactly this.
-export const QERIN_SERVICE_FEE_USD = 0.08;
-
-// Flat price charged per answer.
+// Flat price charged per answer to legacy prepaid credit ($0.07 sources +
+// $0.08 fee). Personal Qerin wallets instead pay the exact source cost plus
+// QERIN_SERVICE_FEE_USD (agentPolicy.ts).
 export const ANSWER_PRICE_USD = 0.15;
 
 // Hard cap on question length, enforced at the route layer (index.ts) before
@@ -88,7 +86,11 @@ export async function recordSpend(
   sourceCostUsd: number,
   sourceCount: number,
   accountId: string | null = null,
-  debitedUsd: number | null = null
+  debitedUsd: number | null = null,
+  // The global cap bounds Qerin's own shared-wallet exposure. Spend from a
+  // user's personal Qerin wallet is bounded by that user's own policy
+  // (agentPolicy.ts) instead, so it must not exhaust everyone's shared cap.
+  countTowardGlobalCap = true
 ): Promise<string> {
   const db = getDb();
   const day = todayKey();
@@ -100,11 +102,12 @@ export async function recordSpend(
       sourceCount,
       userId: accountId,
       debitedUsd,
+      paidFromUserWallet: !countTowardGlobalCap,
       delivered: false,
       createdAt: FieldValue.serverTimestamp(),
     }),
-    bumpCounter(globalRef, sourceCostUsd),
-    accountId ? bumpCounter(globalRef.collection("accounts").doc(accountId), sourceCostUsd) : Promise.resolve(),
+    countTowardGlobalCap ? bumpCounter(globalRef, sourceCostUsd) : Promise.resolve(),
+    accountId && countTowardGlobalCap ? bumpCounter(globalRef.collection("accounts").doc(accountId), sourceCostUsd) : Promise.resolve(),
   ]);
   return log.id;
 }

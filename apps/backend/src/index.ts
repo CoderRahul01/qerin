@@ -3,7 +3,6 @@ import { isAddress } from "viem";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { answerHandler } from "./answerHandler.js";
-import { getQerinAccount } from "./wallet.js";
 import { paidSourcesReady } from "./payerReadiness.js";
 import { verifyAccountProof } from "./accountProof.js";
 import { getNetwork } from "./networks.js";
@@ -11,14 +10,16 @@ import { createAccount, getOrCreateAccount, getBalance, debitBalance, creditBala
 import { ANSWER_PRICE_USD, MAX_QUESTION_LENGTH } from "./spendGuard.js";
 import { isValidEmail, joinWaitlist } from "./waitlist.js";
 import { verifyAndCreditCryptoDeposit, fetchLiveBotPrice } from "./cryptoTopup.js";
-import { getSolanaNetwork, type SupportedSolanaNetwork } from "./solana/network.js";
-import { getQerinSolanaSigner } from "./solana/wallet.js";
-import { verifyAndCreditSolanaDeposit } from "./solana/topup.js";
 import { getPublicAnalytics, getPrivateAnalytics } from "./analytics.js";
 import { getChatHistory, isValidChatVaultId, saveChatHistory } from "./chatHistory.js";
-import { agentWalletsEnabled, findAgentWallet, getAgentWalletSigner, getBaseUsdcBalance, getOrCreateAgentWallet } from "./agentWallet.js";
+import { agentWalletsEnabled } from "./agentWallet.js";
 import { selectSources } from "./selectSources.js";
 import { estimateCost } from "./orchestrator.js";
+import { checkPolicy, getAgentState, QERIN_SERVICE_FEE_USD } from "./agentPolicy.js";
+import { chooseAgentPayer, listQerinWallets } from "./qerinWallet.js";
+import { getRail } from "./rails.js";
+import { registerWalletRoutes } from "./walletRoutes.js";
+import type { AgentPayer } from "./agentPayer.js";
 
 interface RateLimiterBinding {
   limit: (opts: { key: string }) => Promise<{ success: boolean }>;
@@ -74,6 +75,8 @@ async function rateLimit(c: RateLimitContext, next: () => Promise<void>) {
 app.use("/v1/keys", rateLimit);
 app.use("/v1/answer", rateLimit);
 app.use("/v1/account/*", rateLimit);
+app.use("/v1/wallet", rateLimit);
+app.use("/v1/wallet/*", rateLimit);
 app.use("/v1/history", rateLimit);
 app.use("/v1/waitlist", rateLimit);
 
@@ -162,12 +165,12 @@ app.get("/v1/account/balance", async (c) => {
 
   try {
     const { balance } = await getOrCreateAccount(accountId);
-    // A user's spendable balance is their ledger credit plus the USDC sitting
-    // in their own agent wallet. Read-only: a wallet is never provisioned
-    // from this unauthenticated lookup.
-    const agentWallet = agentWalletsEnabled() ? await findAgentWallet(accountId).catch(() => null) : null;
-    const agentUsdc = agentWallet ? (await getBaseUsdcBalance(agentWallet)) ?? 0 : 0;
-    return c.json({ balance: balance + agentUsdc, ledgerBalance: balance, agentWallet, agentUsdc });
+    // A user's spendable balance is the USDC in their own Qerin wallet on
+    // every rail, plus any prepaid credit from before personal wallets.
+    // Read-only: a wallet is never provisioned from this lookup.
+    const wallets = isAddress(accountId) ? await listQerinWallets(accountId, false).catch(() => []) : [];
+    const walletUsdc = wallets.reduce((sum, w) => sum + (w.usdc ?? 0), 0);
+    return c.json({ balance: balance + walletUsdc, ledgerBalance: balance, walletUsdc, wallets });
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal error" }, 500);
@@ -212,27 +215,25 @@ app.put("/v1/history", async (c) => {
   }
 });
 
-// Public — everything here (Qerin's wallet address, the chain, the USDC
-// contract) is already visible on-chain to anyone; there's nothing to gate.
-// Lets the frontend build the USDC transfer without hardcoding addresses
-// in two places.
+// Public chain metadata for the top-up UI. A deposit always goes to the
+// user's own Qerin wallet on that rail (see /v1/wallet) — never to a shared
+// Qerin address — so this only reports where that wallet lives, if it exists.
 app.get("/v1/network-info", async (c) => {
   const target = c.req.query("network");
+  const account = c.req.query("account");
 
-  // Solana is not an EVM chain — getNetwork()/NETWORKS can't represent it
-  // (see apps/backend/src/solana/network.ts), so it's handled as a fully
-  // separate branch rather than forced through the EVM-shaped response below.
-  if (target === "solana_mainnet" || target === "solana_devnet") {
-    const network = getSolanaNetwork(target as SupportedSolanaNetwork);
-    const signer = await getQerinSolanaSigner();
+  const solana = target === "solana" || target === "solana_mainnet" || target === "solana_devnet" ? getRail("solana") : null;
+  if (solana) {
+    const wallets = account && isAddress(account) ? await listQerinWallets(account, false).catch(() => []) : [];
+    const mine = wallets.find((w) => w.rail === "solana");
     return c.json({
-      name: network.name,
-      payTo: signer.address,
-      usdc: network.usdc,
+      name: solana.name,
+      payTo: mine?.address ?? null,
+      personalWallet: Boolean(mine?.address),
+      usdc: solana.usdc,
       currency: "SOL",
-      rpcUrl: network.rpcUrl,
-      cluster: network.cluster,
-      paidSourcesReady: await paidSourcesReady(),
+      rpcUrl: solana.rpcUrl,
+      testnet: solana.testnet,
     });
   }
 
@@ -246,25 +247,17 @@ app.get("/v1/network-info", async (c) => {
     }
   }
 
-  // Base deposits from a connected wallet go to that user's own agent wallet
-  // rather than Qerin's shared one. BOT Chain deposits still credit the
-  // ledger — CDP wallets and x402 sources don't exist on that chain.
-  let payTo: string = getQerinAccount().address;
-  let personalWallet = false;
-  const account = c.req.query("account");
-  if (network.chainId === 8453 && account && isAddress(account) && agentWalletsEnabled()) {
-    try {
-      payTo = await getOrCreateAgentWallet(account);
-      personalWallet = true;
-    } catch (err) {
-      console.error("Could not provision agent wallet:", err);
-    }
+  const base = getRail("base");
+  let payTo: string | null = null;
+  if (base && network.caip2 === base.caip2 && account && isAddress(account)) {
+    const wallets = await listQerinWallets(account, false).catch(() => []);
+    payTo = wallets.find((w) => w.rail === "base")?.address ?? null;
   }
 
   return c.json({
     name: network.name,
     payTo,
-    personalWallet,
+    personalWallet: Boolean(payTo),
     chainId: network.chainId.toString(),
     usdc: network.usdc ?? null,
     usdt: network.usdt ?? null,
@@ -272,7 +265,6 @@ app.get("/v1/network-info", async (c) => {
     currency: network.currency,
     rpcUrl: network.rpcUrl,
     botPrice,
-    paidSourcesReady: await paidSourcesReady(),
   });
 });
 
@@ -287,28 +279,15 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   if (!accountId) return c.json({ error: "X-Qerin-Account-Id header is required" }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const { txHash, signature, network: depositNetwork, walletPublicKey } = body ?? {};
+  const { txHash, signature, network: depositNetwork } = body ?? {};
   if (typeof txHash !== "string" || typeof signature !== "string") {
     return c.json({ error: "txHash and signature are required" }, 400);
   }
 
-  // Solana verification is ed25519, not ECDSA — the public key can't be
-  // recovered from a (message, signature) pair the way recoverMessageAddress
-  // does for EVM, so the client must send it explicitly.
-  if (depositNetwork === "solana_mainnet" || depositNetwork === "solana_devnet") {
-    if (typeof walletPublicKey !== "string") {
-      return c.json({ error: "walletPublicKey is required for Solana deposits" }, 400);
-    }
-    try {
-      const result = await verifyAndCreditSolanaDeposit(accountId, txHash, walletPublicKey, signature, depositNetwork);
-      if (!result.verified) {
-        return c.json({ error: result.reason ?? "Could not verify this transaction" }, 400);
-      }
-      return c.json({ balance: result.balance });
-    } catch (err) {
-      console.error(err);
-      return c.json({ error: "Internal error" }, 500);
-    }
+  // Solana deposits land directly in the user's own Solana Qerin wallet;
+  // its balance is read from chain, so there is nothing to confirm.
+  if (typeof depositNetwork === "string" && depositNetwork.startsWith("solana")) {
+    return c.json({ error: "Solana deposits appear automatically in your Qerin wallet. No confirmation needed." }, 400);
   }
 
   try {
@@ -328,10 +307,10 @@ app.post("/v1/account/topup/crypto-confirm", async (c) => {
   }
 });
 
-// Free-app path: gated by the internal secret (only Qerin's own frontend
-// can reach it) AND a prepaid balance — the consumer paywall. Debits
-// ANSWER_PRICE_USD before running the request, refunds it if the request
-// fails after the debit (spend cap hit, no sources responded).
+// The research route. Gated by the internal secret (only Qerin's frontend
+// reaches it) and the owner's account-access signature. The Qerin agent then
+// pays for the question out of that user's own Qerin wallet, inside the
+// spend policy the user set — Qerin never fronts the money.
 app.post("/v1/answer", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
 
@@ -349,63 +328,89 @@ app.post("/v1/answer", async (c) => {
   if (questionError) {
     return c.json({ error: questionError }, 400);
   }
+  const targetNetwork = typeof network === "string" ? network : undefined;
 
-  // Preferred path: the user's own agent wallet pays the sources directly, so
-  // they are charged exactly what the sources cost and nothing depends on
-  // Qerin's shared wallet. Falls through to the prepaid ledger below when the
-  // wallet doesn't exist yet or doesn't hold enough USDC.
+  const runStream = (payer: AgentPayer, feeOwedUsd: number, balanceBefore: number, onFailure?: () => Promise<unknown>) =>
+    streamSSE(c, async (stream) => {
+      try {
+        const result = await answerHandler(
+          question,
+          accountId,
+          targetNetwork,
+          (event) => {
+            stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
+          },
+          chatVaultId,
+          (task) => c.executionCtx.waitUntil(task),
+          payer,
+          feeOwedUsd
+        );
+        if (result.status !== 200) {
+          await onFailure?.();
+          await stream.writeSSE({ event: "error", data: JSON.stringify(result.body) });
+          return;
+        }
+        const charged = payer.kind === "agent" ? Number(result.body.totalCharged) || 0 : ANSWER_PRICE_USD;
+        await stream.writeSSE({
+          event: "done",
+          data: JSON.stringify({ ...result.body, balance: Math.max(0, balanceBefore - charged) }),
+        });
+      } catch (err) {
+        console.error(err);
+        await onFailure?.()?.catch(() => {});
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "Internal error" }) }).catch(() => {});
+      }
+    });
+
+  // Preferred path: the user's personal Qerin agent.
   if (agentWalletsEnabled() && isAddress(accountId)) {
     try {
-      const agentWallet = await findAgentWallet(accountId);
-      const agentUsdc = agentWallet ? await getBaseUsdcBalance(agentWallet) : null;
-      const required = estimateCost(selectSources(question));
-      if (agentWallet && agentUsdc !== null && agentUsdc >= required) {
-        const ledgerBalance = (await getBalance(accountId).catch(() => null)) ?? 0;
-        return streamSSE(c, async (stream) => {
-          try {
-            const result = await answerHandler(
-              question,
-              accountId,
-              typeof network === "string" ? network : undefined,
-              (event) => {
-                stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
-              },
-              chatVaultId,
-              (task) => c.executionCtx.waitUntil(task),
-              getAgentWalletSigner(agentWallet)
-            );
-            if (result.status !== 200) {
-              await stream.writeSSE({ event: "error", data: JSON.stringify(result.body) });
-              return;
-            }
-            const paid = Number(result.body.totalPaid) || 0;
-            await stream.writeSSE({
-              event: "done",
-              data: JSON.stringify({ ...result.body, balance: ledgerBalance + Math.max(0, agentUsdc - paid), paidFrom: agentWallet }),
-            });
-          } catch (err) {
-            console.error(err);
-            await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "Internal error" }) }).catch(() => {});
-          }
-        });
+      const [state, wallets, ledgerBalance] = await Promise.all([
+        getAgentState(accountId),
+        listQerinWallets(accountId, false),
+        getBalance(accountId).catch(() => null),
+      ]);
+      const required = estimateCost(selectSources(question)) + QERIN_SERVICE_FEE_USD + state.feeOwedUsd;
+      const hasWallet = wallets.some((w) => w.address);
+      const walletUsdc = wallets.reduce((sum, w) => sum + (w.usdc ?? 0), 0);
+
+      if (hasWallet) {
+        const decision = checkPolicy(state, required);
+        if (!decision.ok) {
+          return c.json({ error: decision.code, message: decision.message, required }, 403);
+        }
+        const choice = await chooseAgentPayer(accountId, required);
+        if (choice) {
+          return runStream(choice.payer, state.feeOwedUsd, walletUsdc + (ledgerBalance ?? 0));
+        }
+      }
+
+      // No wallet able to pay. Fall through only if old prepaid credit can
+      // cover it; otherwise ask the user to fund their own wallet.
+      if ((ledgerBalance ?? 0) < ANSWER_PRICE_USD) {
+        return c.json({
+          error: "insufficient_balance",
+          message: hasWallet
+            ? `Add USDC to your Qerin wallet to run research. This question needs up to $${required.toFixed(3)}.`
+            : "Open your Qerin wallet and fund it to run research.",
+          balance: walletUsdc + (ledgerBalance ?? 0),
+          required,
+        }, 402);
       }
     } catch (err) {
-      console.error("Agent wallet payment path unavailable:", err);
+      console.error("Qerin agent payment path unavailable:", err);
     }
   }
 
+  // Legacy prepaid credit (bought before personal wallets existed). Spent
+  // from Qerin's shared wallet only while that wallet still holds funds —
+  // nothing requires it to be funded.
   if (!(await paidSourcesReady())) {
-    if (agentWalletsEnabled()) {
-      const balance = (await getBalance(accountId).catch(() => null)) ?? 0;
-      return c.json(
-        { error: "insufficient_balance", message: "Add USDC on Base to your Qerin wallet to run research.", balance, required: ANSWER_PRICE_USD },
-        402
-      );
-    }
-    return c.json({
-      error: "paid_sources_unavailable",
-      message: "Paid research is temporarily unavailable while Qerin's source wallet is replenished. Your balance was not charged.",
-    }, 503);
+    const balance = (await getBalance(accountId).catch(() => null)) ?? 0;
+    return c.json(
+      { error: "insufficient_balance", message: "Fund your Qerin wallet to run research.", balance, required: ANSWER_PRICE_USD },
+      402
+    );
   }
 
   let balanceAfterDebit: number | null;
@@ -419,46 +424,14 @@ app.post("/v1/answer", async (c) => {
   if (balanceAfterDebit === null) {
     const balance = (await getBalance(accountId).catch(() => null)) ?? 0;
     return c.json(
-      { error: "insufficient_balance", message: "Top up your balance to keep asking questions.", balance, required: ANSWER_PRICE_USD },
+      { error: "insufficient_balance", message: "Fund your Qerin wallet to run research.", balance, required: ANSWER_PRICE_USD },
       402
     );
   }
 
-  // Debit succeeded — from here on, any failure must refund it. Streamed as
-  // SSE so the client can render real pipeline progress (which sources
-  // actually settled, when synthesis actually started) instead of a
-  // decorative loop — every event below fires exactly when the thing it
-  // describes happens. The refund/response-shape contract is unchanged from
-  // the old plain-JSON version: a non-200 result (or a thrown error) always
-  // refunds before anything is sent back, only now as a terminal SSE event
-  // instead of an HTTP status+body.
-  return streamSSE(c, async (stream) => {
-    try {
-      const result = await answerHandler(
-        question,
-        accountId,
-        typeof network === "string" ? network : undefined,
-        (event) => {
-          stream.writeSSE({ event: "progress", data: JSON.stringify(event) }).catch(() => {});
-        },
-        chatVaultId,
-        (task) => c.executionCtx.waitUntil(task)
-      );
-      if (result.status !== 200) {
-        await creditBalance(accountId, ANSWER_PRICE_USD);
-        await stream.writeSSE({ event: "error", data: JSON.stringify(result.body) });
-        return;
-      }
-      await stream.writeSSE({
-        event: "done",
-        data: JSON.stringify({ ...result.body, balance: balanceAfterDebit }),
-      });
-    } catch (err) {
-      console.error(err);
-      await creditBalance(accountId, ANSWER_PRICE_USD).catch(() => {});
-      await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "Internal error" }) }).catch(() => {});
-    }
-  });
+  // Debit succeeded — from here on, any failure must refund it.
+  const base = getRail("base")!;
+  return runStream({ kind: "legacy", rail: base }, 0, balanceAfterDebit + ANSWER_PRICE_USD, () => creditBalance(accountId, ANSWER_PRICE_USD));
 });
 
 // Public marketing signup — no internal-secret gate (reachable directly from
@@ -487,5 +460,7 @@ app.post("/v1/paid/answer", (c) => c.json({
   error: "direct_api_unavailable",
   message: "Direct x402 API access is paused during early access. Use the Qerin web app.",
 }, 503));
+
+registerWalletRoutes(app, requireInternalSecret);
 
 export default app;

@@ -1,71 +1,74 @@
 import { x402Client, x402HTTPClient, wrapFetchWithPayment } from "@x402/fetch";
-import { registerExactEvmScheme } from "@x402/evm/exact/client";
-import type { ClientEvmSigner } from "@x402/evm";
-import { getQerinAccount } from "./wallet.js";
-import { getNetwork } from "./networks.js";
+import { registerPayerScheme, type AgentPayer } from "./agentPayer.js";
 
 // A paid request includes an initial 402, a signature, settlement and a
 // second response. Three seconds routinely expired during settlement.
 const SOURCE_TIMEOUT_MS = 20_000;
 const MAX_SOURCE_USDC = 0.07;
 
+const EVM_TX_REGEX = /^0x[a-fA-F0-9]{64}$/;
+// Solana transaction signatures are base58-encoded 64-byte ed25519 signatures.
+const SOLANA_TX_REGEX = /^[1-9A-HJ-NP-Za-km-z]{64,96}$/;
+
 export interface PaidResult {
   content: unknown;
   sourceName: string;
   amountPaid: string;
   txHash: string | null;
+  /** CAIP-2 network the source settled on (x402 results only). */
+  network?: string;
   timestamp: string;
   /** True only when the x402 facilitator returned an on-chain settlement tx. */
   settlement: "x402" | "enrichment" | "telemetry";
 }
 
-// Lazily built on first paySource() call — the wallet and network config it
-// depends on both read process.env, which is only populated once a request
-// is being handled on Workers (see wallet.ts). `signer` is the user's own
-// agent wallet when they have one (see agentWallet.ts); Qerin's shared wallet
-// is only the fallback for balances funded before agent wallets existed.
-function getPaymentClient(expectedPriceUsd: string, signer: ClientEvmSigner = getQerinAccount()) {
+type QuotedOption = { scheme: string; network: string; asset?: string; amount?: string; maxAmountRequired?: string };
+
+function quotedAmount(option: QuotedOption): string {
+  return option.amount ?? option.maxAmountRequired ?? "";
+}
+
+// Built per call: the signer is the paying user's own wallet on the rail the
+// agent chose for this question, so no client is ever shared between users.
+function getPaymentClient(expectedPriceUsd: string, payer: AgentPayer) {
   const maxAtomic = BigInt(Math.round(Math.min(Number(expectedPriceUsd), MAX_SOURCE_USDC) * 1_000_000));
-  const network = getNetwork();
+  const { rail } = payer;
   let quotedAtomic: string | null = null;
   const client = new x402Client((_version, accepts) => {
     const allowed = accepts.filter((option) => {
-      const quoted = option as unknown as { network: string; asset?: string; amount?: string; maxAmountRequired?: string };
-      const amount = quoted.amount ?? quoted.maxAmountRequired ?? "";
+      const quoted = option as unknown as QuotedOption;
+      const amount = quotedAmount(quoted);
+      const networkMatches = quoted.network === rail.caip2 || (quoted.network === "base" && rail.caip2 === "eip155:8453");
       return option.scheme === "exact"
-        && (quoted.network === network.caip2 || (quoted.network === "base" && network.chainId === 8453))
-        && quoted.asset?.toLowerCase() === network.usdc?.toLowerCase()
+        && networkMatches
+        && quoted.asset?.toLowerCase() === rail.usdc.toLowerCase()
         && /^\d+$/.test(amount) && BigInt(amount) > 0n && BigInt(amount) <= maxAtomic;
     });
-    if (allowed.length === 0) throw new Error("Source payment is unavailable or exceeds its quoted price");
+    if (allowed.length === 0) throw new Error(`Source does not accept USDC on ${rail.name} within its quoted price`);
     const selected = allowed.sort((a, b) => {
-      const price = (item: typeof a) => BigInt((item as unknown as { amount?: string; maxAmountRequired?: string }).amount ?? (item as unknown as { maxAmountRequired?: string }).maxAmountRequired ?? "0");
+      const price = (item: typeof a) => BigInt(quotedAmount(item as unknown as QuotedOption) || "0");
       return price(a) < price(b) ? -1 : 1;
     })[0];
-    quotedAtomic = (selected as unknown as { amount?: string; maxAmountRequired?: string }).amount
-      ?? (selected as unknown as { maxAmountRequired?: string }).maxAmountRequired ?? null;
+    quotedAtomic = quotedAmount(selected as unknown as QuotedOption) || null;
     return selected;
   });
-  registerExactEvmScheme(client, { signer, networks: [network.caip2] });
+  registerPayerScheme(client, payer);
   return { fetchWithPayment: wrapFetchWithPayment(fetch, client), httpClient: new x402HTTPClient(client), getQuotedAtomic: () => quotedAtomic };
 }
 
-/**
- * USDC has 6 decimals on Base. SettleResponse.amount (when present) is in atomic units.
- */
+/** USDC has 6 decimals on every supported rail. */
 function formatUsdcAtomicAmount(atomic: string): string {
-  const value = Number(atomic) / 1_000_000;
-  return value.toString();
+  return (Number(atomic) / 1_000_000).toString();
 }
 
 export async function paySource(
   sourceName: string,
   url: string,
   expectedPriceUsd: string,
-  init: RequestInit = { method: "GET" },
-  signer?: ClientEvmSigner
+  payer: AgentPayer,
+  init: RequestInit = { method: "GET" }
 ): Promise<PaidResult> {
-  const { fetchWithPayment, httpClient, getQuotedAtomic } = getPaymentClient(expectedPriceUsd, signer);
+  const { fetchWithPayment, httpClient, getQuotedAtomic } = getPaymentClient(expectedPriceUsd, payer);
   const response = await fetchWithPayment(url, { ...init, signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS) });
 
   if (!response.ok) {
@@ -77,16 +80,15 @@ export async function paySource(
   // ledger, receipt registry, or customer-facing settlement UI.
   let txHash: string | null = null;
   let amountPaid = "0";
+  const txPattern = payer.rail.family === "evm" ? EVM_TX_REGEX : SOLANA_TX_REGEX;
   try {
-    const settleResponse = httpClient.getPaymentSettleResponse((name) =>
-      response.headers.get(name)
-    );
+    const settleResponse = httpClient.getPaymentSettleResponse((name) => response.headers.get(name));
     txHash = settleResponse.transaction ?? null;
-    if (!settleResponse.success || !txHash || !/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+    if (!settleResponse.success || !txHash || !txPattern.test(txHash)) {
       throw new Error("missing successful settlement transaction");
     }
-    if (settleResponse.network !== getNetwork().caip2) {
-      throw new Error("settlement network does not match the source payer");
+    if (settleResponse.network !== payer.rail.caip2) {
+      throw new Error("settlement network does not match the paying wallet");
     }
     amountPaid = settleResponse.amount
       ? formatUsdcAtomicAmount(settleResponse.amount)
@@ -108,6 +110,7 @@ export async function paySource(
     sourceName,
     amountPaid,
     txHash,
+    network: payer.rail.caip2,
     timestamp: new Date().toISOString(),
     settlement: "x402",
   };

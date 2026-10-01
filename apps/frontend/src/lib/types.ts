@@ -67,6 +67,9 @@ export interface AnswerData {
   network?: string;
   chainId?: number;
   deliveryId?: string;
-  /** Set when the sources were paid from the user's own agent wallet. */
-  paidFrom?: string;
+  /** Which wallet paid: the user's own Qerin wallet (personal) or legacy credit. */
+  paidFrom?: { address: string; rail: "base" | "solana"; railName: string; personal: boolean };
+  /** Sources + service fee actually charged to the user's Qerin wallet. */
+  totalCharged?: string;
+  serviceFee?: { amount: string; txHash: string | null; explorerUrl: string | null; status: "settled" | "owed" };
 }
