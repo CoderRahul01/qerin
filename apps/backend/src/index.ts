@@ -19,6 +19,7 @@ import { checkPolicy, getAgentState, QERIN_SERVICE_FEE_USD } from "./agentPolicy
 import { chooseAgentPayer, listQerinWallets } from "./qerinWallet.js";
 import { getRail } from "./rails.js";
 import { registerWalletRoutes } from "./walletRoutes.js";
+import { getWalletConfigReport } from "./walletConfig.js";
 import type { AgentPayer } from "./agentPayer.js";
 
 interface RateLimiterBinding {
@@ -103,6 +104,13 @@ function requireInternalSecret(c: { req: { header: (name: string) => string | un
   const internalSecret = process.env.QERIN_INTERNAL_SECRET;
   return Boolean(internalSecret) && c.req.header("x-qerin-internal-secret") === internalSecret;
 }
+
+// Whether Qerin wallets are fully configured — true/false per value, never
+// the values themselves.
+app.get("/v1/admin/wallet-config", async (c) => {
+  if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
+  return c.json(await getWalletConfigReport());
+});
 
 app.get("/v1/admin/analytics", async (c) => {
   if (!requireInternalSecret(c)) return c.json({ error: "Forbidden" }, 403);
