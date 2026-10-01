@@ -475,6 +475,15 @@ function mapOp(op: string): string {
 
 let _db: FirestoreClient | null = null;
 
+/**
+ * Test-only: swaps in an in-memory stand-in with the same surface, so the
+ * wallet, policy and intent logic can be exercised without a Firebase
+ * project. Never called by the Worker.
+ */
+export function __setDbForTests(db: unknown): void {
+  _db = db as FirestoreClient | null;
+}
+
 export function getDb(): FirestoreClient {
   if (!_db) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;

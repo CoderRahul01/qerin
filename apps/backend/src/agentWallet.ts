@@ -4,7 +4,7 @@ import type { ClientEvmSigner } from "@x402/evm";
 import { getCdpAuthHeaders, getCdpCredentials } from "./cdpAuth.js";
 import { normalizeAccountId } from "./accounts.js";
 import { getDb } from "./db.js";
-import { getNetwork } from "./networks.js";
+import { getRail } from "./rails.js";
 
 // Personal agent wallets: every connected user gets their own CDP-held EVM
 // account on Base, named after the wallet address they signed in with. The
@@ -17,7 +17,7 @@ import { getNetwork } from "./networks.js";
 // Wrangler's bundler). The wallet-auth JWT below is ported from the SDK's
 // generateWalletJwt.
 
-const CDP_HOST = "api.cdp.coinbase.com";
+export const CDP_HOST = "api.cdp.coinbase.com";
 const CDP_BASE_PATH = "/platform/v2/evm/accounts";
 const CDP_TIMEOUT_MS = 10_000;
 const USDC_DECIMALS = 1_000_000;
@@ -91,7 +91,7 @@ export async function generateWalletAuthJwt(
     .sign(key);
 }
 
-async function cdpRequest(
+export async function cdpRequest(
   method: "GET" | "POST",
   path: string,
   body?: Record<string, unknown>
@@ -166,9 +166,14 @@ export async function getOrCreateAgentWallet(ownerAddress: string): Promise<`0x$
   return address;
 }
 
-/** USDC held by an address on Base mainnet, or null when the RPC can't say. */
+/**
+ * USDC held by an address on the Base rail (mainnet or Sepolia, per
+ * QERIN_WALLET_ENV), or null when the RPC can't say. A plain eth_call against
+ * a public RPC: reading a balance never touches CDP or costs anything.
+ */
 export async function getBaseUsdcBalance(address: string): Promise<number | null> {
-  const base = getNetwork("mainnet");
+  const base = getRail("base");
+  if (!base) return null;
   try {
     const res = await fetch(base.rpcUrl, {
       method: "POST",

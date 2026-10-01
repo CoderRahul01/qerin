@@ -2,30 +2,43 @@
 # fill in real values — never commit `.dev.vars`. In production these are set
 # with `wrangler secret put <NAME>`, not committed anywhere.
 
-# EOA private key that pays real x402 sources on Base mainnet with real USDC.
-# Keep the balance small. Same key also receives developer payments to
-# /v1/paid/answer (payToConfig in src/index.ts uses this account's address).
-QERIN_WALLET_PRIVATE_KEY=0x...
+# ── Qerin wallets ───────────────────────────────────────────────────────────
+# Every user gets their own Qerin wallet on each rail (Base, Solana), held in
+# Coinbase CDP's key enclave. The user funds it from MetaMask / BO Wallet /
+# Coinbase Wallet / Phantom, and their Qerin agent pays sources and Qerin's
+# per-question fee from it. Qerin does NOT fund or front any shared wallet.
+#
+# "mainnet" = Base + Solana mainnet (real USDC)
+# "testnet" = Base Sepolia + Solana devnet (free test USDC). Switches all rails
+# together so a balance is never part real money, part test tokens.
+QERIN_WALLET_ENV=mainnet
 
-# Solana ed25519 keypair (base58-encoded 64-byte secret key), used only for
-# the Solana devnet deposit path in solana/topup.ts — see solana/wallet.ts.
-# Devnet-only for now; do not point QERIN_SOLANA_NETWORK at mainnet until
-# this has been exercised end-to-end with a real deposit.
-QERIN_SOLANA_WALLET_SECRET_KEY=
-QERIN_SOLANA_NETWORK=solana_devnet
+# Where the $0.08 per-question service fee is paid. Receive-only addresses —
+# they never need funding. A rail without a treasury can still be funded and
+# withdrawn from, but the agent won't run research on it.
+QERIN_TREASURY_ADDRESS=
+# Must already hold a USDC token account (receive any USDC there once).
+QERIN_SOLANA_TREASURY_ADDRESS=
 
-# CDP API key, used to authenticate with the CDP x402 facilitator on both the
-# buyer side (paying sources, via paidFetch.ts's facilitator sync) and the
-# seller side (accepting developer payments to /v1/paid/answer). Create at
-# https://portal.cdp.coinbase.com — no CDP_WALLET_SECRET needed since we pass
-# our own wallet address via payToConfig instead of provisioning a CDP wallet.
+# Optional: free Helius/QuickNode/Alchemy RPC URLs to lift public rate limits.
+QERIN_BASE_RPC_URL=
+QERIN_SOLANA_RPC_URL=
+# Set to "off" to hide Solana wallets on this deployment.
+QERIN_SOLANA_WALLETS=
+
+# Optional, legacy. Signs on-chain receipts on BOT Chain (tiny BOT gas, and
+# non-fatal if empty) and honors prepaid credit bought before personal
+# wallets existed. Research never depends on this wallet being funded.
+QERIN_WALLET_PRIVATE_KEY=
+
+# CDP API key (https://portal.cdp.coinbase.com). Authenticates the per-user
+# Qerin wallets and the x402 facilitator that settles fees and withdrawals.
 CDP_API_KEY_ID=
 CDP_API_KEY_SECRET=
 
-# CDP Wallet Secret. When set alongside the API key above, every connected
-# user gets their own CDP-held agent wallet on Base and their x402 source
-# payments are signed by it (see agentWallet.ts). Leave unset to keep paying
-# sources from QERIN_WALLET_PRIVATE_KEY.
+# CDP Wallet Secret. Required: with the API key above it creates and signs
+# for every user's Qerin wallet (agentWallet.ts, solana/agentWallet.ts), and
+# authenticates the x402 facilitator that settles payments gaslessly.
 CDP_WALLET_SECRET=
 
 # Free API key from https://build.nvidia.com (NVIDIA Developer Program, no
