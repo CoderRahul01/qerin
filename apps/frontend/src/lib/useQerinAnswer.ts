@@ -6,7 +6,8 @@ export type AskStatus = "idle" | "paying" | "done" | "error" | "insufficient_bal
 
 export type AskResult =
   | { ok: true; data: AnswerData }
-  | { ok: false; reason: "insufficient_balance"; required: number | null }
+  | { ok: false; reason: "insufficient_balance"; required: number | null; message?: string }
+  | { ok: false; reason: "agent_policy"; message: string }
   | { ok: false; reason: "error"; message: string };
 
 // Parses one Server-Sent Events frame (the part before a blank line) into
@@ -105,7 +106,11 @@ export function useQerinAnswer() {
         if (json?.error === "insufficient_balance") {
           setStatus("insufficient_balance");
           const required = typeof json.required === "number" ? json.required : null;
-          return { ok: false, reason: "insufficient_balance", required };
+          return { ok: false, reason: "insufficient_balance", required, message: typeof json.message === "string" ? json.message : undefined };
+        }
+        if (json?.error === "agent_paused" || json?.error === "per_query_limit" || json?.error === "daily_limit") {
+          setStatus("idle");
+          return { ok: false, reason: "agent_policy", message: String(json.message ?? "Your agent's spend limits blocked this question.") };
         }
         throw new Error(json?.message || json?.error || "Request failed");
       }

@@ -353,11 +353,11 @@ export function UserTransparencyModal({
             {/* Fuel Balance */}
             <div>
               <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.05em" }}>
-                Your Research Fuel Balance
+                Your Qerin Wallet
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                 <span style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-ibm-plex-mono), monospace", color: "#22c55e" }}>
-                  {balance === null || balance === undefined ? "Balance unavailable" : `$${balance.toFixed(2)} Fuel`}
+                  {balance === null || balance === undefined ? "Balance unavailable" : `$${balance.toFixed(2)} USDC`}
                 </span>
                 {onOpenTopup && (
                   <button
@@ -409,7 +409,7 @@ export function UserTransparencyModal({
             </div>
           </div>
 
-          <p style={{ margin: 0, color: "#94a3b8", fontSize: 12 }}>Source payments settle in USDC on Base. Your Qerin balance may be funded on Base or BOT Chain. Registry transactions appear only when a hash is available.</p>
+          <p style={{ margin: 0, color: "#94a3b8", fontSize: 12 }}>Your Qerin agent pays sources and the service fee in USDC from your own Qerin wallet on Base or Solana. Receipts are written on Base or BOT Chain. Registry transactions appear only when a hash is available.</p>
 
           {/* INDIVIDUAL SETTLEMENT HISTORY TABLE */}
           <div>

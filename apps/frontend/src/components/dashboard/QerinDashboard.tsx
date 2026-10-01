@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoLockup } from "@/components/LogoMark";
-import { TopupModal } from "@/components/TopupModal";
+import { QerinWalletModal, type WalletTab } from "@/components/QerinWalletModal";
 import { UserTransparencyModal } from "@/components/UserTransparencyModal";
 import { ProofCardModal } from "@/components/ProofCardModal";
 import { keccak256, toBytes } from "viem";
@@ -54,6 +54,9 @@ interface ReceiptData {
   registryTxHash?: string;
   registryContract?: string;
   chainId?: number;
+  /** The user's own Qerin wallet that paid, and Qerin's fee settlement from it. */
+  paidFrom?: AnswerData["paidFrom"];
+  serviceFee?: AnswerData["serviceFee"];
 }
 
 interface ChatThread {
@@ -134,6 +137,8 @@ function buildAnswerData(data: AnswerData): {
       registryTxHash: data.registryTxHash,
       registryContract: data.registryContract,
       chainId: data.chainId || (isBotChain ? 677 : 8453),
+      paidFrom: data.paidFrom,
+      serviceFee: data.serviceFee,
     };
   }
   return { content, receipt, rawReceipts: data.receipt, sourceCitations: paidSourceCitations };
@@ -151,9 +156,14 @@ function QerinAvatar({ size = 28 }: { size?: number }) {
   return <Image src="/qerin-mark-orange.png" alt="Qerin" width={size} height={size} style={{ flexShrink: 0, borderRadius: 6 }} />;
 }
 
+// Legacy flat price, still what prepaid credit (pre-Qerin-wallet) is charged.
 const ANSWER_PRICE_USD = 0.15;
-// Visual reference for a "full" bar — matches the recommended top-up tier
-// (see TIERS in TopupModal.tsx), not a real account cap.
+// A question from a Qerin wallet costs its sources (~$0.001–$0.03) plus the
+// $0.08 service fee. This is the typical cost, used for "~N left" estimates
+// and the low-balance gate — the backend enforces the real amount.
+const TYPICAL_QUESTION_USD = 0.09;
+const SERVICE_FEE_USD = 0.08;
+// Visual reference for a "full" bar (the $5 funding preset), not an account cap.
 const FUEL_METER_MAX_USD = 5;
 
 // Always-visible balance + real cumulative usage, replacing a bare "$X.XX"
@@ -172,16 +182,16 @@ function FuelMeter({
 }) {
   if (balance === null) return null;
 
-  const queriesLeft = Math.floor(balance / ANSWER_PRICE_USD);
+  const queriesLeft = Math.floor(balance / TYPICAL_QUESTION_USD);
   const pct = Math.max(4, Math.min(100, (balance / FUEL_METER_MAX_USD) * 100));
-  const level: "ok" | "low" | "empty" = balance < ANSWER_PRICE_USD ? "empty" : balance < 1 ? "low" : "ok";
+  const level: "ok" | "low" | "empty" = balance < TYPICAL_QUESTION_USD ? "empty" : balance < 1 ? "low" : "ok";
   const barColor = level === "empty" ? "#ef4444" : level === "low" ? "#eab308" : "#22c55e";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`$${balance.toFixed(2)} remaining · ~${queriesLeft} ${queriesLeft === 1 ? "query" : "queries"} left · $${usedTotal.toFixed(2)} used total · $${ANSWER_PRICE_USD.toFixed(2)}/query`}
+      title={`$${balance.toFixed(2)} remaining · ~${queriesLeft} ${queriesLeft === 1 ? "query" : "queries"} left · $${usedTotal.toFixed(2)} used total · $${SERVICE_FEE_USD.toFixed(2)} fee + sources per answer`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -206,7 +216,7 @@ function FuelMeter({
       </div>
       {!compact && (
         <div style={{ fontSize: 10, color: "var(--qd-muted2)", opacity: 0.75 }}>
-          ${usedTotal.toFixed(2)} used · ${ANSWER_PRICE_USD.toFixed(2)}/query
+          ${usedTotal.toFixed(2)} used · ~${TYPICAL_QUESTION_USD.toFixed(2)}/answer
         </div>
       )}
     </button>
@@ -421,16 +431,16 @@ function ReceiptCard({
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
           <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
-            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Query Cost (Your Fuel)</div>
+            <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>{receipt.paidFrom?.personal ? "Charged to Your Qerin Wallet" : "Query Cost"}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-              -${costDebited.toFixed(3)} Fuel
+              -${costDebited.toFixed(3)} USDC
             </div>
           </div>
 
           <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--qd-input-bg)", border: "1px solid var(--qd-receipt-border)" }}>
             <div style={{ fontSize: 10.5, color: "var(--qd-muted2)", fontWeight: 500, marginBottom: 2 }}>Your Remaining Balance</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "var(--qd-receipt-success)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>
-              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} Fuel` : "Balance unavailable"}
+              {typeof remainingBalance === "number" ? `$${remainingBalance.toFixed(2)} USDC` : "Balance unavailable"}
             </div>
           </div>
 
@@ -441,6 +451,20 @@ function ReceiptCard({
             </div>
           </div>
         </div>
+
+        {receipt.serviceFee && (
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6, fontSize: 11 }}>
+            <span style={{ color: "var(--qd-muted2)" }}>
+              Qerin service fee <strong style={{ color: "var(--qerin-text)", fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{receipt.serviceFee.amount} USDC</strong>
+              {receipt.paidFrom && <> · paid from your {receipt.paidFrom.railName} Qerin wallet</>}
+            </span>
+            {receipt.serviceFee.status === "settled" && receipt.serviceFee.explorerUrl ? (
+              <a href={receipt.serviceFee.explorerUrl} target="_blank" rel="noreferrer" style={{ color: "var(--qd-receipt-success)", fontWeight: 600, textDecoration: "none" }}>✓ Settled ↗</a>
+            ) : (
+              <span style={{ color: "var(--qd-muted2)", fontWeight: 600 }}>Collected with your next answer</span>
+            )}
+          </div>
+        )}
 
         {/* Cryptographic Question Hash Proof Tag */}
         <div style={{ marginTop: 8, paddingTop: 6, borderTop: "1px solid var(--qd-receipt-border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
@@ -872,6 +896,7 @@ export function QerinDashboard() {
   const [showProofModal, setShowProofModal] = useState(false);
   const [activeProofData, setActiveProofData] = useState<{ topic?: string; receipt?: ReceiptData; sourceCitations?: SourceCitation[] }>({});
   const [topupReason, setTopupReason] = useState<string | null>(null);
+  const [walletTab, setWalletTab] = useState<WalletTab>("fund");
   const [activePersona, setActivePersona] = useState<Record<string, PersonaType>>({});
   const [selectedNetwork, setSelectedNetwork] = useState<"base" | "botchain">("base");
   const [copyStatus, setCopyStatus] = useState<Record<string, string>>({});
@@ -1260,8 +1285,9 @@ export function QerinDashboard() {
       setConnectNudge((n) => n + 1);
       return;
     }
-    if (balance !== null && balance < ANSWER_PRICE_USD) {
-      setTopupReason("Your Agent Settlement Fuel is depleted. Fund your treasury to fuel autonomous research queries.");
+    if (balance !== null && balance < TYPICAL_QUESTION_USD) {
+      setTopupReason("Your Qerin wallet is empty. Fund it so your agent can pay for research.");
+      setWalletTab("fund");
       setShowTopup(true);
       return;
     }
@@ -1317,10 +1343,12 @@ export function QerinDashboard() {
         if (typeof result.data.balance === "number") setBalance(result.data.balance);
 
         const newTopic = result.data.topic || q.slice(0, 45);
-        // This is the user's Qerin query charge, not the agent's separate
-        // downstream x402 spend. Keeping them distinct makes the fuel ledger
-        // reconcile with the account balance.
-        const costDebited = result.data.paidFrom ? Number(result.data.totalPaid) || 0 : ANSWER_PRICE_USD;
+        // What actually left the user's Qerin wallet (sources + fee), so the
+        // usage ledger reconciles with the on-chain balance. Legacy prepaid
+        // credit is still charged the flat price.
+        const costDebited = result.data.paidFrom?.personal
+          ? Number(result.data.totalCharged ?? result.data.totalPaid) || 0
+          : ANSWER_PRICE_USD;
 
         updateThread(threadId, t => ({
           ...t,
@@ -1351,7 +1379,15 @@ export function QerinDashboard() {
           }),
         }));
       } else if (result.reason === "insufficient_balance") {
-        setTopupReason("Your Agent Settlement Fuel ran out while settling data source micropayments.");
+        setTopupReason(result.message ?? "Fund your Qerin wallet so your agent can pay for research.");
+        setWalletTab("fund");
+        setShowTopup(true);
+        updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking") }));
+      } else if (result.reason === "agent_policy") {
+        // The user's own spend policy stopped the agent before anything was
+        // spent — send them straight to the limits they control.
+        setTopupReason(result.message);
+        setWalletTab("limits");
         setShowTopup(true);
         updateThread(threadId, t => ({ ...t, messages: t.messages.filter(m => m.role !== "thinking") }));
       } else {
@@ -1566,7 +1602,7 @@ export function QerinDashboard() {
               made both overlap illegibly on narrower sidebars. */}
           {balance !== null && (
             <div
-              onClick={() => { setTopupReason(null); setShowTopup(true); }}
+              onClick={() => { setTopupReason(null); setWalletTab("fund"); setShowTopup(true); }}
               style={{ padding: "10px 12px", borderTop: "1px solid var(--qd-sidebar-border)", cursor: "pointer" }}
             >
               <FuelMeter balance={balance} usedTotal={totalUsed} compact />
@@ -1589,7 +1625,7 @@ export function QerinDashboard() {
               )}
             </div>
           )}
-          <div className="qd-user-bar" onClick={() => { setTopupReason(null); setShowTopup(true); }}>
+          <div className="qd-user-bar" onClick={() => { setTopupReason(null); setWalletTab("fund"); setShowTopup(true); }}>
             <div style={{ position: "relative" }}>
               <Avatar letter={connectedWallet ? "W" : "U"} size={30} />
               <div
@@ -1726,7 +1762,7 @@ export function QerinDashboard() {
                   <FuelMeter
                     balance={balance}
                     usedTotal={totalUsed}
-                    onClick={() => { setTopupReason(null); setShowTopup(true); }}
+                    onClick={() => { setTopupReason(null); setWalletTab("fund"); setShowTopup(true); }}
                     compact
                   />
                 </div>
@@ -1886,13 +1922,13 @@ export function QerinDashboard() {
                   Ask anything to pay & retrieve verified live data
                 </div>
                 <div style={{ fontSize: 13.5, color: "var(--qd-muted2)", maxWidth: 440, lineHeight: 1.6 }}>
-                  Decentralized research engine with per-query on-chain micropayments on Base &amp; BOT Chain.
+                  Your own Qerin agent pays for verified sources from your Qerin wallet on Base &amp; Solana, with on-chain receipts.
                 </div>
 
-                {(balance === null || balance < ANSWER_PRICE_USD) && (
+                {(balance === null || balance < TYPICAL_QUESTION_USD) && (
                   <button
                     type="button"
-                    onClick={() => setShowTopup(true)}
+                    onClick={() => { setTopupReason(null); setWalletTab("fund"); setShowTopup(true); }}
                     className="qd-glass-btn"
                     style={{
                       cursor: "pointer",
@@ -1910,7 +1946,7 @@ export function QerinDashboard() {
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <span>⚡ Fund your Qerin balance to start research</span>
+                    <span>⚡ Fund your Qerin wallet to start research</span>
                     <span style={{ fontSize: 14 }}>→</span>
                   </button>
                 )}
@@ -2216,9 +2252,9 @@ export function QerinDashboard() {
             <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11.5, color: "var(--qd-muted2)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1" /><path d="M4 4V3a2 2 0 0 1 4 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg>
-                <span>Settling via <strong>{selectedNetwork === "base" ? "Base (USDC)" : "BOT Chain (BOT/USDT)"}</strong></span>
+                <span>Paid from your Qerin wallet · receipt on <strong>{selectedNetwork === "base" ? "Base" : "BOT Chain"}</strong></span>
               </div>
-              <span>${ANSWER_PRICE_USD.toFixed(2)} / answer</span>
+              <span>${SERVICE_FEE_USD.toFixed(2)} fee + sources</span>
             </div>
           </div>
 
@@ -2253,20 +2289,16 @@ export function QerinDashboard() {
       </div>
 
       {showTopup && accountId && (
-        <TopupModal
+        <QerinWalletModal
           accountId={accountId}
-          initialNetwork={selectedNetwork}
+          connectedWallet={connectedWallet}
           reason={topupReason}
+          initialTab={walletTab}
           onClose={() => {
             setShowTopup(false);
             if (accountId) fetchBalance(accountId).then(setBalance).catch(() => {});
           }}
-          onCredited={(b) => setBalance(b)}
-          onAccountCreated={(id, b) => {
-            setAccountId(id);
-            setBalance(b);
-            if (id.startsWith("0x")) setConnectedWallet(id);
-          }}
+          onBalance={(b) => setBalance(b)}
         />
       )}
 
@@ -2279,6 +2311,7 @@ export function QerinDashboard() {
         onOpenTopup={() => {
           setShowTransparencyModal(false);
           setTopupReason(null);
+          setWalletTab("fund");
           setShowTopup(true);
         }}
         activeNetwork={selectedNetwork}
