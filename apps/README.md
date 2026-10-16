@@ -2,15 +2,14 @@
 
 Two independently deployed packages, per `02-stack-decision.md` / `07-deployment.md`.
 
-## `backend/` — Node/Express, TypeScript
+## `backend/` — High-Performance Rust (Axum, Tokio, Alloy/k256)
 
-The orchestrator: accepts a question, pays real x402 sources in USDC on **Base mainnet**, synthesizes
-an answer via an open-weight model on NVIDIA NIM, returns the answer plus an itemized on-chain receipt.
+The orchestrator: accepts research queries, executes autonomous source procurement (free arXiv preprints + x402 paid micro-sources across **Arbitrum One**, **Base mainnet**, **BOT Chain**, and **Solana**), synthesizes answers via NVIDIA NIM Llama 3.3, and returns verifiable cryptographic receipts.
 
-```
+```bash
 cd apps/backend
-cp .env.example .env   # fill in NVIDIA_API_KEY; a wallet key is already generated (see below)
-npm run dev             # http://localhost:3001
+cargo run             # starts high-performance server on http://localhost:8787
+cargo test            # runs unit, integration, and live RPC chain test suite
 ```
 
 Env vars (`.env`, gitignored):

@@ -1,5 +1,5 @@
-node_modules
-dist
+/target
 .env
 .dev.vars
-.wrangler
+**/*.rs.bk
+*.log
