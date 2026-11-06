@@ -291,9 +291,13 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
           <>
             <section className="qw-summary">
               <div>
-                <div className="qw-label">Balance</div>
-                <div className="qw-total">{usd(view.totalUsdc)} <span>USDC</span></div>
-                {view.legacyCredit > 0 && <div className="qw-hint">+ {usd(view.legacyCredit)} prepaid credit</div>}
+                <div className="qw-label">Total Balance</div>
+                <div className="qw-total">{usd(view.totalUsdc + view.legacyCredit)}</div>
+                {view.legacyCredit > 0 && view.totalUsdc > 0 && (
+                  <div className="qw-hint">
+                    ({usd(view.totalUsdc)} on-chain + {usd(view.legacyCredit)} credit)
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: "right" }}>
                 <span className={`qw-status ${view.policy.paused ? "is-paused" : ""}`}>
@@ -307,13 +311,18 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
             </section>
 
             <div className="qw-rails">
-              {view.wallets.map((w) => (
-                <button key={w.rail} type="button" className={`qw-rail ${active?.rail === w.rail ? "is-active" : ""}`} onClick={() => w.address && setRail(w.rail)} disabled={!w.address}>
-                  <RailBadge rail={w.rail} name={w.name} />
-                  <span className="qw-rail-amount">{w.usdc === null ? "-" : usd(w.usdc)}</span>
-                  {!w.researchReady && w.address && <span className="qw-hint">Funding only</span>}
-                </button>
-              ))}
+              {view.wallets.map((w) => {
+                const railBal = w.rail === "botchain" && view.legacyCredit > 0
+                  ? (w.usdc ?? 0) + view.legacyCredit
+                  : w.usdc ?? 0;
+                return (
+                  <button key={w.rail} type="button" className={`qw-rail ${active?.rail === w.rail ? "is-active" : ""}`} onClick={() => w.address && setRail(w.rail)} disabled={!w.address}>
+                    <RailBadge rail={w.rail} name={w.name} />
+                    <span className="qw-rail-amount">{usd(railBal)}</span>
+                    {!w.researchReady && w.address && <span className="qw-hint">Funding only</span>}
+                  </button>
+                );
+              })}
             </div>
 
             <nav className="qw-tabs" role="tablist">
@@ -360,7 +369,11 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
                       disabled={Boolean(busy)}
                       style={{ background: "linear-gradient(135deg, #10B981 0%, #059669 100%)", boxShadow: "0 6px 20px rgba(16,185,129,0.35)" }}
                     >
-                      {busy === "fund-bot" ? "Confirm in your wallet…" : `Fund ${amount ? usd(Number(amount) || 0) : ""} on BOT Chain`}
+                      {busy === "fund-bot"
+                        ? "Confirm in your wallet…"
+                        : botMethod === "bot"
+                        ? `Fund ≈ ${(Number(amount) / Math.max(botPrice, 0.01)).toFixed(3)} BOT (${usd(Number(amount) || 0)})`
+                        : `Fund ${usd(Number(amount) || 0)} USDT on BOT Chain`}
                     </button>
                     <p className="qw-hint">
                       Sends {botMethod === "usdt" ? "USDT" : "BOT"} on BOT Chain Mainnet from BO Wallet, MetaMask or OKX. Gas fees on BOT Chain are ultra-low (~$0.00008). Instant on-chain confirmation.

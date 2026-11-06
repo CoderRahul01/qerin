@@ -1112,10 +1112,12 @@ export function QerinDashboard() {
       const hex = typeof chainId === "string" ? chainId.toLowerCase() : "";
       if (hex === "0x2a5" || Number(hex) === 677) {
         setSelectedNetwork("botchain");
+      } else if (hex === "0x2105" || Number(hex) === 8453) {
+        setSelectedNetwork("base");
       }
     };
 
-    const ethereum = typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined;
+    const ethereum = getInjectedProvider() ?? (typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined);
     if (ethereum?.on) {
       ethereum.on("accountsChanged", handleAccountsChanged);
       ethereum.on("chainChanged", handleChainChanged);
@@ -1126,6 +1128,8 @@ export function QerinDashboard() {
         const hex = typeof cid === "string" ? cid.toLowerCase() : "";
         if (hex === "0x2a5" || Number(hex) === 677) {
           setSelectedNetwork("botchain");
+        } else if (hex === "0x2105" || Number(hex) === 8453) {
+          setSelectedNetwork("base");
         }
       }).catch(() => {});
     }
@@ -1274,7 +1278,7 @@ export function QerinDashboard() {
   };
 
   const addBotChainToWallet = async () => {
-    const ethereum = typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined;
+    const ethereum = getInjectedProvider() ?? (typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined);
     if (ethereum) {
       try {
         await ethereum.request({

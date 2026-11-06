@@ -182,12 +182,13 @@ const ERC20_TRANSFER_ABI = [{
  */
 export async function ensureBotChain(provider: EthereumProvider): Promise<void> {
   const chain = BOT_CHAINS.mainnet;
-  const current = await provider.request({ method: "eth_chainId" });
-  if (typeof current === "string" && current.toLowerCase() === chain.chainIdHex.toLowerCase()) return;
+  try {
+    const current = await provider.request({ method: "eth_chainId" });
+    if (typeof current === "string" && (current.toLowerCase() === chain.chainIdHex.toLowerCase() || Number(current) === 677)) return;
+  } catch {}
   try {
     await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chain.chainIdHex }] });
-  } catch (err) {
-    if ((err as { code?: number })?.code !== 4902) throw err;
+  } catch {
     await provider.request({
       method: "wallet_addEthereumChain",
       params: [{
@@ -308,7 +309,7 @@ export function solanaPayUrl(qerinSolanaAddress: string, amountUsd: number, env:
 export async function waitForDeposit(
   accountId: string,
   previousTotal: number,
-  { timeoutMs = 120_000, intervalMs = 4_000, signal }: { timeoutMs?: number; intervalMs?: number; signal?: AbortSignal } = {}
+  { timeoutMs = 120_000, intervalMs = 2_500, signal }: { timeoutMs?: number; intervalMs?: number; signal?: AbortSignal } = {}
 ): Promise<QerinWalletView | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline && !signal?.aborted) {
