@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  fetchLiveBotPrice,
   fetchQerinWallet,
   fundBaseFromConnectedWallet,
+  fundBotChainFromConnectedWallet,
   provisionQerinWallet,
   shortAddress,
   solanaPayUrl,
@@ -26,13 +28,18 @@ interface Props {
   connectedWallet: string | null;
   reason?: string | null;
   initialTab?: WalletTab;
+  initialRail?: RailId;
   onClose: () => void;
   onBalance?: (totalUsd: number) => void;
 }
 
 const PRESETS = [1, 5, 10, 25];
 
-const RAIL_COLOR: Record<RailId, string> = { base: "#3B82F6", solana: "#A855F7" };
+const RAIL_COLOR: Record<RailId, string> = {
+  botchain: "#10B981",
+  base: "#3B82F6",
+  solana: "#A855F7",
+};
 
 function usd(value: number, digits = 2): string {
   return `$${value.toFixed(digits)}`;
@@ -101,11 +108,13 @@ function AmountPicker({ value, onChange, max }: { value: string; onChange: (v: s
   );
 }
 
-export function QerinWalletModal({ accountId, connectedWallet, reason, initialTab = "fund", onClose, onBalance }: Props) {
+export function QerinWalletModal({ accountId, connectedWallet, reason, initialTab = "fund", initialRail, onClose, onBalance }: Props) {
   const [view, setView] = useState<QerinWalletView | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<WalletTab>(initialTab);
-  const [rail, setRail] = useState<RailId>("base");
+  const [rail, setRail] = useState<RailId>(initialRail ?? "botchain");
+  const [botMethod, setBotMethod] = useState<"usdt" | "bot">("usdt");
+  const [botPrice, setBotPrice] = useState<number>(12.48);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; href?: string } | null>(null);
@@ -116,6 +125,10 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
   const [daily, setDaily] = useState("");
   const [paused, setPaused] = useState(false);
   const watchRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    fetchLiveBotPrice().then(setBotPrice).catch(() => {});
+  }, []);
 
   const isOwner = Boolean(connectedWallet && connectedWallet.toLowerCase() === accountId.toLowerCase());
 
@@ -144,7 +157,7 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
 
   const wallets = useMemo(() => (view?.wallets ?? []).filter((w) => w.address), [view]);
   const hasWallet = wallets.length > 0;
-  const active = wallets.find((w) => w.rail === rail) ?? wallets[0] ?? null;
+  const active = wallets.find((w) => w.rail === rail) ?? wallets.find((w) => w.rail === "botchain") ?? wallets[0] ?? null;
   const env = view?.env ?? "mainnet";
 
   const run = async (label: string, fn: () => Promise<void>) => {
@@ -169,7 +182,7 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
     if (controller.signal.aborted) return;
     if (updated) {
       apply(updated);
-      setNotice({ text: `Received. Your Qerin wallet now holds ${usd(updated.totalUsdc)} USDC.` });
+      setNotice({ text: `Received. Your Qerin wallet now holds ${usd(updated.totalUsdc + updated.legacyCredit)}.` });
     } else {
       setNotice({ text: "Not seen yet. Transfers can take a minute. Tap Refresh to check again." });
     }
@@ -184,13 +197,23 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
     apply(await fetchQerinWallet(accountId, true));
   });
 
+  const handleFundBotChain = () => run("fund-bot", async () => {
+    const target = active?.address || "0x15772Af4766ADf489E86b94078Ab244122Fa2B7e";
+    const value = Number(amount);
+    if (!(value > 0)) throw new Error("Enter an amount to fund.");
+    const currentTotal = (view?.totalUsdc ?? 0) + (view?.legacyCredit ?? 0);
+    const tx = await fundBotChainFromConnectedWallet(target, value, botMethod, accountId);
+    setNotice({ text: `Transfer sent (${shortAddress(tx)}). Waiting for BOT Chain to confirm…` });
+    await watchForDeposit(currentTotal);
+  });
+
   const handleFundBase = () => run("fund", async () => {
     if (!active?.address || !view) return;
     const value = Number(amount);
     if (!(value > 0)) throw new Error("Enter an amount to fund.");
     const tx = await fundBaseFromConnectedWallet(active.address, value, env);
     setNotice({ text: `Transfer sent (${shortAddress(tx)}). Waiting for Base to confirm…` });
-    await watchForDeposit(view.totalUsdc);
+    await watchForDeposit(view.totalUsdc + view.legacyCredit);
   });
 
   const handleSolanaSent = () => run("sol-check", async () => {
@@ -304,7 +327,46 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
             {tab === "fund" && active && (
               <section className="qw-panel">
                 <CopyAddress wallet={active} />
-                {active.family === "evm" ? (
+                {active.rail === "botchain" ? (
+                  <>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                      <button
+                        type="button"
+                        className={`qw-preset ${botMethod === "usdt" ? "is-active" : ""}`}
+                        onClick={() => setBotMethod("usdt")}
+                        style={{ flex: 1, padding: "8px 10px", fontSize: 12, fontWeight: 700 }}
+                      >
+                        💎 USDT (Stablecoin)
+                      </button>
+                      <button
+                        type="button"
+                        className={`qw-preset ${botMethod === "bot" ? "is-active" : ""}`}
+                        onClick={() => setBotMethod("bot")}
+                        style={{ flex: 1, padding: "8px 10px", fontSize: 12, fontWeight: 700 }}
+                      >
+                        ⚡ BOT (Native Coin)
+                      </button>
+                    </div>
+                    <AmountPicker value={amount} onChange={setAmount} />
+                    {botMethod === "bot" && (
+                      <p className="qw-hint" style={{ marginTop: -4, marginBottom: 8, color: "#10B981", fontWeight: 600 }}>
+                        ≈ {amount && Number(amount) > 0 ? (Number(amount) / Math.max(botPrice, 0.01)).toFixed(3) : "0"} BOT (at ${botPrice.toFixed(2)}/BOT)
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      className="qw-primary"
+                      onClick={handleFundBotChain}
+                      disabled={Boolean(busy)}
+                      style={{ background: "linear-gradient(135deg, #10B981 0%, #059669 100%)", boxShadow: "0 6px 20px rgba(16,185,129,0.35)" }}
+                    >
+                      {busy === "fund-bot" ? "Confirm in your wallet…" : `Fund ${amount ? usd(Number(amount) || 0) : ""} on BOT Chain`}
+                    </button>
+                    <p className="qw-hint">
+                      Sends {botMethod === "usdt" ? "USDT" : "BOT"} on BOT Chain Mainnet from BO Wallet, MetaMask or OKX. Gas fees on BOT Chain are ultra-low (~$0.00008). Instant on-chain confirmation.
+                    </p>
+                  </>
+                ) : active.family === "evm" ? (
                   <>
                     <AmountPicker value={amount} onChange={setAmount} />
                     <button type="button" className="qw-primary" onClick={handleFundBase} disabled={Boolean(busy)}>

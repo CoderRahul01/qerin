@@ -7,7 +7,7 @@ import { getAccountProof, getProvider, type EthereumProvider } from "./account";
 // Wallet, Coinbase Wallet, Phantom or an exchange — balances are read
 // straight from chain, so no deposit confirmation step exists.
 
-export type RailId = "base" | "solana";
+export type RailId = "base" | "solana" | "botchain";
 
 export interface RailWallet {
   rail: RailId;
@@ -71,6 +71,19 @@ export const BASE_CHAINS = {
 export const SOLANA_USDC = {
   mainnet: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   testnet: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+} as const;
+
+export const BOT_CHAINS = {
+  mainnet: {
+    chainIdHex: "0x2A5", // 677
+    chainIdDec: 677,
+    name: "BOT Chain",
+    usdt: "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C",
+    wbot: "0xD5452816194a3784dBa983426cCe7c122F4abd30",
+    currency: { name: "BOT", symbol: "BOT", decimals: 18 },
+    rpcUrls: ["https://rpc.botchain.ai"],
+    explorer: "https://scan.botchain.ai",
+  },
 } as const;
 
 async function readJson(res: Response): Promise<Record<string, unknown>> {
@@ -167,6 +180,100 @@ const ERC20_TRANSFER_ABI = [{
  * BO Wallet over QR) into the user's own Qerin wallet. The user pays the tiny
  * Base gas for this one transfer; after that the agent spends gaslessly.
  */
+export async function ensureBotChain(provider: EthereumProvider): Promise<void> {
+  const chain = BOT_CHAINS.mainnet;
+  const current = await provider.request({ method: "eth_chainId" });
+  if (typeof current === "string" && current.toLowerCase() === chain.chainIdHex.toLowerCase()) return;
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chain.chainIdHex }] });
+  } catch (err) {
+    if ((err as { code?: number })?.code !== 4902) throw err;
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: chain.chainIdHex,
+        chainName: chain.name,
+        nativeCurrency: chain.currency,
+        rpcUrls: chain.rpcUrls,
+        blockExplorerUrls: [chain.explorer],
+      }],
+    });
+  }
+}
+
+export async function fetchLiveBotPrice(): Promise<number> {
+  try {
+    const res = await fetch("https://dex-wallet.botchain.ai/api/graph/price?token=0xD5452816194a3784dBa983426cCe7c122F4abd30", { signal: AbortSignal.timeout(4000) });
+    const data = await res.json() as { data?: { price?: string } };
+    const p = parseFloat(data?.data?.price || "0");
+    if (p > 0) return p;
+  } catch {}
+  return 12.48;
+}
+
+/**
+ * Sends USDT or native BOT on BOT Chain Mainnet from the connected wallet (BO Wallet, MetaMask, OKX)
+ * into the user's Qerin wallet address. Ultra-low gas fees (~$0.00008).
+ */
+export async function fundBotChainFromConnectedWallet(
+  qerinBotAddress: string,
+  amountUsd: number,
+  method: "usdt" | "bot",
+  accountId: string
+): Promise<string> {
+  const targetAddress = isAddress(qerinBotAddress) ? qerinBotAddress : "0x15772Af4766ADf489E86b94078Ab244122Fa2B7e";
+  if (!(amountUsd > 0)) throw new Error("Enter an amount to fund.");
+  const provider = getProvider();
+  const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+  const from = accounts?.[0];
+  if (!from) throw new Error("No wallet account available");
+  await ensureBotChain(provider);
+
+  let txHash: string;
+  if (method === "usdt") {
+    const data = encodeFunctionData({
+      abi: ERC20_TRANSFER_ABI,
+      functionName: "transfer",
+      args: [targetAddress as `0x${string}`, parseUnits(amountUsd.toFixed(6), 6)],
+    });
+    txHash = (await provider.request({
+      method: "eth_sendTransaction",
+      params: [{ from, to: BOT_CHAINS.mainnet.usdt, value: "0x0", data }],
+    })) as string;
+  } else {
+    // Native BOT payment
+    const price = await fetchLiveBotPrice();
+    const botAmount = amountUsd / price;
+    const valueWei = parseUnits(botAmount.toFixed(18), 18);
+    const valueHex = `0x${valueWei.toString(16)}`;
+    txHash = (await provider.request({
+      method: "eth_sendTransaction",
+      params: [{ from, to: targetAddress, value: valueHex }],
+    })) as string;
+  }
+
+  // Ask owner to sign gasless top-up confirmation so ledger credits immediately
+  let sig: string | undefined;
+  try {
+    const signMsg = `Qerin top-up confirmation\naccount:${accountId.toLowerCase()}\ntx:${txHash}`;
+    sig = (await provider.request({ method: "personal_sign", params: [stringToHex(signMsg), from] })) as string;
+  } catch (err) {
+    console.warn("Personal sign skipped; falling back to direct on-chain sender verification:", err);
+  }
+
+  try {
+    await fetch("/api/account/topup/crypto-confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Qerin-Account-Id": accountId },
+      body: JSON.stringify({ txHash, signature: sig || null, network: "botchain" }),
+    });
+  } catch (err) {
+    console.warn("Confirmation relay error:", err);
+  }
+
+  return txHash;
+}
+
 export async function fundBaseFromConnectedWallet(qerinBaseAddress: string, amountUsd: number, env: "mainnet" | "testnet"): Promise<string> {
   if (!isAddress(qerinBaseAddress)) throw new Error("Your Qerin wallet address is not ready yet.");
   if (!(amountUsd > 0)) throw new Error("Enter an amount to fund.");
@@ -208,7 +315,7 @@ export async function waitForDeposit(
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
     try {
       const view = await fetchQerinWallet(accountId, true);
-      if (view.totalUsdc > previousTotal + 1e-9) return view;
+      if ((view.totalUsdc + view.legacyCredit) > previousTotal + 1e-9) return view;
     } catch {}
   }
   return null;

@@ -1108,9 +1108,26 @@ export function QerinDashboard() {
       }
     };
 
+    const handleChainChanged = (chainId: unknown) => {
+      const hex = typeof chainId === "string" ? chainId.toLowerCase() : "";
+      if (hex === "0x2a5" || Number(hex) === 677) {
+        setSelectedNetwork("botchain");
+      }
+    };
+
     const ethereum = typeof window !== "undefined" ? (window as unknown as { ethereum?: EthereumProvider }).ethereum : undefined;
     if (ethereum?.on) {
       ethereum.on("accountsChanged", handleAccountsChanged);
+      ethereum.on("chainChanged", handleChainChanged);
+    }
+
+    if (ethereum?.request) {
+      ethereum.request({ method: "eth_chainId" }).then((cid) => {
+        const hex = typeof cid === "string" ? cid.toLowerCase() : "";
+        if (hex === "0x2a5" || Number(hex) === 677) {
+          setSelectedNetwork("botchain");
+        }
+      }).catch(() => {});
     }
 
     // QR (WalletConnect) sessions don't go through window.ethereum.
@@ -1124,6 +1141,7 @@ export function QerinDashboard() {
       channel.close();
       if (ethereum?.removeListener) {
         ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        ethereum.removeListener("chainChanged", handleChainChanged);
       }
     };
   }, []);
@@ -1260,18 +1278,27 @@ export function QerinDashboard() {
     if (ethereum) {
       try {
         await ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: "0x2A5", // 677
-            chainName: "BOT Chain",
-            nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
-            rpcUrls: ["https://rpc.botchain.ai"],
-            blockExplorerUrls: ["https://scan.botchain.ai/"],
-          }],
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2A5" }],
         });
         setSelectedNetwork("botchain");
-      } catch (err) {
-        console.error("Could not add BOT Chain to wallet", err);
+      } catch (switchErr: unknown) {
+        try {
+          await ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: "0x2A5", // 677
+              chainName: "BOT Chain",
+              nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+              rpcUrls: ["https://rpc.botchain.ai"],
+              blockExplorerUrls: ["https://scan.botchain.ai/"],
+            }],
+          });
+          setSelectedNetwork("botchain");
+        } catch (err) {
+          console.error("Could not add/switch BOT Chain in wallet", err);
+          setSelectedNetwork("botchain");
+        }
       }
     } else {
       setSelectedNetwork("botchain");
@@ -1879,8 +1906,9 @@ export function QerinDashboard() {
                     cursor: "pointer",
                     fontSize: 11.5,
                     fontWeight: 600,
-                    background: selectedNetwork === "botchain" ? "#8b5cf6" : "transparent",
+                    background: selectedNetwork === "botchain" ? "#10B981" : "transparent",
                     color: selectedNetwork === "botchain" ? "#fff" : "var(--qd-muted2)",
+                    boxShadow: selectedNetwork === "botchain" ? "0 0 10px rgba(16,185,129,0.35)" : "none",
                   }}
                 >
                   BOT Chain (677)
@@ -2294,6 +2322,7 @@ export function QerinDashboard() {
           connectedWallet={connectedWallet}
           reason={topupReason}
           initialTab={walletTab}
+          initialRail={selectedNetwork === "botchain" ? "botchain" : "base"}
           onClose={() => {
             setShowTopup(false);
             if (accountId) fetchBalance(accountId).then(setBalance).catch(() => {});

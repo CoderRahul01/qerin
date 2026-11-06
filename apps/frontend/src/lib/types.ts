@@ -68,7 +68,7 @@ export interface AnswerData {
   chainId?: number;
   deliveryId?: string;
   /** Which wallet paid: the user's own Qerin wallet (personal) or legacy credit. */
-  paidFrom?: { address: string; rail: "base" | "solana"; railName: string; personal: boolean };
+  paidFrom?: { address: string; rail: "base" | "solana" | "botchain"; railName: string; personal: boolean };
   /** Sources + service fee actually charged to the user's Qerin wallet. */
   totalCharged?: string;
   serviceFee?: { amount: string; txHash: string | null; explorerUrl: string | null; status: "settled" | "owed" };

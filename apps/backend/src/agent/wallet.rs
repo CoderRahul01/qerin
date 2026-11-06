@@ -24,7 +24,7 @@ pub struct RailWalletView {
 pub async fn read_wallet_balance(rail_id: RailId, wallet_address: &str) -> Option<f64> {
     let rail = get_rail(rail_id.as_str())?;
     match rail_id {
-        RailId::Base | RailId::Arbitrum => {
+        RailId::Base | RailId::Arbitrum | RailId::Botchain => {
             get_usdc_balance(&rail.rpc_url, &rail.usdc, wallet_address).await
         }
         RailId::Solana => {

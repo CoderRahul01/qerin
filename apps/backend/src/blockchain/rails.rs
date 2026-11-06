@@ -9,6 +9,7 @@ pub enum RailId {
     Base,
     Arbitrum,
     Solana,
+    Botchain,
 }
 
 impl RailId {
@@ -17,6 +18,7 @@ impl RailId {
             RailId::Base => "base",
             RailId::Arbitrum => "arbitrum",
             RailId::Solana => "solana",
+            RailId::Botchain => "botchain",
         }
     }
 }
@@ -163,9 +165,24 @@ pub fn solana_rail(env: WalletEnv) -> PaymentRail {
     }
 }
 
+pub fn botchain_rail(_env: WalletEnv) -> PaymentRail {
+    PaymentRail {
+        id: RailId::Botchain,
+        family: RailFamily::Evm,
+        name: "BOT Chain".to_string(),
+        caip2: "eip155:677".to_string(),
+        cdp_network: "botchain".to_string(),
+        usdc: "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C".to_string(),
+        rpc_url: std::env::var("QERIN_BOTCHAIN_RPC_URL").unwrap_or_else(|_| "https://rpc.botchain.ai".to_string()),
+        testnet: false,
+        explorer_tx_base: "https://scan.botchain.ai/tx".to_string(),
+        explorer_address_base: "https://scan.botchain.ai/address".to_string(),
+    }
+}
+
 pub fn get_rails() -> Vec<PaymentRail> {
     let env = get_wallet_env();
-    let mut rails = vec![base_rail(env)];
+    let mut rails = vec![botchain_rail(env), base_rail(env)];
     if std::env::var("QERIN_ARBITRUM_WALLETS").as_deref() == Ok("on")
         || std::env::var("QERIN_NETWORK").as_deref() == Ok("arbitrum")
         || std::env::var("QERIN_NETWORK").as_deref() == Ok("arbitrum_sepolia")
