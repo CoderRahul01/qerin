@@ -113,7 +113,7 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<WalletTab>(initialTab);
   const [rail, setRail] = useState<RailId>(initialRail ?? "botchain");
-  const [botMethod, setBotMethod] = useState<"usdt" | "bot">("usdt");
+  const [botMethod, setBotMethod] = useState<"usdt" | "bot">("bot");
   const [botPrice, setBotPrice] = useState<number>(12.48);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +157,18 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
 
   const wallets = useMemo(() => (view?.wallets ?? []).filter((w) => w.address), [view]);
   const hasWallet = wallets.length > 0;
+  const fallbackBotWallet = useMemo(() => ({
+    rail: "botchain" as const,
+    name: "BOT Chain",
+    family: "evm" as const,
+    testnet: false,
+    address: "0x15772Af4766ADf489E86b94078Ab244122Fa2B7e",
+    usdc: null,
+    explorerUrl: "https://scan.botchain.ai/address/0x15772Af4766ADf489E86b94078Ab244122Fa2B7e",
+    researchReady: true,
+  }), []);
   const active = wallets.find((w) => w.rail === rail) ?? wallets.find((w) => w.rail === "botchain") ?? wallets[0] ?? null;
+  const currentActive = active ?? (rail === "botchain" ? fallbackBotWallet : wallets[0] ?? fallbackBotWallet);
   const env = view?.env ?? "mainnet";
 
   const run = async (label: string, fn: () => Promise<void>) => {
@@ -268,16 +279,12 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
           </div>
         )}
 
-        {!loading && isOwner && view && !view.enabled && (
-          <div className="qw-empty">Qerin wallets aren&apos;t enabled on this deployment yet.</div>
-        )}
-
-        {!loading && isOwner && view?.enabled && !hasWallet && (
+        {!loading && (!hasWallet && tab !== "fund") && (
           <div className="qw-create">
             <h3>Create your Qerin wallet</h3>
             <ul>
-              <li><b>Your own wallet</b> on {view.wallets.map((w) => w.name).join(" and ")}, separate from MetaMask.</li>
-              <li><b>Your Qerin agent spends only from it</b>, paying sources and the {usd(view.serviceFeeUsd)} fee per answer.</li>
+              <li><b>Your own wallet</b> on {view?.wallets?.map((w) => w.name).join(" and ") || "BOT Chain and Base"}, separate from MetaMask.</li>
+              <li><b>Your Qerin agent spends only from it</b>, paying sources and the {usd(view?.serviceFeeUsd ?? 0.08)} fee per answer.</li>
               <li><b>You set the limits.</b> Changes and withdrawals need your signature.</li>
             </ul>
             <button type="button" className="qw-primary" onClick={handleCreate} disabled={busy === "create"}>
@@ -287,33 +294,33 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
           </div>
         )}
 
-        {!loading && isOwner && view?.enabled && hasWallet && (
+        {!loading && (hasWallet || tab === "fund") && (
           <>
             <section className="qw-summary">
               <div>
                 <div className="qw-label">Total Balance</div>
-                <div className="qw-total">{usd(view.totalUsdc + view.legacyCredit)}</div>
-                {view.legacyCredit > 0 && view.totalUsdc > 0 && (
+                <div className="qw-total">{usd((view?.totalUsdc ?? 0) + (view?.legacyCredit ?? 0))}</div>
+                {(view?.legacyCredit ?? 0) > 0 && (view?.totalUsdc ?? 0) > 0 && (
                   <div className="qw-hint">
-                    ({usd(view.totalUsdc)} on-chain + {usd(view.legacyCredit)} credit)
+                    ({usd(view?.totalUsdc ?? 0)} on-chain + {usd(view?.legacyCredit ?? 0)} credit)
                   </div>
                 )}
               </div>
               <div style={{ textAlign: "right" }}>
-                <span className={`qw-status ${view.policy.paused ? "is-paused" : ""}`}>
-                  {view.policy.paused ? "Agent paused" : "Agent active"}
+                <span className={`qw-status ${view?.policy?.paused ? "is-paused" : ""}`}>
+                  {view?.policy?.paused ? "Agent paused" : "Agent active"}
                 </span>
                 <div className="qw-hint" style={{ marginTop: 6 }}>
-                  {usd(view.spentTodayUsd)} of {usd(view.policy.dailyUsd)} today
+                  {usd(view?.spentTodayUsd ?? 0)} of {usd(view?.policy?.dailyUsd ?? 2)} today
                 </div>
                 <div className="qw-meter"><div style={{ width: `${spentPct}%` }} /></div>
               </div>
             </section>
 
             <div className="qw-rails">
-              {view.wallets.map((w) => {
-                const railBal = w.rail === "botchain" && view.legacyCredit > 0
-                  ? (w.usdc ?? 0) + view.legacyCredit
+              {(view?.wallets ?? []).map((w) => {
+                const railBal = w.rail === "botchain" && (view?.legacyCredit ?? 0) > 0
+                  ? (w.usdc ?? 0) + (view?.legacyCredit ?? 0)
                   : w.usdc ?? 0;
                 return (
                   <button key={w.rail} type="button" className={`qw-rail ${active?.rail === w.rail ? "is-active" : ""}`} onClick={() => w.address && setRail(w.rail)} disabled={!w.address}>
@@ -333,20 +340,12 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
               ))}
             </nav>
 
-            {tab === "fund" && active && (
+            {tab === "fund" && (
               <section className="qw-panel">
-                <CopyAddress wallet={active} />
-                {active.rail === "botchain" ? (
+                <CopyAddress wallet={currentActive} />
+                {currentActive.rail === "botchain" ? (
                   <>
                     <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                      <button
-                        type="button"
-                        className={`qw-preset ${botMethod === "usdt" ? "is-active" : ""}`}
-                        onClick={() => setBotMethod("usdt")}
-                        style={{ flex: 1, padding: "8px 10px", fontSize: 12, fontWeight: 700 }}
-                      >
-                        💎 USDT (Stablecoin)
-                      </button>
                       <button
                         type="button"
                         className={`qw-preset ${botMethod === "bot" ? "is-active" : ""}`}
@@ -354,6 +353,14 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
                         style={{ flex: 1, padding: "8px 10px", fontSize: 12, fontWeight: 700 }}
                       >
                         ⚡ BOT (Native Coin)
+                      </button>
+                      <button
+                        type="button"
+                        className={`qw-preset ${botMethod === "usdt" ? "is-active" : ""}`}
+                        onClick={() => setBotMethod("usdt")}
+                        style={{ flex: 1, padding: "8px 10px", fontSize: 12, fontWeight: 700 }}
+                      >
+                        💎 USDT (Stablecoin)
                       </button>
                     </div>
                     <AmountPicker value={amount} onChange={setAmount} />
@@ -379,37 +386,37 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
                       Sends {botMethod === "usdt" ? "USDT" : "BOT"} on BOT Chain Mainnet from BO Wallet, MetaMask or OKX. Gas fees on BOT Chain are ultra-low (~$0.00008). Instant on-chain confirmation.
                     </p>
                   </>
-                ) : active.family === "evm" ? (
+                ) : currentActive.family === "evm" ? (
                   <>
                     <AmountPicker value={amount} onChange={setAmount} />
                     <button type="button" className="qw-primary" onClick={handleFundBase} disabled={Boolean(busy)}>
                       {busy === "fund" ? "Confirm in your wallet…" : `Fund ${amount ? usd(Number(amount) || 0) : ""} from connected wallet`}
                     </button>
                     <p className="qw-hint">
-                      Sends USDC on {active.name} from MetaMask, Coinbase Wallet or BO Wallet. You can also send USDC on {active.name} to the address above from the Coinbase app or any exchange. Only send USDC on {active.name}.
+                      Sends USDC on {currentActive.name} from MetaMask, Coinbase Wallet or BO Wallet. You can also send USDC on {currentActive.name} to the address above from the Coinbase app or any exchange. Only send USDC on {currentActive.name}.
                     </p>
                   </>
                 ) : (
                   <>
                     <AmountPicker value={amount} onChange={setAmount} />
-                    <a className="qw-primary" href={solanaPayUrl(active.address!, Number(amount) || 0, env)}>
+                    <a className="qw-primary" href={solanaPayUrl(currentActive.address!, Number(amount) || 0, env)}>
                       Open in Solana wallet
                     </a>
                     <button type="button" className="qw-secondary" onClick={handleSolanaSent} disabled={Boolean(busy)}>
                       {busy === "sol-check" ? "Watching for your deposit…" : "I've sent it. Check balance"}
                     </button>
                     <p className="qw-hint">
-                      Send USDC on {active.name} from Phantom, MetaMask (Solana), Solflare or an exchange to the address above. Only send USDC on {active.name}.
+                      Send USDC on {currentActive.name} from Phantom, MetaMask (Solana), Solflare or an exchange to the address above. Only send USDC on {currentActive.name}.
                     </p>
                   </>
                 )}
                 <p className="qw-hint">
-                  Each answer costs exactly what its sources charge (about $0.001 to $0.03) plus Qerin&apos;s {usd(view.serviceFeeUsd)} fee, paid gaslessly from this wallet.
+                  Each answer costs exactly what its sources charge (about $0.001 to $0.03) plus Qerin&apos;s {usd(view?.serviceFeeUsd ?? 0.08)} fee, paid gaslessly from this wallet.
                 </p>
               </section>
             )}
 
-            {tab === "limits" && (
+            {tab === "limits" && view && (
               <section className="qw-panel">
                 <p className="qw-hint" style={{ marginTop: 0 }}>
                   Your agent checks these before every question and won&apos;t spend outside them. Changes need your wallet signature.
@@ -463,7 +470,7 @@ export function QerinWalletModal({ accountId, connectedWallet, reason, initialTa
               </section>
             )}
 
-            {tab === "activity" && (
+            {tab === "activity" && view && (
               <section className="qw-panel">
                 {view.activity.length === 0 ? (
                   <div className="qw-hint">No agent activity yet. Every payment your agent makes shows here with its on-chain proof.</div>

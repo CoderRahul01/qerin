@@ -75,7 +75,7 @@ export const SOLANA_USDC = {
 
 export const BOT_CHAINS = {
   mainnet: {
-    chainIdHex: "0x2A5", // 677
+    chainIdHex: "0x2a5", // 677 lowercase hex required by EIP-3085 & MetaMask
     chainIdDec: 677,
     name: "BOT Chain",
     usdt: "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C",
@@ -222,7 +222,7 @@ export async function fundBotChainFromConnectedWallet(
   method: "usdt" | "bot",
   accountId: string
 ): Promise<string> {
-  const targetAddress = isAddress(qerinBotAddress) ? qerinBotAddress : "0x15772Af4766ADf489E86b94078Ab244122Fa2B7e";
+  const targetAddress = isAddress(qerinBotAddress, { strict: false }) ? qerinBotAddress : "0x15772Af4766ADf489E86b94078Ab244122Fa2B7e";
   if (!(amountUsd > 0)) throw new Error("Enter an amount to fund.");
   const provider = getProvider();
   const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];

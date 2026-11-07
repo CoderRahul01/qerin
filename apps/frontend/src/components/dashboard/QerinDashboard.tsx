@@ -1283,7 +1283,7 @@ export function QerinDashboard() {
       try {
         await ethereum.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2A5" }],
+          params: [{ chainId: "0x2a5" }],
         });
         setSelectedNetwork("botchain");
       } catch (switchErr: unknown) {
@@ -1291,7 +1291,7 @@ export function QerinDashboard() {
           await ethereum.request({
             method: "wallet_addEthereumChain",
             params: [{
-              chainId: "0x2A5", // 677
+              chainId: "0x2a5", // 677
               chainName: "BOT Chain",
               nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
               rpcUrls: ["https://rpc.botchain.ai"],
