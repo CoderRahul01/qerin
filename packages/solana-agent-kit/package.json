@@ -1,0 +1,26 @@
+{
+  "name": "@qerin/solana-agent-kit",
+  "version": "0.1.0",
+  "description": "Autonomous verified data procurement and x402 micropayments for Solana AI Agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "solana",
+    "ai-agents",
+    "x402",
+    "micropayments",
+    "langchain",
+    "eliza"
+  ],
+  "author": "Qerin Labs",
+  "license": "MIT",
+  "peerDependencies": {
+    "@solana/web3.js": "^1.95.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -56,15 +56,16 @@ New chains plug in through `apps/backend/src/rails.ts` plus a signer for their c
 
 ## Smart Contracts & Multi-Chain Architecture
 
-Qerin operates natively on EVM networks:
+Qerin operates across SVM and EVM networks:
 
-| Network | Chain ID | Contract Address / Status | Explorer |
+| Network | Chain ID / Environment | Program / Contract Address | Explorer |
 |---|---|---|---|
+| **Solana** | `SVM (Devnet / Mainnet)` | `apps/contracts-solana` (`qerin_vault`) | [Solana Explorer](https://explorer.solana.com) |
 | **Base Mainnet** | `8453` | [`0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`](https://basescan.org/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45#code) | [Basescan](https://basescan.org) |
 | **BOT Chain Mainnet** | `677` | [`0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45`](https://scan.botchain.ai/address/0xb35788922a5b9C8938dE8AEDf725b88D26eEEa45) (Verified) | [BOT Scan](https://scan.botchain.ai) |
 
-### Contract Verification
-The `QerinReceiptRegistry` stores keccak256 hashes of inquiries alongside micro-settlement amounts and source counts, providing cryptographic non-repudiation while preserving privacy.
+### Solana Actions & Blinks
+Qerin provides native Solana Actions (`/actions.json` and `/api/actions/research`) registered for 1-click execution inside Twitter/X and Discord feeds.
 
 ---
 
@@ -73,11 +74,14 @@ The `QerinReceiptRegistry` stores keccak256 hashes of inquiries alongside micro-
 ```text
 qerin/
 ├── apps/
-│   ├── backend/         # Cloudflare Workers monolithic API (Hono, x402, Firebase Firestore REST)
-│   │   ├── src/
-│   │   │   ├── rails.ts          # Payment rails (Base, Solana), mainnet/testnet switch
-│   │   │   ├── qerinWallet.ts    # Per-user Qerin wallets: provision, balances, withdrawals
-│   │   │   ├── agentPayer.ts     # Agent signing + gasless fee/withdraw transfers
+│   ├── contracts-solana/ # Anchor smart contracts (qerin_vault PDA escrow & spend velocity limits)
+│   ├── contracts/        # Foundry EVM smart contracts (Base & BOT Chain)
+│   ├── backend/          # Rust orchestrator (x402 protocol, multi-chain rails, NVIDIA NIM synthesis)
+│   └── frontend/         # Next.js 16 (React 19) Dashboard + Solana Blinks / Actions
+│
+└── packages/
+    ├── solana-agent-kit/ # Open-source tool for Solana Agent Kit (SendAI) & Eliza
+    └── mcp/              # Model Context Protocol servers
 │   │   │   ├── agentPolicy.ts    # Owner-set spend limits enforced per question
 │   │   │   ├── ownerIntents.ts   # Single-use owner signatures for limits & withdrawals
 │   │   │   ├── walletRoutes.ts   # /v1/wallet API
